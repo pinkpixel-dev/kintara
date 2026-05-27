@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Library as LibraryIcon, Star, Plus, ChevronRight, ChevronDown, FolderOpen, Settings, HelpCircle, Edit2, X } from "lucide-react";
+import { Search, Library as LibraryIcon, Star, Plus, ChevronRight, ChevronDown, FolderOpen, Settings, HelpCircle, Edit2, X, Clock } from "lucide-react";
 import { Library, Collection, libraryService, collectionService } from "../db";
 
 interface SidebarProps {
@@ -120,13 +120,19 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
           <div>
             <div className="text-[10px] uppercase text-muted mb-1 px-3 font-semibold tracking-wider">Quick Views</div>
             <div 
-              className={`sidebar-item flex items-center gap-2 px-3 py-1.5 rounded-md cursor-pointer text-sm mb-0.5 ${activeView.type === 'all' ? 'bg-[var(--bg-tertiary)] text-[var(--accent)] font-medium' : 'text-secondary hover:bg-[var(--bg-tertiary)]'}`}
+              className={`sidebar-item flex items-center gap-2 px-3 py-1.5 rounded-md cursor-pointer text-sm mb-0.5 ${activeView.type === 'recent' ? 'bg-[var(--text-primary)] text-[var(--bg-primary)] font-medium' : 'text-secondary hover:bg-[var(--bg-tertiary)]'}`}
+              onClick={() => setActiveView({ type: 'recent' })}
+            >
+              <Clock size={16} /> Recent Documents
+            </div>
+            <div 
+              className={`sidebar-item flex items-center gap-2 px-3 py-1.5 rounded-md cursor-pointer text-sm mb-0.5 ${activeView.type === 'all' ? 'bg-[var(--text-primary)] text-[var(--bg-primary)] font-medium' : 'text-secondary hover:bg-[var(--bg-tertiary)]'}`}
               onClick={() => setActiveView({ type: 'all' })}
             >
               <LibraryIcon size={16} /> All Documents
             </div>
             <div 
-              className={`sidebar-item flex items-center gap-2 px-3 py-1.5 rounded-md cursor-pointer text-sm mb-0.5 ${activeView.type === 'favorites' ? 'bg-[var(--bg-tertiary)] text-[var(--accent)] font-medium' : 'text-secondary hover:bg-[var(--bg-tertiary)]'}`}
+              className={`sidebar-item flex items-center gap-2 px-3 py-1.5 rounded-md cursor-pointer text-sm mb-0.5 ${activeView.type === 'favorites' ? 'bg-[var(--text-primary)] text-[var(--bg-primary)] font-medium' : 'text-secondary hover:bg-[var(--bg-tertiary)]'}`}
               onClick={() => setActiveView({ type: 'favorites' })}
             >
               <Star size={16} /> Favorites
@@ -158,8 +164,17 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
                 return (
                   <div key={`lib-${lib.id}`}>
                     <div 
-                      className={`sidebar-item flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer text-sm group ${isActiveLib ? 'bg-[var(--bg-tertiary)] text-[var(--accent)] font-medium' : 'text-secondary hover:bg-[var(--bg-tertiary)]'}`}
+                      className={`sidebar-item flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer text-sm group ${isActiveLib ? 'bg-[var(--text-primary)] text-[var(--bg-primary)] font-medium' : 'text-secondary hover:bg-[var(--bg-tertiary)]'}`}
                       onClick={() => setActiveView({ type: 'library', id: lib.id })}
+                      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+                      onDrop={async (e) => {
+                        e.preventDefault();
+                        const docId = Number(e.dataTransfer.getData('text/plain'));
+                        if (docId) {
+                          await libraryService.addDocument(lib.id, docId);
+                          window.dispatchEvent(new CustomEvent('refresh-documents'));
+                        }
+                      }}
                     >
                       <div className="flex items-center gap-1.5 min-w-0">
                         <button 
@@ -208,8 +223,17 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
                       return (
                         <div 
                           key={`col-${col.id}`}
-                          className={`flex items-center gap-2 pl-9 pr-3 py-1.5 rounded-md cursor-pointer text-sm ${isActiveCol ? 'bg-[var(--bg-tertiary)] text-[var(--accent)] font-medium' : 'text-muted hover:text-secondary hover:bg-[var(--bg-tertiary)]'}`}
+                          className={`flex items-center gap-2 pl-9 pr-3 py-1.5 rounded-md cursor-pointer text-sm ${isActiveCol ? 'bg-[var(--text-primary)] text-[var(--bg-primary)] font-medium' : 'text-muted hover:text-secondary hover:bg-[var(--bg-tertiary)]'}`}
                           onClick={() => setActiveView({ type: 'collection', id: col.id })}
+                          onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+                          onDrop={async (e) => {
+                            e.preventDefault();
+                            const docId = Number(e.dataTransfer.getData('text/plain'));
+                            if (docId) {
+                              await collectionService.addDocument(col.id, docId);
+                              window.dispatchEvent(new CustomEvent('refresh-documents'));
+                            }
+                          }}
                         >
                           <span className="w-1.5 h-1.5 rounded-full bg-current opacity-50 flex-shrink-0"></span>
                           <span className="truncate">{col.name}</span>

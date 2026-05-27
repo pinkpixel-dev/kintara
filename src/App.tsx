@@ -17,6 +17,7 @@ import { DocumentGrid } from "./components/DocumentGrid";
 import { DetailsSidebar } from "./components/DetailsSidebar";
 import { SettingsModal, defaultSettings } from "./components/SettingsModal";
 import { HelpModal } from "./components/HelpModal";
+import { ImportModal } from "./components/ImportModal";
 import { OnboardingOverlay } from "./components/OnboardingOverlay";
 import { BaseDirectory, readTextFile, exists } from "@tauri-apps/plugin-fs";
 
@@ -43,6 +44,7 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [importingDoc, setImportingDoc] = useState<Document | null>(null);
 
   // Load app settings on mount
   useEffect(() => {
@@ -138,6 +140,8 @@ function App() {
         docs = await documentService.getAll();
       } else if (activeView.type === 'recent') {
         docs = await documentService.getRecent();
+      } else if (activeView.type === 'favorites') {
+        docs = await documentService.getFavorites();
       } else if (activeView.type === 'library' && activeView.id) {
         docs = await libraryService.getDocuments(activeView.id);
       } else if (activeView.type === 'collection' && activeView.id) {
@@ -153,19 +157,17 @@ function App() {
 
   useEffect(() => {
     loadDocuments();
+    
+    const handleRefresh = () => loadDocuments();
+    window.addEventListener('refresh-documents', handleRefresh);
+    return () => window.removeEventListener('refresh-documents', handleRefresh);
   }, [searchQuery, activeView]);
 
   const handleImport = async () => {
     try {
       const newDoc = await documentService.importDocument();
       if (newDoc) {
-        if (activeView.type === 'library' && activeView.id) {
-          await libraryService.addDocument(activeView.id, newDoc.id);
-        } else if (activeView.type === 'collection' && activeView.id) {
-          await collectionService.addDocument(activeView.id, newDoc.id);
-        }
-        await loadDocuments();
-        openDocumentInTab(newDoc);
+        setImportingDoc(newDoc);
       }
     } catch (err) {
       alert(`Import failed in App: ${err}`);
@@ -300,6 +302,16 @@ function App() {
       {showOnboarding && <OnboardingOverlay onComplete={handleOnboardingComplete} />}
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
       <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+      {importingDoc && (
+        <ImportModal 
+          document={importingDoc} 
+          onClose={() => setImportingDoc(null)} 
+          onComplete={() => {
+            setImportingDoc(null);
+            loadDocuments();
+          }} 
+        />
+      )}
 
       <Sidebar 
         isOpen={isLeftSidebarOpen}
@@ -333,7 +345,7 @@ function App() {
                   }`}
                 onClick={() => { setActiveTabIndex(idx); setViewMode('reading'); }}
               >
-                <FileText size={14} className={viewMode === 'reading' && idx === activeTabIndex ? "text-[var(--accent)]" : "text-muted"} />
+                <FileText size={14} className={viewMode === 'reading' && idx === activeTabIndex ? "text-primary" : "text-muted"} />
                 <span className="truncate select-none">{tab.title}</span>
                 <button 
                   className="p-1 rounded hover:bg-black/10 text-muted ml-1"
@@ -384,8 +396,9 @@ function App() {
             <div className="w-full h-full animate-in fade-in duration-200">
               <DocumentGrid 
                 documents={documents} 
-                onOpenDocument={openDocumentInTab} 
-                onOpenDetails={openDetails} 
+                onOpenDocument={openDocumentInTab}
+                onOpenDetails={openDetails}
+                onRefresh={loadDocuments}
               />
             </div>
           ) : (

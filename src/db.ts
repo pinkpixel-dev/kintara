@@ -29,6 +29,7 @@ export interface Document {
   isbn: string | null;
   page_count: number | null;
   year: number | null;
+  is_favorite: number;
 }
 
 export interface Library {
@@ -70,7 +71,12 @@ export const documentService = {
     return await db.select<Document[]>("SELECT * FROM documents ORDER BY modified_date DESC LIMIT 10");
   },
 
-  async insert(doc: Omit<Document, "id" | "created_date" | "modified_date" | "reading_progress">): Promise<number> {
+  async getFavorites(): Promise<Document[]> {
+    const db = await getDb();
+    return await db.select<Document[]>("SELECT * FROM documents WHERE is_favorite = 1 ORDER BY modified_date DESC");
+  },
+
+  async insert(doc: Omit<Document, "id" | "created_date" | "modified_date" | "reading_progress" | "is_favorite">): Promise<number> {
     const db = await getDb();
     const result = await db.execute(
       `INSERT INTO documents (title, author, file_path, document_type, extracted_text, thumbnail_path, summary, keywords, doi, isbn, page_count, year) 
@@ -102,6 +108,19 @@ export const documentService = {
     await db.execute("UPDATE documents SET reading_progress = $1, modified_date = CURRENT_TIMESTAMP WHERE id = $2", [
       progress,
       id,
+    ]);
+  },
+
+  async updateThumbnail(id: number, thumbnailPath: string | null): Promise<void> {
+    const db = await getDb();
+    await db.execute("UPDATE documents SET thumbnail_path = $1, modified_date = CURRENT_TIMESTAMP WHERE id = $2", [thumbnailPath, id]);
+  },
+
+  async toggleFavorite(id: number, currentStatus: number): Promise<void> {
+    const db = await getDb();
+    await db.execute("UPDATE documents SET is_favorite = $1, modified_date = CURRENT_TIMESTAMP WHERE id = $2", [
+      currentStatus === 1 ? 0 : 1,
+      id
     ]);
   },
 
@@ -159,6 +178,7 @@ export const documentService = {
     let keywords = null;
     let extractedTitle = baseName.replace('.' + extension, '');
     let year = null;
+    let thumbnailPath: string | null = null;
 
     if (docType === 'pdf') {
       try {
@@ -169,6 +189,34 @@ export const documentService = {
         const loadingTask = pdfjsLib.getDocument({ data: fileData });
         const doc = await loadingTask.promise;
         pageCount = doc.numPages;
+
+        try {
+          const page = await doc.getPage(1);
+          const viewport = page.getViewport({ scale: 1.0 });
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            
+            const res = await fetch(dataUrl);
+            const blob = await res.blob();
+            const arrayBuffer = await blob.arrayBuffer();
+            const uint8Array = new Uint8Array(arrayBuffer);
+            const thumbFilename = `thumb_${Date.now()}.jpg`;
+            
+            const { BaseDirectory, writeFile } = await import('@tauri-apps/plugin-fs');
+            await writeFile(`library/thumbnails/${thumbFilename}`, uint8Array, { baseDir: BaseDirectory.AppLocalData });
+            
+            const { appDataDir, join } = await import('@tauri-apps/api/path');
+            const dataDir = await appDataDir();
+            thumbnailPath = await join(dataDir, 'library', 'thumbnails', thumbFilename);
+          }
+        } catch (e) {
+          console.error("Failed to generate PDF thumbnail", e);
+        }
 
         const metadataData = await doc.getMetadata();
         const info = metadataData.info as any;
@@ -194,7 +242,7 @@ export const documentService = {
         file_path: destPath,
         document_type: docType,
         extracted_text: null,
-        thumbnail_path: null,
+        thumbnail_path: thumbnailPath,
         summary: null,
         keywords: keywords,
         doi: null,

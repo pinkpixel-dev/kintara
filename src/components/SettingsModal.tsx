@@ -6,6 +6,7 @@ interface AppSettings {
   fontFamily: string;
   fontSize: string;
   theme: 'dark' | 'light' | 'system';
+  pdfTheme: 'dark' | 'light' | 'system';
   hasSeenOnboarding: boolean;
 }
 
@@ -13,6 +14,7 @@ const defaultSettings: AppSettings = {
   fontFamily: 'Inter, system-ui, Avenir, Helvetica, Arial, sans-serif',
   fontSize: '14px',
   theme: 'dark',
+  pdfTheme: 'light',
   hasSeenOnboarding: false
 };
 
@@ -67,6 +69,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     } else {
       document.documentElement.removeAttribute('data-theme');
     }
+    if (s.pdfTheme) {
+      document.documentElement.setAttribute('data-pdf-theme', s.pdfTheme);
+    }
   };
 
   const updateSetting = (key: keyof AppSettings, value: any) => {
@@ -106,6 +111,18 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 >
                   <option value="dark">Dark</option>
                   <option value="light">Light</option>
+                  <option value="system">System</option>
+                </select>
+              </div>
+              <div className="flex items-center justify-between mt-2">
+                <label className="text-sm">PDF Reader Theme</label>
+                <select 
+                  className="input py-1 px-2 text-sm w-32"
+                  value={settings.pdfTheme || 'light'}
+                  onChange={(e) => updateSetting('pdfTheme', e.target.value)}
+                >
+                  <option value="dark">Dark (Inverted)</option>
+                  <option value="light">Light (Original)</option>
                   <option value="system">System</option>
                 </select>
               </div>

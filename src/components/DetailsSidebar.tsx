@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Document, documentService, tagService, Tag } from "../db";
-import { Trash2, Save, Image as ImageIcon } from "lucide-react";
+import { Trash2, Save, Image as ImageIcon, X } from "lucide-react";
+import { open } from "@tauri-apps/plugin-dialog";
 
 interface DetailsSidebarProps {
   document: Document;
@@ -12,6 +13,7 @@ export function DetailsSidebar({ document, onUpdate, onDelete }: DetailsSidebarP
   const [docState, setDocState] = useState<Document>(document);
   const [isSaving, setIsSaving] = useState(false);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [newTagInput, setNewTagInput] = useState("");
 
   useEffect(() => {
     setDocState(document);
@@ -29,6 +31,65 @@ export function DetailsSidebar({ document, onUpdate, onDelete }: DetailsSidebarP
 
   const handleChange = (field: keyof Document, value: string) => {
     setDocState(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleUploadCover = async () => {
+    const selected = await open({
+      multiple: false,
+      filters: [{ name: 'Images', extensions: ['png', 'jpeg', 'jpg', 'webp'] }]
+    });
+    if (!selected) return;
+    
+    const sourcePath = selected as string;
+    const { basename } = await import('@tauri-apps/api/path');
+    const baseName = await basename(sourcePath);
+    
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const destPath = await invoke<string>("copy_thumbnail_to_library", { 
+        sourcePath, 
+        filename: `${Date.now()}_${baseName}` 
+      });
+      await documentService.updateThumbnail(document.id, destPath);
+      setDocState(prev => ({ ...prev, thumbnail_path: destPath }));
+      onUpdate();
+    } catch (err) {
+      console.error("Failed to update cover", err);
+    }
+  };
+
+  const handleAddTag = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && newTagInput.trim()) {
+      e.preventDefault();
+      const tagName = newTagInput.trim();
+      setNewTagInput("");
+      
+      try {
+        let allTags = await tagService.getAll();
+        let tag = allTags.find(t => t.name.toLowerCase() === tagName.toLowerCase());
+        let tagId: number;
+        if (tag) {
+          tagId = tag.id;
+        } else {
+          const colors = ['rgba(248, 113, 113, 0.2)', 'rgba(251, 146, 60, 0.2)', 'rgba(251, 191, 36, 0.2)', 'rgba(163, 230, 53, 0.2)', 'rgba(74, 222, 128, 0.2)', 'rgba(45, 212, 191, 0.2)', 'rgba(56, 189, 248, 0.2)', 'rgba(129, 140, 248, 0.2)', 'rgba(167, 139, 250, 0.2)', 'rgba(232, 121, 249, 0.2)'];
+          const randomColor = colors[Math.floor(Math.random() * colors.length)];
+          tagId = await tagService.create(tagName, randomColor);
+        }
+        await tagService.addTagToDocument(document.id, tagId);
+        await loadTags(document.id);
+      } catch (err) {
+        console.error("Failed to add tag", err);
+      }
+    }
+  };
+
+  const handleRemoveTag = async (tagId: number) => {
+    try {
+      await tagService.removeTagFromDocument(document.id, tagId);
+      await loadTags(document.id);
+    } catch (err) {
+      console.error("Failed to remove tag", err);
+    }
   };
 
   const handleSave = async () => {
@@ -78,16 +139,19 @@ export function DetailsSidebar({ document, onUpdate, onDelete }: DetailsSidebarP
       <div className="inspector-content p-4 overflow-y-auto flex-1 flex flex-col gap-4 text-sm">
         
         {/* Thumbnail Preview Area */}
-        <div className="w-full aspect-4-3 bg-[var(--bg-tertiary)] rounded flex flex-col items-center justify-center border border-dashed border-[var(--border-color)] relative overflow-hidden">
+        <div 
+          className="w-full aspect-4-3 bg-[var(--bg-tertiary)] rounded flex flex-col items-center justify-center border border-dashed border-[var(--border-color)] relative overflow-hidden cursor-pointer hover:border-[var(--accent)] transition-colors group"
+          onClick={handleUploadCover}
+          title="Click to change cover image"
+        >
           {docState.thumbnail_path ? (
             <img src={docState.thumbnail_path} alt="Thumbnail" className="object-cover w-full h-full" />
           ) : (
             <>
-              <ImageIcon size={32} className="text-muted mb-2 opacity-50" />
-              <span className="text-xs text-muted">No Cover</span>
+              <ImageIcon size={32} className="text-muted mb-2 opacity-50 group-hover:text-[var(--accent)] transition-colors" />
+              <span className="text-xs text-muted group-hover:text-primary transition-colors">Click to upload cover</span>
             </>
           )}
-          {/* Custom thumbnail upload logic goes here */}
         </div>
 
         <div className="flex flex-col gap-1">
@@ -152,11 +216,24 @@ export function DetailsSidebar({ document, onUpdate, onDelete }: DetailsSidebarP
           <div className="flex gap-1 flex-wrap mt-1">
             {tags.length === 0 ? <span className="text-xs text-muted italic">No tags assigned</span> : null}
             {tags.map(t => (
-              <span key={t.id} className="px-2 py-0.5 rounded-full text-xs" style={{ backgroundColor: t.color || 'var(--bg-tertiary)' }}>
+              <span key={t.id} className="px-2 py-0.5 rounded-full text-xs flex items-center gap-1 border" style={{ backgroundColor: t.color || 'var(--bg-tertiary)', borderColor: t.color ? t.color.replace('0.2)', '0.5)') : 'var(--border-color)' }}>
                 {t.name}
+                <button 
+                  className="bg-transparent border-none text-muted hover:text-red-500 cursor-pointer p-0 flex items-center"
+                  onClick={() => handleRemoveTag(t.id)}
+                >
+                  <X size={10} />
+                </button>
               </span>
             ))}
           </div>
+          <input 
+            className="input text-xs mt-2 py-1.5" 
+            placeholder="Type tag and press Enter..."
+            value={newTagInput}
+            onChange={e => setNewTagInput(e.target.value)}
+            onKeyDown={handleAddTag}
+          />
         </div>
 
         <button 

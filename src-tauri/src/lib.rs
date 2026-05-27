@@ -17,6 +17,14 @@ fn copy_file_to_library(app: tauri::AppHandle, source_path: String, filename: St
 }
 
 #[tauri::command]
+fn copy_thumbnail_to_library(app: tauri::AppHandle, source_path: String, filename: String) -> Result<String, String> {
+    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let dest_path = app_data_dir.join("library").join("thumbnails").join(&filename);
+    std::fs::copy(&source_path, &dest_path).map_err(|e| e.to_string())?;
+    Ok(dest_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
 fn read_file_from_library(file_path: String) -> Result<Vec<u8>, String> {
     std::fs::read(&file_path).map_err(|e| e.to_string())
 }
@@ -111,6 +119,12 @@ pub fn run() {
                 );
             ",
             kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 2,
+            description: "add_is_favorite",
+            sql: "ALTER TABLE documents ADD COLUMN is_favorite INTEGER DEFAULT 0;",
+            kind: MigrationKind::Up,
         }
     ];
 
@@ -142,7 +156,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet, copy_file_to_library, read_file_from_library, delete_document_file])
+        .invoke_handler(tauri::generate_handler![greet, copy_file_to_library, copy_thumbnail_to_library, read_file_from_library, delete_document_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -1,13 +1,14 @@
-import { FileText, Info } from "lucide-react";
-import { Document } from "../db";
+import { FileText, Info, Star } from "lucide-react";
+import { Document, documentService } from "../db";
 
 interface DocumentGridProps {
   documents: Document[];
   onOpenDocument: (doc: Document) => void;
   onOpenDetails: (doc: Document) => void;
+  onRefresh: () => void;
 }
 
-export function DocumentGrid({ documents, onOpenDocument, onOpenDetails }: DocumentGridProps) {
+export function DocumentGrid({ documents, onOpenDocument, onOpenDetails, onRefresh }: DocumentGridProps) {
   return (
     <div className="document-grid-container">
       {documents.length === 0 ? (
@@ -21,6 +22,11 @@ export function DocumentGrid({ documents, onOpenDocument, onOpenDetails }: Docum
               key={doc.id} 
               className="document-card"
               onClick={() => onOpenDocument(doc)}
+              draggable={true}
+              onDragStart={(e) => {
+                e.dataTransfer.setData('text/plain', doc.id.toString());
+                e.dataTransfer.effectAllowed = 'move';
+              }}
             >
               <div className="document-card-thumb">
                 {doc.thumbnail_path ? (
@@ -38,6 +44,18 @@ export function DocumentGrid({ documents, onOpenDocument, onOpenDetails }: Docum
                   title="View Details"
                 >
                   <Info size={14} />
+                </button>
+                {/* Favorite Button Overlay */}
+                <button 
+                  className={`absolute top-2 right-2 border-none rounded-full p-1 cursor-pointer transition-colors z-10 ${doc.is_favorite === 1 ? 'bg-yellow-400/20 text-yellow-500 opacity-100' : 'bg-black/40 text-white/70 opacity-0 group-hover:opacity-100 hover:bg-black/60 hover:text-white'}`}
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    await documentService.toggleFavorite(doc.id, doc.is_favorite);
+                    onRefresh();
+                  }}
+                  title={doc.is_favorite === 1 ? "Remove from Favorites" : "Add to Favorites"}
+                >
+                  <Star size={14} className={doc.is_favorite === 1 ? 'fill-current' : ''} />
                 </button>
               </div>
               <div className="document-card-details">

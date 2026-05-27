@@ -174,6 +174,17 @@ select, option {
 }
 
 /* Main Reader */
+/* PDF Theme Support */
+[data-pdf-theme="dark"] .pdf-canvas-wrapper canvas {
+  filter: invert(0.9) hue-rotate(180deg);
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-pdf-theme="system"] .pdf-canvas-wrapper canvas {
+    filter: invert(0.9) hue-rotate(180deg);
+  }
+}
+
 .reader-pane {
   flex: 1;
   display: flex;
