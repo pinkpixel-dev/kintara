@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { codeToHtml } from "shiki";
 import { invoke } from "@tauri-apps/api/core";
 import { annotationService, Annotation, documentService } from "../db";
@@ -97,6 +98,7 @@ export const MarkdownReader: React.FC<MarkdownReaderProps> = ({ documentId, file
       </div>
       
       <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
         // Using rehypeRaw would be needed to render the <mark> tags properly from processContent.
         // For MVP without installing rehype-raw, we just render the raw text. 
         // We will install rehype-raw or just leave the text raw for now.

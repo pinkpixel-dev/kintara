@@ -1,4 +1,4 @@
-import { FileText, Info, Star } from "lucide-react";
+import { FileText, Info, Star, Trash2 } from "lucide-react";
 import { Document, documentService } from "../db";
 
 interface DocumentGridProps {
@@ -20,7 +20,7 @@ export function DocumentGrid({ documents, onOpenDocument, onOpenDetails, onRefre
           {documents.map((doc) => (
             <div 
               key={doc.id} 
-              className="document-card"
+              className="document-card group"
               onClick={() => onOpenDocument(doc)}
               draggable={true}
               onDragStart={(e) => {
@@ -47,7 +47,7 @@ export function DocumentGrid({ documents, onOpenDocument, onOpenDetails, onRefre
                 </button>
                 {/* Favorite Button Overlay */}
                 <button 
-                  className={`absolute top-2 right-2 border-none rounded-full p-1 cursor-pointer transition-colors z-10 ${doc.is_favorite === 1 ? 'bg-yellow-400/20 text-yellow-500 opacity-100' : 'bg-black/40 text-white/70 opacity-0 group-hover:opacity-100 hover:bg-black/60 hover:text-white'}`}
+                  className={`document-card-star-btn ${doc.is_favorite === 1 ? 'is-favorite' : ''}`}
                   onClick={async (e) => {
                     e.stopPropagation();
                     await documentService.toggleFavorite(doc.id, doc.is_favorite);
@@ -56,6 +56,20 @@ export function DocumentGrid({ documents, onOpenDocument, onOpenDetails, onRefre
                   title={doc.is_favorite === 1 ? "Remove from Favorites" : "Add to Favorites"}
                 >
                   <Star size={14} className={doc.is_favorite === 1 ? 'fill-current' : ''} />
+                </button>
+                {/* Trash Button Overlay */}
+                <button 
+                  className="document-card-trash-btn"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    if (window.confirm("Are you sure you want to delete this document?")) {
+                      await documentService.delete(doc.id);
+                      onRefresh();
+                    }
+                  }}
+                  title="Delete Document"
+                >
+                  <Trash2 size={14} />
                 </button>
               </div>
               <div className="document-card-details">

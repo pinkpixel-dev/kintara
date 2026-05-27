@@ -13,6 +13,8 @@ All notable changes to this project will be documented in this file.
 - Introduced an interactive Help & Shortcuts modal and Onboarding overlay.
 - Added the ability to completely delete imported documents.
 - Added UI prompt system for creating and renaming libraries and collections.
+- Added `remark-gfm` to support Markdown tables and GitHub Flavored Markdown in the reader.
+- Added a Trash icon overlay on document thumbnails for quick deletion.
 
 ### Fixed
 - Fixed PDF extraction crashing due to reference error when parsing titles.
@@ -22,6 +24,11 @@ All notable changes to this project will be documented in this file.
 - Changed default app view to `recent` so the dashboard isn't empty upon initial load.
 - Adjusted Onboarding flow to reliably trigger the "Name your first Library" prompt upon completion.
 - Added layout CSS utility classes to fix scrunching and alignment bugs in UI.
+- Fixed sidebar active selection styling to properly contrast in Light and Dark modes.
+- Fixed settings logic so Reader Themes apply correctly and distinctly from UI Themes.
+- Fixed PDF reader background to respond to the dark/light Reader Theme correctly.
+- Fixed thumbnail Star icon to align to the top right and persistently display yellow when favorited.
+- Fixed Details Sidebar to fallback to the currently active reading document if no specific thumbnail was clicked.
 - Initialized Tauri + React + Vite + TypeScript project.
 - Generated application icons from `icon.png`.
 - Created initial documentation (`README.md`, `OVERVIEW.md`, `CHANGELOG.md`, `LICENSE`).

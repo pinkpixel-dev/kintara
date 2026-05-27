@@ -162,9 +162,14 @@ select, option {
 }
 
 .sidebar-item.active {
-  background-color: var(--accent-light);
-  color: var(--accent);
+  background-color: var(--accent);
+  color: #ffffff;
   font-weight: 500;
+}
+
+.sidebar-item.active:hover {
+  background-color: var(--accent);
+  color: #ffffff;
 }
 
 .sidebar-item svg {
@@ -175,13 +180,74 @@ select, option {
 
 /* Main Reader */
 /* PDF Theme Support */
-[data-pdf-theme="dark"] .pdf-canvas-wrapper canvas {
+[data-reader-theme="dark"] .pdf-canvas-wrapper canvas {
   filter: invert(0.9) hue-rotate(180deg);
 }
 
 @media (prefers-color-scheme: dark) {
-  [data-pdf-theme="system"] .pdf-canvas-wrapper canvas {
+  [data-reader-theme="system"] .pdf-canvas-wrapper canvas {
     filter: invert(0.9) hue-rotate(180deg);
+  }
+}
+
+/* Reader Background specific override for light/dark reading */
+[data-reader-theme="light"] .reader-bg {
+  color-scheme: light;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-tertiary: #f1f3f5;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #9ca3af;
+  --border-color: #e5e7eb;
+  --border-subtle: #f3f4f6;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+[data-reader-theme="dark"] .reader-bg {
+  color-scheme: dark;
+  --bg-primary: #0f0f13;
+  --bg-secondary: #18181f;
+  --bg-tertiary: #252530;
+  --text-primary: #f9fafb;
+  --text-secondary: #d1d5db;
+  --text-muted: #6b7280;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-reader-theme="system"] .reader-bg {
+    color-scheme: dark;
+    --bg-primary: #0f0f13;
+    --bg-secondary: #18181f;
+    --bg-tertiary: #252530;
+    --text-primary: #f9fafb;
+    --text-secondary: #d1d5db;
+    --text-muted: #6b7280;
+    --border-color: rgba(255, 255, 255, 0.08);
+    --border-subtle: rgba(255, 255, 255, 0.04);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  [data-reader-theme="system"] .reader-bg {
+    color-scheme: light;
+    --bg-primary: #ffffff;
+    --bg-secondary: #f8f9fa;
+    --bg-tertiary: #f1f3f5;
+    --text-primary: #111827;
+    --text-secondary: #4b5563;
+    --text-muted: #9ca3af;
+    --border-color: #e5e7eb;
+    --border-subtle: #f3f4f6;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
   }
 }
 
@@ -525,6 +591,7 @@ select, option {
   opacity: 0;
   transition: all 0.2s ease;
   box-shadow: var(--shadow-sm);
+  z-index: 10;
 }
 .document-card:hover .document-card-info-btn {
   opacity: 1;
@@ -533,6 +600,61 @@ select, option {
   color: var(--text-primary);
   border-color: var(--accent);
 }
+
+/* Star Button Overlay */
+.document-card-star-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  border: none;
+  border-radius: 50%;
+  padding: 0.25rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10;
+  background-color: rgba(0, 0, 0, 0.4);
+  color: rgba(255, 255, 255, 0.7);
+  opacity: 0;
+}
+.document-card:hover .document-card-star-btn {
+  opacity: 1;
+}
+.document-card-star-btn:hover {
+  background-color: rgba(0, 0, 0, 0.6);
+  color: #ffffff;
+}
+.document-card-star-btn.is-favorite {
+  background-color: rgba(250, 204, 21, 0.2); /* yellow-400/20 */
+  color: #eab308; /* yellow-500 */
+  opacity: 1; /* Always visible if favorited */
+}
+.document-card-star-btn.is-favorite svg {
+  fill: currentColor;
+}
+
+/* Trash Button Overlay */
+.document-card-trash-btn {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  border: none;
+  border-radius: 50%;
+  padding: 0.25rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10;
+  background-color: rgba(0, 0, 0, 0.4);
+  color: rgba(255, 255, 255, 0.7);
+  opacity: 0;
+}
+.document-card:hover .document-card-trash-btn {
+  opacity: 1;
+}
+.document-card-trash-btn:hover {
+  background-color: rgba(220, 38, 38, 0.8); /* red hover */
+  color: #ffffff;
+}
+
 .document-card-details {
   padding: 0.75rem;
 }

@@ -6,7 +6,7 @@ interface AppSettings {
   fontFamily: string;
   fontSize: string;
   theme: 'dark' | 'light' | 'system';
-  pdfTheme: 'dark' | 'light' | 'system';
+  readerTheme: 'dark' | 'light' | 'system';
   hasSeenOnboarding: boolean;
 }
 
@@ -14,7 +14,7 @@ const defaultSettings: AppSettings = {
   fontFamily: 'Inter, system-ui, Avenir, Helvetica, Arial, sans-serif',
   fontSize: '14px',
   theme: 'dark',
-  pdfTheme: 'light',
+  readerTheme: 'light',
   hasSeenOnboarding: false
 };
 
@@ -48,6 +48,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   };
 
   const saveSettings = async (newSettings: AppSettings) => {
+    applySettingsToDom(newSettings);
     try {
       const hasDir = await exists('', { baseDir: BaseDirectory.AppLocalData });
       if (!hasDir) {
@@ -55,7 +56,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       }
       await writeTextFile('settings.json', JSON.stringify(newSettings, null, 2), { baseDir: BaseDirectory.AppLocalData });
       setSettings(newSettings);
-      applySettingsToDom(newSettings);
     } catch (err) {
       console.error("Failed to save settings", err);
     }
@@ -69,8 +69,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     } else {
       document.documentElement.removeAttribute('data-theme');
     }
-    if (s.pdfTheme) {
-      document.documentElement.setAttribute('data-pdf-theme', s.pdfTheme);
+    if (s.readerTheme) {
+      document.documentElement.setAttribute('data-reader-theme', s.readerTheme);
     }
   };
 
@@ -115,14 +115,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </select>
               </div>
               <div className="flex items-center justify-between mt-2">
-                <label className="text-sm">PDF Reader Theme</label>
+                <label className="text-sm">Reader Theme</label>
                 <select 
                   className="input py-1 px-2 text-sm w-32"
-                  value={settings.pdfTheme || 'light'}
-                  onChange={(e) => updateSetting('pdfTheme', e.target.value)}
+                  value={settings.readerTheme || 'light'}
+                  onChange={(e) => updateSetting('readerTheme', e.target.value)}
                 >
-                  <option value="dark">Dark (Inverted)</option>
-                  <option value="light">Light (Original)</option>
+                  <option value="dark">Dark</option>
+                  <option value="light">Light</option>
                   <option value="system">System</option>
                 </select>
               </div>

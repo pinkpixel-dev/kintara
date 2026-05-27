@@ -61,6 +61,11 @@ function App() {
         document.documentElement.style.fontSize = currentSettings.fontSize;
         if (currentSettings.theme !== 'system') {
           document.documentElement.setAttribute('data-theme', currentSettings.theme);
+        } else {
+          document.documentElement.removeAttribute('data-theme');
+        }
+        if (currentSettings.readerTheme) {
+          document.documentElement.setAttribute('data-reader-theme', currentSettings.readerTheme);
         }
 
         if (!currentSettings.hasSeenOnboarding) {
@@ -404,16 +409,16 @@ function App() {
           ) : (
             <>
               {/* Left Reader Panel */}
-              <div className="flex-1 min-w-0 h-full w-full relative">
-                <div className="absolute inset-0">
+              <div className="flex-1 min-w-0 h-full w-full relative reader-bg">
+                <div className="absolute inset-0 overflow-y-auto">
                   {renderReaderContent(activeDocument)}
                 </div>
               </div>
 
               {/* Right Reader Panel (Split View) */}
               {isSplitView && splitRightTabIndex !== null && (
-                <div className="flex-1 min-w-0 border-l border-[var(--border-color)] h-full bg-[var(--bg-primary)] w-full relative">
-                  <div className="absolute inset-0">
+                <div className="flex-1 min-w-0 border-l border-[var(--border-color)] h-full w-full relative reader-bg">
+                  <div className="absolute inset-0 overflow-y-auto">
                     {renderReaderContent(openTabs[splitRightTabIndex] || null)}
                   </div>
                 </div>
@@ -424,19 +429,18 @@ function App() {
       </main>
 
       {/* Right Sidebar (Details) */}
-      {isRightSidebarOpen && detailsDocument && (
+      {isRightSidebarOpen && (detailsDocument || activeDocument) ? (
         <DetailsSidebar 
-          document={detailsDocument} 
+          document={(detailsDocument || activeDocument)!} 
           onUpdate={handleDocumentUpdate}
           onDelete={handleDocumentDelete}
         />
-      )}
-      {isRightSidebarOpen && !detailsDocument && (
+      ) : isRightSidebarOpen && !(detailsDocument || activeDocument) ? (
          <aside className="inspector-pane flex-shrink-0 w-80 bg-[var(--bg-secondary)] border-l border-[var(--border-color)] flex flex-col h-full items-center justify-center text-center p-6">
             <PanelRightOpen size={32} className="text-muted mb-4 opacity-50" />
             <p className="text-sm text-muted">Select a document's details button to view and edit its metadata.</p>
          </aside>
-      )}
+      ) : null}
     </div>
   );
 }
