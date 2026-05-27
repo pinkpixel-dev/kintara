@@ -1,0 +1,19 @@
+.pdf-reader-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pdf-canvas-wrapper {
+  background-color: white; /* PDFs generally expect a white background */
+  transition: box-shadow 0.2s ease;
+}
+
+/* In dark mode, we might want to slightly dim the PDF container or let it be white to preserve colors */
+@media (prefers-color-scheme: dark) {
+  .pdf-canvas-wrapper {
+    opacity: 0.95;
+  }
+}
