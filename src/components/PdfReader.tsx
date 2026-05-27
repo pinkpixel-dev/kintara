@@ -55,6 +55,8 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ documentId, filePath }) =>
   }, [filePath, documentId]);
 
   useEffect(() => {
+    let renderTask: pdfjsLib.RenderTask | null = null;
+
     const renderPage = async () => {
       if (!pdfDoc || !canvasRef.current) return;
       try {
@@ -66,13 +68,23 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ documentId, filePath }) =>
         if (context) {
           canvas.height = viewport.height;
           canvas.width = viewport.width;
-          await page.render({ canvasContext: context, viewport }).promise;
+          renderTask = page.render({ canvasContext: context, canvas: canvas, viewport });
+          await renderTask.promise;
         }
-      } catch (err) {
-        console.error("Failed to render page:", err);
+      } catch (err: any) {
+        if (err?.name !== 'RenderingCancelledException') {
+          console.error("Failed to render page:", err);
+        }
       }
     };
+    
     renderPage();
+    
+    return () => {
+      if (renderTask) {
+        renderTask.cancel();
+      }
+    };
   }, [pdfDoc, pageNumber]);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {

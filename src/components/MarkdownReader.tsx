@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 import { codeToHtml } from "shiki";
 import { invoke } from "@tauri-apps/api/core";
-import { annotationService, Annotation, documentService } from "../db";
+import { annotationService, Annotation } from "../db";
 import "./MarkdownReader.css";
 import { Link } from "lucide-react";
 
@@ -70,6 +71,15 @@ export const MarkdownReader: React.FC<MarkdownReaderProps> = ({ documentId, file
   // Very simple custom renderer for highlights and wikilinks
   const processContent = (raw: string) => {
     let processed = raw;
+    
+    // Fix missing blank line before tables
+    // Matches a non-newline char, followed by \n, then a table header row, then the delimiter row
+    processed = processed.replace(/([^\n])\n(\s*\|.*?\|\s*\n\s*\|[-:\s|]+\|\s*(\n|$))/g, '$1\n\n$2');
+    
+    // Fix empty lines between table rows
+    // Matches a line ending with pipe, empty lines, and a line starting with pipe
+    processed = processed.replace(/\|\s*\n\s*\n\s*\|/g, '|\n|');
+
     // Highlight existing annotations
     annotations.forEach(ann => {
       if (ann.content) {
@@ -99,9 +109,7 @@ export const MarkdownReader: React.FC<MarkdownReaderProps> = ({ documentId, file
       
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        // Using rehypeRaw would be needed to render the <mark> tags properly from processContent.
-        // For MVP without installing rehype-raw, we just render the raw text. 
-        // We will install rehype-raw or just leave the text raw for now.
+        rehypePlugins={[rehypeRaw]}
         components={{
           code({ node, inline, className, children, ...props }: any) {
             const match = /language-(\w+)/.exec(className || "");
@@ -130,20 +138,6 @@ export const MarkdownReader: React.FC<MarkdownReaderProps> = ({ documentId, file
                 {children}
               </code>
             );
-          },
-          p({ children }) {
-            // Very hacky way to support <mark> without rehype-raw for MVP
-            const renderChild = (child: any) => {
-               if (typeof child === 'string') {
-                  // If string has <mark>, we dangerously render it inside a span
-                  if (child.includes('<mark') || child.includes('<a href="#" class="wikilink"')) {
-                    return <span dangerouslySetInnerHTML={{ __html: child }} />;
-                  }
-               }
-               return child;
-            };
-            
-            return <p>{React.Children.map(children, renderChild)}</p>;
           }
         }}
       >
