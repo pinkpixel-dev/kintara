@@ -14,9 +14,9 @@
   --border-subtle: #f3f4f6;
 
   /* Pink Pixel Brand Colors */
-  --accent: #ff69b4;
-  --accent-hover: #ff85c6;
-  --accent-light: rgba(255, 105, 180, 0.15);
+  --accent: #410186;
+  --accent-hover: #5a02ba;
+  --accent-light: rgba(65, 1, 134, 0.15);
   
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
@@ -42,9 +42,9 @@
     --border-subtle: rgba(255, 255, 255, 0.04);
 
     /* Pink Pixel Brand Colors */
-    --accent: #ff69b4;
-    --accent-hover: #ff85c6;
-    --accent-light: rgba(255, 105, 180, 0.15);
+    --accent: #410186;
+    --accent-hover: #5a02ba;
+    --accent-light: rgba(65, 1, 134, 0.15);
     
     --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.4);

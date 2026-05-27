@@ -138,7 +138,7 @@ function App() {
       return (
         <div className="flex flex-col items-center justify-center h-full text-center">
           <h1>Welcome to Kintara</h1>
-          <img src="/logo.png" alt="Kintara Logo" style={{ width: '150px', marginBottom: '2rem', marginTop: '1rem' }} />
+          <img src="/logo.png" alt="Kintara Logo" style={{ width: '300px', marginBottom: '2rem', marginTop: '1rem' }} />
           <p className="text-secondary mt-2">
             “Obsidian meets Calibre meets Zotero meets VS Code Explorer… but prettier and faster.”
           </p>
@@ -171,8 +171,8 @@ function App() {
         <aside className="sidebar transition-all duration-300 flex-shrink-0">
           <div className="sidebar-header flex justify-between items-center">
             <div className="flex items-center">
-              <Library className="mr-2" size={20} color="var(--accent)" />
-              <span className="font-bold text-lg bg-gradient-pink-cyan">Kintara</span>
+              <img src="/logo.png" alt="Kintara Logo" className="mr-2" style={{ width: '50px', height: '50px' }} />
+              <span className="font-bold text-lg text-white">Kintara</span>
             </div>
             <button className="btn btn-ghost p-1" onClick={handleImport} title="Import Document">
               <Plus size={18} />
@@ -299,7 +299,7 @@ function App() {
         
         <div className="flex-1 flex overflow-hidden">
           {/* Left Reader Panel */}
-          <div className="flex-1 overflow-y-auto relative h-full w-full">
+          <div className="flex-1 min-w-0 overflow-y-auto relative h-full w-full">
             <div className="reader-content">
               {renderReaderContent(activeDocument)}
             </div>
@@ -307,7 +307,7 @@ function App() {
 
           {/* Right Reader Panel (Split View) */}
           {isSplitView && splitRightTabIndex !== null && (
-            <div className="flex-1 overflow-y-auto border-l border-[var(--border-color)] relative h-full bg-[var(--bg-primary)] w-full">
+            <div className="flex-1 min-w-0 overflow-y-auto border-l border-[var(--border-color)] relative h-full bg-[var(--bg-primary)] w-full">
               {/* Optional secondary tab bar could go here, but for now it renders the selected splitRightTabIndex */}
               <div className="absolute top-0 left-0 w-full bg-[var(--bg-secondary)] px-3 py-1 border-b border-[var(--border-color)] z-10 flex justify-between items-center text-xs text-muted">
                 <span>Split View: {openTabs[splitRightTabIndex]?.title}</span>

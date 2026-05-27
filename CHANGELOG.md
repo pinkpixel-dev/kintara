@@ -11,4 +11,6 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - Fixed missing app name by restoring "Kintara" to the sidebar header and separating the workspace selector.
-- Upgraded theme to Pink Pixel brand colors (`#ff69b4`).
+- Reverted theme accent to `#410186` per request and improved UI typography.
+- Updated sidebar logo to use `logo.png` instead of the icon.
+- Fixed split view layout allowing both sides to scale equally.
