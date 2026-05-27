@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
+  color-scheme: light;
   /* Premium Light Theme */
   --bg-primary: #ffffff;
   --bg-secondary: #f8f9fa;
@@ -29,6 +30,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
+    color-scheme: dark;
     /* Premium Dark Theme */
     --bg-primary: #0f0f13;
     --bg-secondary: #18181f;
@@ -76,6 +78,11 @@ a {
 
 a:hover {
   color: var(--accent-hover);
+}
+
+select, option {
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
 }
 
 /* =========================================

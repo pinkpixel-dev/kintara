@@ -149,7 +149,7 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ documentId, filePath }) =>
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
       >
-        <canvas ref={canvasRef} className="max-w-full h-auto" />
+        <canvas ref={canvasRef} className="max-w-full h-auto" style={{ maxHeight: 'calc(100vh - 160px)', objectFit: 'contain' }} />
         
         {/* Render Annotations for current page */}
         {annotations.map(ann => {

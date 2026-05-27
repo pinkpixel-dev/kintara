@@ -15,3 +15,5 @@ All notable changes to this project will be documented in this file.
 - Updated sidebar logo to use `logo.png` instead of the icon.
 - Fixed split view layout allowing both sides to scale equally by removing absolute positioning and standardizing DOM structures for panels.
 - Relocated split view selector to main header to eliminate asymmetrical padding on the right panel.
+- Fixed unreadable white-on-white text in select dropdowns by setting `color-scheme` property for native inputs and standardizing background colors globally.
+- Constrained the maximum height of PDF pages to fit entirely within the viewport without clipping.
