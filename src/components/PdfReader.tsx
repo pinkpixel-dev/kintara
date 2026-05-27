@@ -187,9 +187,6 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ documentId, filePath }) =>
           />
         )}
       </div>
-      <div className="text-xs text-muted mt-2">
-        Drag on the document to create highlights.
-      </div>
     </div>
   );
 };

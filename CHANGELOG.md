@@ -13,4 +13,5 @@ All notable changes to this project will be documented in this file.
 - Fixed missing app name by restoring "Kintara" to the sidebar header and separating the workspace selector.
 - Reverted theme accent to `#410186` per request and improved UI typography.
 - Updated sidebar logo to use `logo.png` instead of the icon.
-- Fixed split view layout allowing both sides to scale equally.
+- Fixed split view layout allowing both sides to scale equally by removing absolute positioning and standardizing DOM structures for panels.
+- Relocated split view selector to main header to eliminate asymmetrical padding on the right panel.

@@ -278,6 +278,18 @@ function App() {
             </div>
             
             <div className="flex items-center gap-2 flex-shrink-0 ml-auto pr-2">
+              {isSplitView && splitRightTabIndex !== null && (
+                <select 
+                  className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-primary rounded px-2 py-1 text-xs mr-2 cursor-pointer focus:outline-none focus:border-[var(--accent)] transition-all"
+                  value={splitRightTabIndex}
+                  onChange={(e) => setSplitRightTabIndex(Number(e.target.value))}
+                  title="Split View Document"
+                >
+                  {openTabs.map((t, idx) => (
+                    <option key={idx} value={idx}>{t.title}</option>
+                  ))}
+                </select>
+              )}
               <button 
                 className={`btn btn-ghost p-1 ${isSplitView ? 'text-[var(--accent)]' : 'text-muted'}`}
                 onClick={toggleSplitView}
@@ -308,23 +320,7 @@ function App() {
           {/* Right Reader Panel (Split View) */}
           {isSplitView && splitRightTabIndex !== null && (
             <div className="flex-1 min-w-0 overflow-y-auto border-l border-[var(--border-color)] relative h-full bg-[var(--bg-primary)] w-full">
-              {/* Optional secondary tab bar could go here, but for now it renders the selected splitRightTabIndex */}
-              <div className="absolute top-0 left-0 w-full bg-[var(--bg-secondary)] px-3 py-1 border-b border-[var(--border-color)] z-10 flex justify-between items-center text-xs text-muted">
-                <span>Split View: {openTabs[splitRightTabIndex]?.title}</span>
-                <div className="flex gap-1">
-                  <select 
-                    className="bg-transparent border border-[var(--border-color)] rounded px-1"
-                    value={splitRightTabIndex}
-                    onChange={(e) => setSplitRightTabIndex(Number(e.target.value))}
-                  >
-                    {openTabs.map((t, idx) => (
-                      <option key={idx} value={idx}>{t.title}</option>
-                    ))}
-                  </select>
-                  <button onClick={() => setIsSplitView(false)} className="hover:text-primary"><X size={14}/></button>
-                </div>
-              </div>
-              <div className="pt-8 h-full reader-content">
+              <div className="reader-content">
                 {renderReaderContent(openTabs[splitRightTabIndex] || null)}
               </div>
             </div>
