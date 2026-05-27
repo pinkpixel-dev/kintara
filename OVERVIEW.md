@@ -2,7 +2,7 @@
 
 ## Architecture
 - **Frontend**: React, Vite, TypeScript
-- **Styling**: Vanilla CSS (monochromatic dark/light modes with purple `#410186` accents)
+- **Styling**: Vanilla CSS (monochromatic dark/light modes with Pink Pixel `#ff69b4` accents)
 - **Backend/Desktop Layer**: Tauri (Rust)
 - **Database**: SQLite (via Tauri Rust commands)
 

@@ -8,6 +8,19 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+#[tauri::command]
+fn copy_file_to_library(app: tauri::AppHandle, source_path: String, filename: String) -> Result<String, String> {
+    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let dest_path = app_data_dir.join("library").join("documents").join(&filename);
+    std::fs::copy(&source_path, &dest_path).map_err(|e| e.to_string())?;
+    Ok(dest_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn read_file_from_library(file_path: String) -> Result<Vec<u8>, String> {
+    std::fs::read(&file_path).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let migrations = vec![
@@ -52,6 +65,31 @@ pub fn run() {
                     FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE CASCADE,
                     FOREIGN KEY(collection_id) REFERENCES collections(id) ON DELETE CASCADE
                 );
+
+                CREATE TABLE IF NOT EXISTS workspaces (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    theme_color TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS workspace_documents (
+                    workspace_id INTEGER,
+                    document_id INTEGER,
+                    PRIMARY KEY (workspace_id, document_id),
+                    FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+                    FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE CASCADE
+                );
+
+                CREATE TABLE IF NOT EXISTS annotations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    document_id INTEGER NOT NULL,
+                    annotation_type TEXT NOT NULL,
+                    serialized_position TEXT NOT NULL,
+                    content TEXT,
+                    color TEXT,
+                    created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE CASCADE
+                );
             ",
             kind: MigrationKind::Up,
         }
@@ -85,7 +123,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet])
+        .invoke_handler(tauri::generate_handler![greet, copy_file_to_library, read_file_from_library])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
