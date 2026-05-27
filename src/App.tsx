@@ -139,9 +139,6 @@ function App() {
         <div className="flex flex-col items-center justify-center h-full text-center">
           <h1>Welcome to Kintara</h1>
           <img src="/logo.png" alt="Kintara Logo" style={{ width: '300px', marginBottom: '2rem', marginTop: '1rem' }} />
-          <p className="text-secondary mt-2">
-            “Obsidian meets Calibre meets Zotero meets VS Code Explorer… but prettier and faster.”
-          </p>
           <p className="mt-8 text-sm text-muted">
             Select a document from the sidebar to open a tab, or click Import.
           </p>
