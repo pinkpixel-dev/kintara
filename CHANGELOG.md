@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- Implemented nested Collections under Libraries in the sidebar.
+- Added a Document Grid view for library/collection browsing.
+- Extracted PDF metadata (Title, Author, Keywords, Year) automatically via pdfjs-dist on import.
+- Built an editable "Details" sidebar for managing document metadata, tags, and thumbnails.
+- Created persistent Settings page (theme, typography) using `settings.json` in the app data directory.
+- Added global keyboard shortcuts for navigation and actions.
+- Introduced an interactive Help & Shortcuts modal and Onboarding overlay.
+- Added the ability to completely delete imported documents.
+- Added UI prompt system for creating and renaming libraries and collections.
+
+### Fixed
+- Fixed PDF extraction crashing due to reference error when parsing titles.
+- Fixed `App.css` to properly support manual `[data-theme]` toggles for light/dark mode override.
+- Fixed native HTML button rendering on sidebar chevrons to use clean, unstyled icons.
+- Improved Help Modal spacing and readability with proper display utilities.
+- Changed default app view to `recent` so the dashboard isn't empty upon initial load.
+- Adjusted Onboarding flow to reliably trigger the "Name your first Library" prompt upon completion.
 - Added layout CSS utility classes to fix scrunching and alignment bugs in UI.
 - Initialized Tauri + React + Vite + TypeScript project.
 - Generated application icons from `icon.png`.

@@ -21,6 +21,14 @@ fn read_file_from_library(file_path: String) -> Result<Vec<u8>, String> {
     std::fs::read(&file_path).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn delete_document_file(file_path: String) -> Result<(), String> {
+    if std::path::Path::new(&file_path).exists() {
+        std::fs::remove_file(&file_path).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let migrations = vec![
@@ -37,12 +45,20 @@ pub fn run() {
                     created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
                     modified_date DATETIME DEFAULT CURRENT_TIMESTAMP,
                     reading_progress REAL DEFAULT 0,
-                    extracted_text TEXT
+                    extracted_text TEXT,
+                    thumbnail_path TEXT,
+                    summary TEXT,
+                    keywords TEXT,
+                    doi TEXT,
+                    isbn TEXT,
+                    page_count INTEGER,
+                    year INTEGER
                 );
                 
                 CREATE TABLE IF NOT EXISTS tags (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL UNIQUE
+                    name TEXT NOT NULL UNIQUE,
+                    color TEXT
                 );
                 
                 CREATE TABLE IF NOT EXISTS document_tags (
@@ -52,10 +68,19 @@ pub fn run() {
                     FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE CASCADE,
                     FOREIGN KEY(tag_id) REFERENCES tags(id) ON DELETE CASCADE
                 );
+
+                CREATE TABLE IF NOT EXISTS libraries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    theme_color TEXT
+                );
                 
                 CREATE TABLE IF NOT EXISTS collections (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL UNIQUE
+                    library_id INTEGER NOT NULL,
+                    name TEXT NOT NULL,
+                    FOREIGN KEY(library_id) REFERENCES libraries(id) ON DELETE CASCADE,
+                    UNIQUE(library_id, name)
                 );
                 
                 CREATE TABLE IF NOT EXISTS document_collections (
@@ -66,17 +91,11 @@ pub fn run() {
                     FOREIGN KEY(collection_id) REFERENCES collections(id) ON DELETE CASCADE
                 );
 
-                CREATE TABLE IF NOT EXISTS workspaces (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL UNIQUE,
-                    theme_color TEXT
-                );
-
-                CREATE TABLE IF NOT EXISTS workspace_documents (
-                    workspace_id INTEGER,
+                CREATE TABLE IF NOT EXISTS library_documents (
+                    library_id INTEGER,
                     document_id INTEGER,
-                    PRIMARY KEY (workspace_id, document_id),
-                    FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+                    PRIMARY KEY (library_id, document_id),
+                    FOREIGN KEY(library_id) REFERENCES libraries(id) ON DELETE CASCADE,
                     FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE CASCADE
                 );
 
@@ -123,7 +142,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet, copy_file_to_library, read_file_from_library])
+        .invoke_handler(tauri::generate_handler![greet, copy_file_to_library, read_file_from_library, delete_document_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -7,7 +7,7 @@
 - **Database**: SQLite (via Tauri Rust commands)
 
 ## Design System
-The UI relies on a 3-pane layout: Sidebar, Document Reader, Inspector. The styling uses native CSS variables to ensure highly performant and flexible theming.
+The UI relies on a flexible 3-pane layout: Sidebar (Libraries/Collections), Main View (Grid or Reader), and Details Sidebar. The styling uses native CSS variables to ensure highly performant and flexible theming.
 
 ## Data Flow
 - Frontend interacts with Rust backend via Tauri IPC (`invoke` commands).
