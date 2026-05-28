@@ -409,7 +409,7 @@ function App() {
           ) : (
             <>
               {/* Left Reader Panel */}
-              <div className="flex-1 min-w-0 h-full w-full relative reader-bg">
+              <div className={`flex-1 min-w-0 h-full w-full relative ${activeDocument?.document_type === 'pdf' ? 'bg-[var(--bg-secondary)]' : 'reader-bg'}`}>
                 <div className="absolute inset-0 overflow-y-auto">
                   {renderReaderContent(activeDocument)}
                 </div>
@@ -417,7 +417,7 @@ function App() {
 
               {/* Right Reader Panel (Split View) */}
               {isSplitView && splitRightTabIndex !== null && (
-                <div className="flex-1 min-w-0 border-l border-[var(--border-color)] h-full w-full relative reader-bg">
+                <div className={`flex-1 min-w-0 border-l border-[var(--border-color)] h-full w-full relative ${openTabs[splitRightTabIndex]?.document_type === 'pdf' ? 'bg-[var(--bg-secondary)]' : 'reader-bg'}`}>
                   <div className="absolute inset-0 overflow-y-auto">
                     {renderReaderContent(openTabs[splitRightTabIndex] || null)}
                   </div>

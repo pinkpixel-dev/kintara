@@ -472,6 +472,10 @@ select, option {
 .select-none { user-select: none; }
 .focus\:outline-none:focus { outline: none; }
 .max-w-\[200px\] { max-width: 200px; }
+.max-w-full { max-width: 100%; }
+.max-w-2xl { max-width: 42rem; }
+.max-w-3xl { max-width: 48rem; }
+.max-w-4xl { max-width: 56rem; }
 .min-w-\[14px\] { min-width: 14px; }
 .transition-all { transition-property: all; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 300ms; }
 .duration-300 { transition-duration: 300ms; }
