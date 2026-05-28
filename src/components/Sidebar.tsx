@@ -1,6 +1,24 @@
 import { useState, useEffect } from "react";
-import { Search, Library as LibraryIcon, Star, Plus, ChevronRight, ChevronDown, FolderOpen, Settings, HelpCircle, Edit2, X, Clock } from "lucide-react";
+import {
+  Search, Library as LibraryIcon, Star, Plus, ChevronRight, ChevronDown,
+  FolderOpen, Settings, HelpCircle, X, Clock,
+  BookOpen, BookMarked, Palette,
+  Monitor, Code2, Music, Film, Camera,
+  Dumbbell, Plane, Heart, Coffee,
+  Leaf, Globe, Briefcase, Gamepad2, FlaskConical,
+  GraduationCap, Microscope, Landmark, Building2,
+  ChefHat, TreePine, Waves, Rocket, Bot
+} from "lucide-react";
 import { Library, Collection, libraryService, collectionService } from "../db";
+
+// Map icon name strings → components for rendering
+const ICON_MAP: Record<string, React.ElementType> = {
+  Library: LibraryIcon, BookOpen, BookMarked, FolderOpen, Palette,
+  Monitor, Code2, Music, Film, Camera, FlaskConical, Dumbbell, Plane,
+  Heart, Star, Coffee, Leaf, Globe, Briefcase, Gamepad2,
+  GraduationCap, Microscope, Landmark, Building2, ChefHat, TreePine,
+  Waves, Rocket, Bot,
+};
 
 interface SidebarProps {
   isOpen: boolean;
@@ -36,13 +54,12 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
       }
       setLibraries(libs);
 
-      // Load collections for each library
       const colMap: Record<number, Collection[]> = {};
       const expMap: Record<number, boolean> = { ...expandedLibraries };
       for (const lib of libs) {
         const cols = await collectionService.getAllForLibrary(lib.id);
         colMap[lib.id] = cols;
-        if (expMap[lib.id] === undefined) expMap[lib.id] = true; // expand by default
+        if (expMap[lib.id] === undefined) expMap[lib.id] = true;
       }
       setCollectionsByLibrary(colMap);
       setExpandedLibraries(expMap);
@@ -53,7 +70,7 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
 
   useEffect(() => {
     loadData();
-    
+
     // Listen for custom event to trigger library rename for onboarding
     const handleRenamePrompt = () => {
       openPrompt("Name your first library", "Library name...", "My Library", async (val) => {
@@ -65,7 +82,15 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
       });
     };
     window.addEventListener('prompt-rename-first-library', handleRenamePrompt);
-    return () => window.removeEventListener('prompt-rename-first-library', handleRenamePrompt);
+
+    // Listen for sidebar reload requests (e.g. after library/collection edit from App.tsx)
+    const handleReload = () => loadData();
+    window.addEventListener('reload-sidebar', handleReload);
+
+    return () => {
+      window.removeEventListener('prompt-rename-first-library', handleRenamePrompt);
+      window.removeEventListener('reload-sidebar', handleReload);
+    };
   }, []);
 
   const toggleLibrary = (id: number, e: React.MouseEvent) => {
@@ -82,7 +107,7 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
     setPromptConfig(prev => ({ ...prev, isOpen: false }));
   };
 
-  const handlePromptSubmit = async (e: React.SubmitEvent) => {
+  const handlePromptSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (promptValue.trim()) {
       await promptConfig.onSave(promptValue.trim());
@@ -97,20 +122,29 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
       <aside className="sidebar transition-all duration-300 flex-shrink-0 flex flex-col h-full bg-[var(--bg-secondary)] border-r border-[var(--border-color)]">
         <div className="sidebar-header flex justify-between items-center px-4 py-3 border-b border-[var(--border-color)]">
           <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="Kintara Logo" className="w-12 h-12 object-contain p-1" />
-            <span className="text-lg text-primary tracking-wide" style={{ fontFamily: "'Bellota', sans-serif", fontWeight: 700 }}>Kintara</span>
+            <img src="/logo.png" alt="Kintara Logo" style={{ width: "58px", height: "58px", objectFit: "contain", padding: "2px" }} />
+            <span
+              className="text-primary tracking-wide"
+              style={{ fontFamily: "'Bellota', sans-serif", fontWeight: 700, fontSize: "1.5rem" }}
+            >
+              Kintara
+            </span>
           </div>
-          <button className="btn btn-ghost p-1.5 hover:bg-[var(--bg-tertiary)] rounded text-muted hover:text-primary transition-colors border-none bg-transparent cursor-pointer" onClick={onImport} title="Import Document">
+          <button
+            className="btn btn-ghost p-1.5 hover:bg-[var(--bg-tertiary)] rounded text-muted hover:text-primary transition-colors border-none bg-transparent cursor-pointer"
+            onClick={onImport}
+            title="Import Document"
+          >
             <Plus size={18} />
           </button>
         </div>
-        
+
         <div className="sidebar-content flex-1 overflow-y-auto px-2 py-4 flex flex-col gap-4">
           <div className="relative px-2">
             <Search className="absolute left-4 top-2.5 text-muted" size={14} />
-            <input 
-              type="text" 
-              placeholder="Search documents..." 
+            <input
+              type="text"
+              placeholder="Search documents..."
               className="input pl-8 py-2 text-sm w-full bg-[var(--bg-tertiary)] border-transparent focus:border-[var(--accent)]"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -118,20 +152,20 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
           </div>
 
           <div>
-            <div className="text-[10px] uppercase text-muted mb-1 px-3 font-semibold tracking-wider">Quick Views</div>
-            <div 
+            <div className="uppercase text-muted mb-1 px-3 font-semibold tracking-wider" style={{ fontSize: "0.75rem" }}>Quick Views</div>
+            <div
               className={`sidebar-item flex items-center gap-2 px-3 py-1.5 rounded-md cursor-pointer text-sm mb-0.5 ${activeView.type === 'recent' ? 'active' : ''}`}
               onClick={() => setActiveView({ type: 'recent' })}
             >
               <Clock size={16} /> Recent Documents
             </div>
-            <div 
+            <div
               className={`sidebar-item flex items-center gap-2 px-3 py-1.5 rounded-md cursor-pointer text-sm mb-0.5 ${activeView.type === 'all' ? 'active' : ''}`}
               onClick={() => setActiveView({ type: 'all' })}
             >
               <LibraryIcon size={16} /> All Documents
             </div>
-            <div 
+            <div
               className={`sidebar-item flex items-center gap-2 px-3 py-1.5 rounded-md cursor-pointer text-sm mb-0.5 ${activeView.type === 'favorites' ? 'active' : ''}`}
               onClick={() => setActiveView({ type: 'favorites' })}
             >
@@ -140,9 +174,9 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
           </div>
 
           <div>
-            <div className="text-[10px] uppercase text-muted mb-1 px-3 font-semibold tracking-wider flex justify-between items-center group">
+            <div className="uppercase text-muted mb-1 px-3 font-semibold tracking-wider flex justify-between items-center group" style={{ fontSize: "0.75rem" }}>
               Libraries
-              <button 
+              <button
                 className="p-0.5 text-muted hover:text-primary bg-transparent border-none cursor-pointer rounded hover:bg-[var(--bg-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity"
                 title="New Library"
                 onClick={() => {
@@ -160,10 +194,14 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
                 const isExpanded = expandedLibraries[lib.id];
                 const collections = collectionsByLibrary[lib.id] || [];
                 const isActiveLib = activeView.type === 'library' && activeView.id === lib.id;
-                
+
+                // Resolve icon component
+                const LibIcon = (lib.icon && ICON_MAP[lib.icon]) ? ICON_MAP[lib.icon] : FolderOpen;
+                const iconColor = lib.icon_color || undefined;
+
                 return (
                   <div key={`lib-${lib.id}`}>
-                    <div 
+                    <div
                       className={`sidebar-item flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer text-sm group ${isActiveLib ? 'active' : ''}`}
                       onClick={() => setActiveView({ type: 'library', id: lib.id })}
                       onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
@@ -177,31 +215,23 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
                       }}
                     >
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <button 
+                        <button
                           className="p-0.5 flex items-center justify-center bg-transparent border-none cursor-pointer hover:bg-black/10 rounded text-current opacity-70 transition-colors"
                           onClick={(e) => toggleLibrary(lib.id, e)}
                         >
                           {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                         </button>
-                        <FolderOpen size={14} className="flex-shrink-0 opacity-80" />
+                        <LibIcon
+                          size={14}
+                          className="flex-shrink-0 opacity-90"
+                          style={isActiveLib ? {} : (iconColor ? { color: iconColor } : {})}
+                        />
                         <span className="truncate">{lib.name}</span>
                       </div>
-                      
+
+                      {/* Only the + (new collection) button on hover */}
                       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                        <button 
-                          className="p-1 text-muted hover:text-primary bg-transparent border-none cursor-pointer rounded hover:bg-black/10"
-                          title="Rename Library"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openPrompt("Rename Library", "Library name...", lib.name, async (val) => {
-                              await libraryService.rename(lib.id, val);
-                              await loadData();
-                            });
-                          }}
-                        >
-                          <Edit2 size={12} />
-                        </button>
-                        <button 
+                        <button
                           className="p-1 text-muted hover:text-primary bg-transparent border-none cursor-pointer rounded hover:bg-black/10"
                           title="New Collection"
                           onClick={(e) => {
@@ -217,11 +247,11 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
                         </button>
                       </div>
                     </div>
-                    
+
                     {isExpanded && collections.map(col => {
                       const isActiveCol = activeView.type === 'collection' && activeView.id === col.id;
                       return (
-                        <div 
+                        <div
                           key={`col-${col.id}`}
                           className={`sidebar-item flex items-center gap-2 pl-9 pr-3 py-1.5 rounded-md cursor-pointer text-sm ${isActiveCol ? 'active' : ''}`}
                           onClick={() => setActiveView({ type: 'collection', id: col.id })}
@@ -246,17 +276,17 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
             </div>
           </div>
         </div>
-        
+
         {/* Sidebar Footer */}
         <div className="mt-auto px-4 py-3 border-t border-[var(--border-color)] flex justify-between items-center bg-[var(--bg-primary)]">
-          <button 
+          <button
             className="btn btn-ghost p-2 rounded-md hover:bg-[var(--bg-tertiary)] text-muted hover:text-primary transition-colors flex items-center justify-center border-none cursor-pointer bg-transparent"
             onClick={() => window.dispatchEvent(new CustomEvent('open-settings'))}
             title="Settings (Ctrl+,)"
           >
             <Settings size={18} />
           </button>
-          <button 
+          <button
             className="btn btn-ghost p-2 rounded-md hover:bg-[var(--bg-tertiary)] text-muted hover:text-primary transition-colors flex items-center justify-center border-none cursor-pointer bg-transparent"
             onClick={() => window.dispatchEvent(new CustomEvent('open-help'))}
             title="Help & Shortcuts (F1)"
@@ -277,7 +307,7 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
               </button>
             </div>
             <form onSubmit={handlePromptSubmit} className="modal-body">
-              <input 
+              <input
                 type="text"
                 autoFocus
                 className="input py-2 px-3 text-sm"

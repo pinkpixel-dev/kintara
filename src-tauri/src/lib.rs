@@ -125,6 +125,12 @@ pub fn run() {
             description: "add_is_favorite",
             sql: "ALTER TABLE documents ADD COLUMN is_favorite INTEGER DEFAULT 0;",
             kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 3,
+            description: "add_library_icon_fields",
+            sql: "ALTER TABLE libraries ADD COLUMN icon TEXT; ALTER TABLE libraries ADD COLUMN icon_color TEXT;",
+            kind: MigrationKind::Up,
         }
     ];
 

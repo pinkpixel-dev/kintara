@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+
+## [0.6.0] - 2026-05-27
+### Added
+- **Library Settings Modal** — clicking the ⚙ icon in the header when a library or collection is active opens a dedicated settings panel for renaming, deleting, and (for libraries) choosing a custom icon and icon color.
+- **Library Icon Customization** — libraries can now have a custom Lucide icon (29 options: BookOpen, Palette, Code, Music, Film, etc.) and a custom icon color (15 presets + custom hex picker). The icon is displayed in the sidebar next to the library name.
+- **Library & Collection Delete** — integrated delete with a two-step confirmation inside the settings modal. Deleting a library navigates back to Recent; documents are preserved but removed from the library.
+- **Collection Rename** — collections can now be renamed via the same settings modal flow.
+- **SQLite Migration v3** — adds `icon TEXT` and `icon_color TEXT` columns to the `libraries` table via an incremental Tauri migration.
+- **Sidebar event listener** — sidebar now responds to a `reload-sidebar` custom event so library changes from anywhere in the app are reflected immediately.
+
+### Changed
+- Removed the inline Edit (pencil) icon from library rows in the sidebar — editing is now handled via the cleaner settings modal, reducing sidebar clutter especially at larger font sizes.
+- Widened sidebar from 260 px to 280 px to better accommodate longer library names at larger text sizes.
+- Made the "Kintara" logo text bolder (`fontWeight: 800`) and slightly larger (`1.25rem`) in the sidebar header.
+- Logo image in sidebar header slightly enlarged from `w-12 h-12` to 52 px for improved visual presence.
+
 ### Added
 - Implemented nested Collections under Libraries in the sidebar.
 - Added a Document Grid view for library/collection browsing.

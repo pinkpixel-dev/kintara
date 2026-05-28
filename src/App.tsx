@@ -6,10 +6,11 @@ import {
   PanelRightClose,
   PanelRightOpen,
   X,
-  Columns
+  Columns,
+  Settings
 } from "lucide-react";
 import "./App.css";
-import { documentService, libraryService, collectionService, Document } from "./db";
+import { documentService, libraryService, collectionService, Library, Collection, Document } from "./db";
 import { MarkdownReader } from "./components/MarkdownReader";
 import { PdfReader } from "./components/PdfReader";
 import { Sidebar } from "./components/Sidebar";
@@ -19,6 +20,7 @@ import { SettingsModal, defaultSettings } from "./components/SettingsModal";
 import { HelpModal } from "./components/HelpModal";
 import { ImportModal } from "./components/ImportModal";
 import { OnboardingOverlay } from "./components/OnboardingOverlay";
+import { LibrarySettingsModal } from "./components/LibrarySettingsModal";
 import { BaseDirectory, readTextFile, exists } from "@tauri-apps/plugin-fs";
 
 type ViewType = 'all' | 'recent' | 'favorites' | 'library' | 'collection';
@@ -45,6 +47,12 @@ function App() {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [importingDoc, setImportingDoc] = useState<Document | null>(null);
+
+  // Library / Collection settings modal
+  const [isLibSettingsOpen, setIsLibSettingsOpen] = useState(false);
+  const [libSettingsLibrary, setLibSettingsLibrary] = useState<Library | null>(null);
+  const [libSettingsCollection, setLibSettingsCollection] = useState<Collection | null>(null);
+  const [libSettingsMode, setLibSettingsMode] = useState<'library' | 'collection'>('library');
 
   // Load app settings on mount
   useEffect(() => {
@@ -302,11 +310,47 @@ function App() {
     }
   };
 
+  const handleOpenLibSettings = async () => {
+    if (activeView.type === 'library' && activeView.id) {
+      const libs = await libraryService.getAll();
+      const lib = libs.find(l => l.id === activeView.id) ?? null;
+      setLibSettingsLibrary(lib);
+      setLibSettingsCollection(null);
+      setLibSettingsMode('library');
+      setIsLibSettingsOpen(true);
+    } else if (activeView.type === 'collection' && activeView.id) {
+      const col = await collectionService.getById(activeView.id);
+      setLibSettingsCollection(col);
+      setLibSettingsLibrary(null);
+      setLibSettingsMode('collection');
+      setIsLibSettingsOpen(true);
+    }
+  };
+
+  const handleLibSettingsSaved = () => {
+    window.dispatchEvent(new CustomEvent('reload-sidebar'));
+  };
+
+  const handleLibDeleted = () => {
+    setActiveView({ type: 'recent' });
+    setViewMode('grid');
+    window.dispatchEvent(new CustomEvent('reload-sidebar'));
+  };
+
   return (
     <div className="app-container font-sans text-primary bg-[var(--bg-primary)]">
       {showOnboarding && <OnboardingOverlay onComplete={handleOnboardingComplete} />}
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
       <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+      <LibrarySettingsModal
+        isOpen={isLibSettingsOpen}
+        mode={libSettingsMode}
+        library={libSettingsLibrary}
+        collection={libSettingsCollection}
+        onClose={() => setIsLibSettingsOpen(false)}
+        onSaved={handleLibSettingsSaved}
+        onDeleted={handleLibDeleted}
+      />
       {importingDoc && (
         <ImportModal 
           document={importingDoc} 
@@ -337,6 +381,19 @@ function App() {
           >
             {isLeftSidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
           </button>
+
+          {/* Library / Collection context actions */}
+          {(activeView.type === 'library' || activeView.type === 'collection') && activeView.id && viewMode === 'grid' && (
+            <div className="flex items-center gap-1 mr-2 flex-shrink-0">
+              <button
+                className="btn btn-ghost p-1.5 rounded text-muted hover:text-primary hover:bg-[var(--bg-tertiary)]"
+                title={activeView.type === 'library' ? 'Library Settings' : 'Collection Settings'}
+                onClick={handleOpenLibSettings}
+              >
+                <Settings size={16} />
+              </button>
+            </div>
+          )}
 
           {/* Tabs Area */}
           <div className="flex flex-1 overflow-x-auto no-scrollbar items-center h-full">

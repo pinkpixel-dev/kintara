@@ -36,6 +36,8 @@ export interface Library {
   id: number;
   name: string;
   theme_color: string | null;
+  icon: string | null;
+  icon_color: string | null;
 }
 
 export interface Collection {
@@ -278,6 +280,24 @@ export const libraryService = {
     await db.execute("UPDATE libraries SET name = $1 WHERE id = $2", [name, id]);
   },
 
+  async update(id: number, fields: { name?: string; icon?: string | null; icon_color?: string | null }): Promise<void> {
+    const db = await getDb();
+    const sets: string[] = [];
+    const vals: any[] = [];
+    let i = 1;
+    if (fields.name !== undefined) { sets.push(`name = $${i++}`); vals.push(fields.name); }
+    if (fields.icon !== undefined) { sets.push(`icon = $${i++}`); vals.push(fields.icon); }
+    if (fields.icon_color !== undefined) { sets.push(`icon_color = $${i++}`); vals.push(fields.icon_color); }
+    if (sets.length === 0) return;
+    vals.push(id);
+    await db.execute(`UPDATE libraries SET ${sets.join(', ')} WHERE id = $${i}`, vals);
+  },
+
+  async delete(id: number): Promise<void> {
+    const db = await getDb();
+    await db.execute("DELETE FROM libraries WHERE id = $1", [id]);
+  },
+
   async getDocuments(libraryId: number): Promise<Document[]> {
     const db = await getDb();
     return await db.select<Document[]>(
@@ -301,10 +321,26 @@ export const collectionService = {
     return await db.select<Collection[]>("SELECT * FROM collections WHERE library_id = $1", [libraryId]);
   },
 
+  async getById(id: number): Promise<Collection | null> {
+    const db = await getDb();
+    const rows = await db.select<Collection[]>("SELECT * FROM collections WHERE id = $1", [id]);
+    return rows[0] ?? null;
+  },
+
   async create(libraryId: number, name: string): Promise<number> {
     const db = await getDb();
     const result = await db.execute("INSERT INTO collections (library_id, name) VALUES ($1, $2)", [libraryId, name]);
     return result.lastInsertId as number;
+  },
+
+  async rename(id: number, name: string): Promise<void> {
+    const db = await getDb();
+    await db.execute("UPDATE collections SET name = $1 WHERE id = $2", [name, id]);
+  },
+
+  async delete(id: number): Promise<void> {
+    const db = await getDb();
+    await db.execute("DELETE FROM collections WHERE id = $1", [id]);
   },
 
   async getDocuments(collectionId: number): Promise<Document[]> {

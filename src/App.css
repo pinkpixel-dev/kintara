@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bellota:wght@400;700&display=swap');
 
 :root, [data-theme="light"] {
   color-scheme: light;
@@ -120,7 +121,7 @@ select, option {
 
 /* Sidebar */
 .sidebar {
-  width: 260px;
+  width: 280px;
   background-color: var(--bg-secondary);
   border-right: 1px solid var(--border-color);
   display: flex;
@@ -128,7 +129,7 @@ select, option {
 }
 
 .sidebar-header {
-  height: 60px;
+  min-height: 68px;
   display: flex;
   align-items: center;
   justify-content: space-between;
