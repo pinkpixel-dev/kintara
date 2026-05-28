@@ -1,5 +1,6 @@
 import { FileText, Info, Star, Trash2 } from "lucide-react";
 import { Document, documentService } from "../db";
+import { convertFileSrc } from "@tauri-apps/api/core";
 
 interface DocumentGridProps {
   documents: Document[];
@@ -30,7 +31,7 @@ export function DocumentGrid({ documents, onOpenDocument, onOpenDetails, onRefre
             >
               <div className="document-card-thumb">
                 {doc.thumbnail_path ? (
-                  <img src={doc.thumbnail_path} alt={doc.title} />
+                  <img src={convertFileSrc(doc.thumbnail_path)} alt={doc.title} />
                 ) : (
                   <FileText size={48} className="text-muted opacity-50" />
                 )}
@@ -63,7 +64,7 @@ export function DocumentGrid({ documents, onOpenDocument, onOpenDetails, onRefre
                   onClick={async (e) => {
                     e.stopPropagation();
                     if (window.confirm("Are you sure you want to delete this document?")) {
-                      await documentService.delete(doc.id);
+                      await documentService.delete(doc.id, doc.file_path);
                       onRefresh();
                     }
                   }}

@@ -12,7 +12,7 @@ interface PdfReaderProps {
   isSplitView?: boolean;
 }
 
-export const PdfReader: React.FC<PdfReaderProps> = ({ documentId, filePath, isSplitView = false }) => {
+export const PdfReader: React.FC<PdfReaderProps> = ({ documentId, filePath = false }) => {
   const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(1);

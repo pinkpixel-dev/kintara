@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Document, documentService, tagService, Tag } from "../db";
 import { Trash2, Save, Image as ImageIcon, X } from "lucide-react";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 
 interface DetailsSidebarProps {
@@ -140,12 +141,12 @@ export function DetailsSidebar({ document, onUpdate, onDelete }: DetailsSidebarP
         
         {/* Thumbnail Preview Area */}
         <div 
-          className="w-full aspect-4-3 bg-[var(--bg-tertiary)] rounded flex flex-col items-center justify-center border border-dashed border-[var(--border-color)] relative overflow-hidden cursor-pointer hover:border-[var(--accent)] transition-colors group"
+          className="w-full aspect-3-4 bg-[var(--bg-tertiary)] rounded flex flex-col items-center justify-center border border-dashed border-[var(--border-color)] relative overflow-hidden cursor-pointer hover:border-[var(--accent)] transition-colors group"
           onClick={handleUploadCover}
           title="Click to change cover image"
         >
           {docState.thumbnail_path ? (
-            <img src={docState.thumbnail_path} alt="Thumbnail" className="object-cover w-full h-full" />
+            <img src={convertFileSrc(docState.thumbnail_path)} alt="Thumbnail" className="object-cover w-full h-full" />
           ) : (
             <>
               <ImageIcon size={32} className="text-muted mb-2 opacity-50 group-hover:text-[var(--accent)] transition-colors" />

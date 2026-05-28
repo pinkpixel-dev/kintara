@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { X, Image as ImageIcon } from "lucide-react";
 import { Document, Library, Collection, libraryService, collectionService, documentService } from "../db";
+import { convertFileSrc } from "@tauri-apps/api/core";
 
 interface ImportModalProps {
   document: Document;
@@ -70,7 +71,7 @@ export function ImportModal({ document, onClose, onComplete }: ImportModalProps)
         <div className="modal-body flex-row gap-6">
           <div className="w-1/3 aspect-4-3 bg-[var(--bg-tertiary)] rounded flex flex-col items-center justify-center border border-dashed border-[var(--border-color)] relative overflow-hidden flex-shrink-0">
             {docState.thumbnail_path ? (
-              <img src={docState.thumbnail_path} alt="Thumbnail" className="object-cover w-full h-full" />
+              <img src={convertFileSrc(docState.thumbnail_path)} alt="Thumbnail" className="object-cover w-full h-full" />
             ) : (
               <>
                 <ImageIcon size={32} className="text-muted mb-2 opacity-50" />
