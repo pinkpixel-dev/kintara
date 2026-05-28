@@ -198,7 +198,7 @@ export const documentService = {
           if (ctx) {
             canvas.width = viewport.width;
             canvas.height = viewport.height;
-            await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+            await page.render({ canvasContext: ctx, viewport: viewport, canvas: canvas }).promise;
             const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
             
             const res = await fetch(dataUrl);

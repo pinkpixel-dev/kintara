@@ -27,13 +27,17 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["deb", "appimage", "rpm", "nsis"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "category": "Office",
+    "shortDescription": "A premium document organizer and reader",
+    "longDescription": "Kintara is a premium document organizer and reader application built with Tauri, React, and Vite. It offers frictionless interaction with knowledge, prioritizing a distraction-free, highly polished dark/light UI.",
+    "copyright": "Copyright © 2026 Pink Pixel"
   }
 }

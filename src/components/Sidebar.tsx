@@ -97,7 +97,7 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
       <aside className="sidebar transition-all duration-300 flex-shrink-0 flex flex-col h-full bg-[var(--bg-secondary)] border-r border-[var(--border-color)]">
         <div className="sidebar-header flex justify-between items-center px-4 py-3 border-b border-[var(--border-color)]">
           <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="Kintara Logo" className="w-8 h-8 object-contain" />
+            <img src="/logo.png" alt="Kintara Logo" className="w-12 h-12 object-contain p-1" />
             <span className="font-bold text-lg text-primary tracking-wide">Kintara</span>
           </div>
           <button className="btn btn-ghost p-1.5 hover:bg-[var(--bg-tertiary)] rounded text-muted hover:text-primary transition-colors border-none bg-transparent cursor-pointer" onClick={onImport} title="Import Document">

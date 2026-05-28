@@ -10,7 +10,6 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "tauri:bundle": "tauri bundle",
     "tauri:icon": "tauri icon",
     "tauri:clean": "tauri clean",
     "tauri:update": "tauri update",
