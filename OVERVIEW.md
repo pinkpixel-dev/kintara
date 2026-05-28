@@ -13,7 +13,13 @@ The UI relies on a flexible 3-pane layout: Sidebar (Libraries/Collections), Main
 - Frontend interacts with Rust backend via Tauri IPC (`invoke` commands).
 - Backend manages the managed library folder and SQLite instance for fast metadata retrieval and full-text search (FTS5).
 - Local resource loading is enabled securely via Tauri's `assetProtocol` configured with scopes inside `tauri.conf.json`, allowing the React frontend to render cached PDF and custom cover thumbnails via `convertFileSrc()`.
-- Interactive prompts and confirmation boxes (such as highlights, deletion, and canceling imports) are handled elegantly via Tauri's native guest bindings for `@tauri-apps/plugin-dialog`.
+- Native Tauri dialog bindings (`@tauri-apps/plugin-dialog`) are used selectively for destructive confirmations (e.g. deleting imports).
+
+## Annotation System
+- Highlights are stored in the `annotations` SQLite table (`annotation_type`, `serialized_position`, `content`, `color`).
+- **Markdown reader**: text selection on `mouseup` immediately creates an annotation — no confirmation dialog. Existing highlights are injected as `<mark data-annotation-id="...">` elements; clicking one calls `annotationService.delete()` via event delegation.
+- **PDF reader**: click-drag draws a bounding box highlight stored as `{ page, x, y, w, h }`. Clicking an existing highlight box removes it, with hover opacity feedback.
+- **Highlight color** is user-configurable (8 presets) in Settings. The chosen color is written to the `--highlight-color` CSS custom property on `<html>` at startup and on every settings change. Both readers read this property at the moment of annotation creation, so existing highlights always retain their original color.
 
 ## Library & Collection Management
 - Libraries and Collections are stored in SQLite with cascade-delete foreign keys.

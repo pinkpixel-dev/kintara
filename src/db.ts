@@ -407,5 +407,10 @@ export const annotationService = {
       [ann.document_id, ann.annotation_type, ann.serialized_position, ann.content, ann.color]
     );
     return result.lastInsertId as number;
+  },
+
+  async delete(id: number): Promise<void> {
+    const db = await getDb();
+    await db.execute("DELETE FROM annotations WHERE id = $1", [id]);
   }
 };

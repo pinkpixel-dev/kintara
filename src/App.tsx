@@ -67,6 +67,7 @@ function App() {
         // Apply theme and fonts
         document.documentElement.style.setProperty('--font-family', currentSettings.fontFamily);
         document.documentElement.style.fontSize = currentSettings.fontSize;
+        document.documentElement.style.setProperty('--highlight-color', currentSettings.highlightColor ?? defaultSettings.highlightColor);
         if (currentSettings.theme !== 'system') {
           document.documentElement.setAttribute('data-theme', currentSettings.theme);
         } else {

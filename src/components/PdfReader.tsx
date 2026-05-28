@@ -12,17 +12,25 @@ interface PdfReaderProps {
   isSplitView?: boolean;
 }
 
+/** Read the current --highlight-color CSS variable from the document root. */
+const getHighlightColor = () =>
+  getComputedStyle(document.documentElement)
+    .getPropertyValue('--highlight-color')
+    .trim() || "rgba(234, 179, 8, 0.4)";
+
 export const PdfReader: React.FC<PdfReaderProps> = ({ documentId, filePath = false }) => {
   const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [error, setError] = useState<string | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
-  
+
   // Drawing state
   const [isDrawing, setIsDrawing] = useState(false);
   const [startPos, setStartPos] = useState<{x: number, y: number} | null>(null);
   const [currentBox, setCurrentBox] = useState<{x: number, y: number, w: number, h: number} | null>(null);
+  // Live preview color for the draw-in-progress box
+  const [drawColor, setDrawColor] = useState("rgba(234, 179, 8, 0.4)");
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -78,9 +86,9 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ documentId, filePath = fal
         }
       }
     };
-    
+
     renderPage();
-    
+
     return () => {
       if (renderTask) {
         renderTask.cancel();
@@ -95,6 +103,8 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ documentId, filePath = fal
     setStartPos({ x, y });
     setIsDrawing(true);
     setCurrentBox({ x, y, w: 0, h: 0 });
+    // Snapshot the current color when drawing starts
+    setDrawColor(getHighlightColor());
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -102,7 +112,7 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ documentId, filePath = fal
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    
+
     setCurrentBox({
       x: Math.min(startPos.x, x),
       y: Math.min(startPos.y, y),
@@ -115,13 +125,14 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ documentId, filePath = fal
     setIsDrawing(false);
     if (currentBox && currentBox.w > 10 && currentBox.h > 10) {
       try {
+        const color = getHighlightColor();
         const serialized = JSON.stringify({ page: pageNumber, ...currentBox });
         await annotationService.create({
           document_id: documentId,
           annotation_type: "highlight",
           serialized_position: serialized,
           content: null,
-          color: "rgba(255, 235, 59, 0.4)"
+          color,
         });
         await loadAnnotations();
       } catch (err) {
@@ -129,6 +140,17 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ documentId, filePath = fal
       }
     }
     setCurrentBox(null);
+  };
+
+  /** Click on an existing PDF highlight box → delete it. */
+  const handleAnnotationClick = async (e: React.MouseEvent, annId: number) => {
+    e.stopPropagation();
+    try {
+      await annotationService.delete(annId);
+      await loadAnnotations();
+    } catch (err) {
+      console.error("Failed to delete annotation", err);
+    }
   };
 
   if (error) return <div className="text-red-500 p-4">{error}</div>;
@@ -171,20 +193,26 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ documentId, filePath = fal
           <canvas ref={canvasRef} style={{ display: 'block' }} />
 
           {annotations.map(ann => {
-            const pos = JSON.parse(ann.serialized_position);
+            let pos: any;
+            try { pos = JSON.parse(ann.serialized_position); } catch { return null; }
             if (pos.page !== pageNumber) return null;
             return (
               <div
                 key={ann.id}
+                title="Click to remove highlight"
+                onClick={(e) => handleAnnotationClick(e, ann.id)}
                 style={{
                   position: 'absolute',
                   left: pos.x,
                   top: pos.y,
                   width: pos.w,
                   height: pos.h,
-                  backgroundColor: ann.color || "rgba(255, 235, 59, 0.4)",
-                  pointerEvents: 'none'
+                  backgroundColor: ann.color || "rgba(234, 179, 8, 0.4)",
+                  cursor: 'pointer',
+                  transition: 'opacity 0.15s ease',
                 }}
+                onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.5')}
+                onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
               />
             );
           })}
@@ -197,7 +225,7 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ documentId, filePath = fal
                 top: currentBox.y,
                 width: currentBox.w,
                 height: currentBox.h,
-                backgroundColor: "rgba(255, 235, 59, 0.4)",
+                backgroundColor: drawColor,
                 border: "1px dashed rgba(0,0,0,0.3)",
                 pointerEvents: 'none'
               }}

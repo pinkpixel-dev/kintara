@@ -1,11 +1,10 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import { codeToHtml } from "shiki";
 import { invoke } from "@tauri-apps/api/core";
 import { annotationService, Annotation } from "../db";
-import { ask } from "@tauri-apps/plugin-dialog";
 import "./MarkdownReader.css";
 import { Link } from "lucide-react";
 
@@ -14,20 +13,26 @@ interface MarkdownReaderProps {
   filePath: string;
 }
 
+/** Read the current --highlight-color CSS variable from the document root. */
+const getHighlightColor = () =>
+  getComputedStyle(document.documentElement)
+    .getPropertyValue('--highlight-color')
+    .trim() || "rgba(139, 92, 246, 0.35)";
+
 export const MarkdownReader: React.FC<MarkdownReaderProps> = ({ documentId, filePath }) => {
   const [content, setContent] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const loadAnnotations = async () => {
+  const loadAnnotations = useCallback(async () => {
     try {
       const anns = await annotationService.getByDocument(documentId);
       setAnnotations(anns);
     } catch (err) {
       console.error("Failed to load annotations:", err);
     }
-  };
+  }, [documentId]);
 
   useEffect(() => {
     const loadFile = async () => {
@@ -45,59 +50,79 @@ export const MarkdownReader: React.FC<MarkdownReaderProps> = ({ documentId, file
     loadFile();
   }, [filePath, documentId]);
 
+  /** On mouseup — immediately highlight selected text, no confirmation dialog. */
   const handleTextSelection = async () => {
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed) return;
 
-    const text = selection.toString();
-    if (text.length < 3) return; // Too short to highlight
+    const text = selection.toString().trim();
+    if (text.length < 3) return;
 
-    const confirmed = await ask(`Highlight "${text.substring(0, 20)}..."?`, {
-      title: "Add Highlight",
-      kind: "info"
-    });
-    if (confirmed) {
-      try {
-        await annotationService.create({
-          document_id: documentId,
-          annotation_type: "highlight",
-          serialized_position: "text_match",
-          content: text,
-          color: "rgba(139, 92, 246, 0.3)" // Purple highlight
-        });
-        await loadAnnotations();
-      } catch (err) {
-        console.error("Failed to save annotation", err);
-      }
+    const color = getHighlightColor();
+
+    try {
+      await annotationService.create({
+        document_id: documentId,
+        annotation_type: "highlight",
+        serialized_position: "text_match",
+        content: text,
+        color,
+      });
+      await loadAnnotations();
+    } catch (err) {
+      console.error("Failed to save annotation", err);
     }
     selection.removeAllRanges();
   };
 
-  // Very simple custom renderer for highlights and wikilinks
+  /** Click on a <mark> element → remove that annotation. */
+  const handleMarkClick = useCallback(async (e: MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.tagName !== "MARK") return;
+
+    const annotationId = Number(target.dataset.annotationId);
+    if (!annotationId) return;
+
+    e.stopPropagation();
+    try {
+      await annotationService.delete(annotationId);
+      await loadAnnotations();
+    } catch (err) {
+      console.error("Failed to delete annotation", err);
+    }
+  }, [loadAnnotations]);
+
+  // Attach click listener on the container to catch mark clicks via delegation
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    el.addEventListener("click", handleMarkClick);
+    return () => el.removeEventListener("click", handleMarkClick);
+  }, [handleMarkClick]);
+
   const processContent = (raw: string) => {
     let processed = raw;
-    
+
     // Fix missing blank line before tables
-    // Matches a non-newline char, followed by \n, then a table header row, then the delimiter row
     processed = processed.replace(/([^\n])\n(\s*\|.*?\|\s*\n\s*\|[-:\s|]+\|\s*(\n|$))/g, '$1\n\n$2');
-    
     // Fix empty lines between table rows
-    // Matches a line ending with pipe, empty lines, and a line starting with pipe
     processed = processed.replace(/\|\s*\n\s*\n\s*\|/g, '|\n|');
 
-    // Highlight existing annotations
+    // Wrap existing annotations in <mark> with data-annotation-id so click-to-remove works
     annotations.forEach(ann => {
       if (ann.content) {
-        // Escaping regex chars
         const escapedContent = ann.content.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const regex = new RegExp(`(${escapedContent})`, 'g');
-        processed = processed.replace(regex, `<mark style="background-color: ${ann.color}">$1</mark>`);
+        processed = processed.replace(
+          regex,
+          `<mark data-annotation-id="${ann.id}" style="background-color: ${ann.color}; cursor: pointer; border-radius: 2px;" title="Click to remove highlight">$1</mark>`
+        );
       }
     });
 
-    // WikiLinks [[Link]] -> a simple markdown link
+    // WikiLinks [[Link]] → a simple markdown link
     processed = processed.replace(/\[\[(.*?)\]\]/g, '<a href="#" class="wikilink" data-target="$1">#$1</a>');
-    
+
     return processed;
   };
 
@@ -109,9 +134,9 @@ export const MarkdownReader: React.FC<MarkdownReaderProps> = ({ documentId, file
     <div className="markdown-reader-container relative" ref={containerRef} onMouseUp={handleTextSelection}>
       <div className="mb-4 text-xs text-muted flex items-center gap-1 border-b border-[var(--border-color)] pb-2">
         <Link size={12} />
-        <span>Select text to highlight</span>
+        <span>Select text to highlight · Click a highlight to remove it</span>
       </div>
-      
+
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw]}

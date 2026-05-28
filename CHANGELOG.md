@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-05-27
+### Added
+- **Highlight Color Picker** — new Highlights section in Settings lets users choose from 8 preset colors (Purple, Yellow, Green, Blue, Pink, Orange, Teal, Red) for text and PDF highlights.
+- **Remove Highlights** — clicking any highlighted text in the Markdown reader removes that highlight immediately. Clicking a PDF highlight box also removes it (with fade hover feedback).
+- `annotationService.delete(id)` method added to the DB service layer.
+
+### Changed
+- **Removed highlight confirmation dialog** — selecting text no longer shows a native `ask()` popup; highlights are applied instantly on mouse-up for a much smoother reading experience.
+- Highlight color is now stored as a CSS custom property (`--highlight-color`) on `<html>` and applied on both app startup and whenever settings change, so both readers always use the user's chosen color.
+- Markdown reader hint text updated to: "Select text to highlight · Click a highlight to remove it".
+- PDF highlights now dim on hover to signal they are clickable/removable.
+
 ## [0.6.0] - 2026-05-27
 ### Added
 - **Library Settings Modal** — clicking the ⚙ icon in the header when a library or collection is active opens a dedicated settings panel for renaming, deleting, and (for libraries) choosing a custom icon and icon color.
