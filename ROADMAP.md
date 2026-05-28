@@ -8,6 +8,7 @@
 ## Phase 2: Refinement & Theming (In Progress)
 - [x] Fix layout scrunching and alignment issues
 - [x] Integrate Pink Pixel branding `#ff69b4`
+- [x] Refined secure local asset rendering and native desktop dialog integration
 - [ ] Add advanced search functionality
 - [ ] Implement robust linked mentions
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { X, Image as ImageIcon } from "lucide-react";
 import { Document, Library, Collection, libraryService, collectionService, documentService } from "../db";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { ask } from "@tauri-apps/plugin-dialog";
 
 interface ImportModalProps {
   document: Document;
@@ -53,7 +54,11 @@ export function ImportModal({ document, onClose, onComplete }: ImportModalProps)
   };
 
   const handleCancel = async () => {
-    if (window.confirm("Are you sure you want to cancel importing this document?")) {
+    const confirmed = await ask("Are you sure you want to cancel importing this document?", {
+      title: "Cancel Import",
+      kind: "warning"
+    });
+    if (confirmed) {
       await documentService.delete(document.id, document.file_path);
       onClose();
     }

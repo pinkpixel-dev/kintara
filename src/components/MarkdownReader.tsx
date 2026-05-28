@@ -5,6 +5,7 @@ import rehypeRaw from "rehype-raw";
 import { codeToHtml } from "shiki";
 import { invoke } from "@tauri-apps/api/core";
 import { annotationService, Annotation } from "../db";
+import { ask } from "@tauri-apps/plugin-dialog";
 import "./MarkdownReader.css";
 import { Link } from "lucide-react";
 
@@ -51,7 +52,11 @@ export const MarkdownReader: React.FC<MarkdownReaderProps> = ({ documentId, file
     const text = selection.toString();
     if (text.length < 3) return; // Too short to highlight
 
-    if (window.confirm(`Highlight "${text.substring(0, 20)}..."?`)) {
+    const confirmed = await ask(`Highlight "${text.substring(0, 20)}..."?`, {
+      title: "Add Highlight",
+      kind: "info"
+    });
+    if (confirmed) {
       try {
         await annotationService.create({
           document_id: documentId,

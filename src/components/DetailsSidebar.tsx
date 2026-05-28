@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Document, documentService, tagService, Tag } from "../db";
-import { Trash2, Save, Image as ImageIcon, X } from "lucide-react";
+import { Save, Image as ImageIcon, X } from "lucide-react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 
@@ -10,7 +10,7 @@ interface DetailsSidebarProps {
   onDelete: () => void;
 }
 
-export function DetailsSidebar({ document, onUpdate, onDelete }: DetailsSidebarProps) {
+export function DetailsSidebar({ document, onUpdate }: DetailsSidebarProps) {
   const [docState, setDocState] = useState<Document>(document);
   const [isSaving, setIsSaving] = useState(false);
   const [tags, setTags] = useState<Tag[]>([]);
@@ -112,29 +112,10 @@ export function DetailsSidebar({ document, onUpdate, onDelete }: DetailsSidebarP
     }
   };
 
-  const handleDelete = async () => {
-    if (window.confirm("Are you sure you want to delete this document? This action cannot be undone.")) {
-      try {
-        await documentService.delete(document.id, document.file_path);
-        onDelete();
-      } catch (err) {
-        console.error("Failed to delete document", err);
-        alert("Failed to delete document. See console for details.");
-      }
-    }
-  };
-
   return (
     <aside className="inspector-pane transition-all duration-300 flex-shrink-0 w-80 bg-[var(--bg-secondary)] border-l border-[var(--border-color)] flex flex-col h-full">
       <div className="inspector-header font-semibold py-3 px-4 border-b border-[var(--border-color)] flex justify-between items-center">
         <span>Details</span>
-        <button 
-          className="btn btn-ghost p-1.5 text-red-400 hover:text-red-500 hover:bg-red-500/10 rounded"
-          onClick={handleDelete}
-          title="Delete Document"
-        >
-          <Trash2 size={16} />
-        </button>
       </div>
       
       <div className="inspector-content p-4 overflow-y-auto flex-1 flex flex-col gap-4 text-sm">

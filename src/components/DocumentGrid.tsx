@@ -1,6 +1,7 @@
 import { FileText, Info, Star, Trash2 } from "lucide-react";
 import { Document, documentService } from "../db";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { ask } from "@tauri-apps/plugin-dialog";
 
 interface DocumentGridProps {
   documents: Document[];
@@ -63,7 +64,11 @@ export function DocumentGrid({ documents, onOpenDocument, onOpenDetails, onRefre
                   className="document-card-trash-btn"
                   onClick={async (e) => {
                     e.stopPropagation();
-                    if (window.confirm("Are you sure you want to delete this document?")) {
+                    const confirmed = await ask("Are you sure you want to delete this document? This action cannot be undone.", {
+                      title: "Delete Document",
+                      kind: "warning"
+                    });
+                    if (confirmed) {
                       await documentService.delete(doc.id, doc.file_path);
                       onRefresh();
                     }

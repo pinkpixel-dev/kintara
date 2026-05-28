@@ -12,3 +12,5 @@ The UI relies on a flexible 3-pane layout: Sidebar (Libraries/Collections), Main
 ## Data Flow
 - Frontend interacts with Rust backend via Tauri IPC (`invoke` commands).
 - Backend manages the managed library folder and SQLite instance for fast metadata retrieval and full-text search (FTS5).
+- Local resource loading is enabled securely via Tauri's `assetProtocol` configured with scopes inside `tauri.conf.json`, allowing the React frontend to render cached PDF and custom cover thumbnails via `convertFileSrc()`.
+- Interactive prompts and confirmation boxes (such as highlights, deletion, and canceling imports) are handled elegantly via Tauri's native guest bindings for `@tauri-apps/plugin-dialog`.
