@@ -9,9 +9,10 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLi
 interface PdfReaderProps {
   documentId: number;
   filePath: string;
+  isSplitView?: boolean;
 }
 
-export const PdfReader: React.FC<PdfReaderProps> = ({ documentId, filePath }) => {
+export const PdfReader: React.FC<PdfReaderProps> = ({ documentId, filePath, isSplitView = false }) => {
   const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(1);
@@ -113,7 +114,6 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ documentId, filePath }) =>
   const handleMouseUp = async () => {
     setIsDrawing(false);
     if (currentBox && currentBox.w > 10 && currentBox.h > 10) {
-      // Save annotation
       try {
         const serialized = JSON.stringify({ page: pageNumber, ...currentBox });
         await annotationService.create({
@@ -121,7 +121,7 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ documentId, filePath }) =>
           annotation_type: "highlight",
           serialized_position: serialized,
           content: null,
-          color: "rgba(255, 235, 59, 0.4)" // Yellow highlight
+          color: "rgba(255, 235, 59, 0.4)"
         });
         await loadAnnotations();
       } catch (err) {
@@ -134,70 +134,76 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ documentId, filePath }) =>
   if (error) return <div className="text-red-500 p-4">{error}</div>;
 
   return (
-    <div className="pdf-reader-container flex flex-col items-center">
-      <div className="pdf-controls flex items-center justify-between w-full max-w-2xl mb-4 bg-[var(--bg-secondary)] p-2 rounded-lg border border-[var(--border-color)]">
-        <button 
-          className="btn btn-ghost px-3 py-1"
-          disabled={pageNumber <= 1}
-          onClick={() => setPageNumber(prev => Math.max(1, prev - 1))}
-        >
-          Previous
-        </button>
-        <span className="text-sm font-medium text-primary">
-          Page {pageNumber} of {numPages}
-        </span>
-        <button 
-          className="btn btn-ghost px-3 py-1"
-          disabled={pageNumber >= numPages}
-          onClick={() => setPageNumber(prev => Math.min(numPages, prev + 1))}
-        >
-          Next
-        </button>
-      </div>
+    <div className="pdf-reader-container">
+      {/*
+        pdf-content-wrapper sizes itself to the canvas's natural pixel width.
+        Both the controls bar and the canvas sit inside it, so the controls
+        always perfectly match the canvas width. The outer container uses
+        margin: auto to horizontally center this wrapper in any panel width.
+      */}
+      <div className="pdf-content-wrapper">
+        <div className="pdf-controls">
+          <button
+            className="btn btn-ghost px-3 py-1"
+            disabled={pageNumber <= 1}
+            onClick={() => setPageNumber(prev => Math.max(1, prev - 1))}
+          >
+            Previous
+          </button>
+          <span className="text-sm font-medium text-primary">
+            Page {pageNumber} of {numPages}
+          </span>
+          <button
+            className="btn btn-ghost px-3 py-1"
+            disabled={pageNumber >= numPages}
+            onClick={() => setPageNumber(prev => Math.min(numPages, prev + 1))}
+          >
+            Next
+          </button>
+        </div>
 
-      <div 
-        className="pdf-canvas-wrapper relative shadow-md rounded border border-[var(--border-color)] bg-white overflow-hidden cursor-crosshair"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-      >
-        <canvas ref={canvasRef} className="max-w-full h-auto" style={{ maxHeight: 'calc(100vh - 160px)', objectFit: 'contain' }} />
-        
-        {/* Render Annotations for current page */}
-        {annotations.map(ann => {
-          const pos = JSON.parse(ann.serialized_position);
-          if (pos.page !== pageNumber) return null;
-          return (
-            <div 
-              key={ann.id}
+        <div
+          className="pdf-canvas-wrapper"
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+        >
+          <canvas ref={canvasRef} style={{ display: 'block' }} />
+
+          {annotations.map(ann => {
+            const pos = JSON.parse(ann.serialized_position);
+            if (pos.page !== pageNumber) return null;
+            return (
+              <div
+                key={ann.id}
+                style={{
+                  position: 'absolute',
+                  left: pos.x,
+                  top: pos.y,
+                  width: pos.w,
+                  height: pos.h,
+                  backgroundColor: ann.color || "rgba(255, 235, 59, 0.4)",
+                  pointerEvents: 'none'
+                }}
+              />
+            );
+          })}
+
+          {isDrawing && currentBox && (
+            <div
               style={{
                 position: 'absolute',
-                left: pos.x,
-                top: pos.y,
-                width: pos.w,
-                height: pos.h,
-                backgroundColor: ann.color || "rgba(255, 235, 59, 0.4)",
+                left: currentBox.x,
+                top: currentBox.y,
+                width: currentBox.w,
+                height: currentBox.h,
+                backgroundColor: "rgba(255, 235, 59, 0.4)",
+                border: "1px dashed rgba(0,0,0,0.3)",
                 pointerEvents: 'none'
               }}
             />
-          );
-        })}
-
-        {/* Current Drawing Box */}
-        {isDrawing && currentBox && (
-          <div 
-            style={{
-              position: 'absolute',
-              left: currentBox.x,
-              top: currentBox.y,
-              width: currentBox.w,
-              height: currentBox.h,
-              backgroundColor: "rgba(255, 235, 59, 0.4)",
-              border: "1px dashed rgba(0,0,0,0.3)",
-              pointerEvents: 'none'
-            }}
-          />
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

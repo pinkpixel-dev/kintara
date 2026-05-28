@@ -235,13 +235,13 @@ function App() {
 
   const activeDocument = openTabs.length > 0 ? openTabs[activeTabIndex] : null;
 
-  const renderReaderContent = (doc: Document | null) => {
+  const renderReaderContent = (doc: Document | null, inSplitView: boolean = false) => {
     if (!doc) return null;
     if (doc.document_type === 'md' || doc.document_type === 'txt') {
       return <MarkdownReader documentId={doc.id} filePath={doc.file_path} />;
     }
     if (doc.document_type === 'pdf') {
-      return <PdfReader documentId={doc.id} filePath={doc.file_path} />;
+      return <PdfReader documentId={doc.id} filePath={doc.file_path} isSplitView={inSplitView} />;
     }
     return <div>Unsupported file format</div>;
   };
@@ -411,15 +411,14 @@ function App() {
               {/* Left Reader Panel */}
               <div className={`flex-1 min-w-0 h-full w-full relative ${activeDocument?.document_type === 'pdf' ? 'bg-[var(--bg-secondary)]' : 'reader-bg'}`}>
                 <div className="absolute inset-0 overflow-y-auto">
-                  {renderReaderContent(activeDocument)}
+                  {renderReaderContent(activeDocument, isSplitView)}
                 </div>
               </div>
 
-              {/* Right Reader Panel (Split View) */}
               {isSplitView && splitRightTabIndex !== null && (
                 <div className={`flex-1 min-w-0 border-l border-[var(--border-color)] h-full w-full relative ${openTabs[splitRightTabIndex]?.document_type === 'pdf' ? 'bg-[var(--bg-secondary)]' : 'reader-bg'}`}>
                   <div className="absolute inset-0 overflow-y-auto">
-                    {renderReaderContent(openTabs[splitRightTabIndex] || null)}
+                    {renderReaderContent(openTabs[splitRightTabIndex] || null, true)}
                   </div>
                 </div>
               )}
