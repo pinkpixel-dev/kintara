@@ -19,11 +19,14 @@ All notable changes to this project will be documented in this file.
 - Standardized document cover/thumbnail aspect ratio to consistent 3:4 (portrait) across the main grid and details sidebar.
 - Configured Tauri bundler targets explicitly for `.deb`, `.appimage`, `.rpm`, and `.nsis` builds along with premium app-level metadata and descriptions in `tauri.conf.json`.
 - Added manual GitHub Actions workflow (`build-windows.yml`) using `workflow_dispatch` to compile the Windows `.exe` installer and compile binary artifacts.
+- Styled Kintara logo text in the sidebar to persistently render with the **Bellota** font family at a premium medium weight, isolated from general typography choices.
+- Expanded typography settings in the Settings page to include Outfit, Livvic, Life Savers, M PLUS U, Bellota, and Elsie fonts.
 
 ### Fixed
 - Resolved thumbnail and cover image loading failure (? icon) in the canvas, details sidebar, and import modal by implementing Tauri `convertFileSrc` and configuring scoped `assetProtocol` in `tauri.conf.json`.
 - Fixed typescript compilation error in `DocumentGrid.tsx` caused by a missing `file_path` parameter on document deletion.
 - Fixed typescript compilation error in `src/db.ts` by passing the required `canvas` parameter to `page.render()` for newer versions of `pdfjs-dist`.
+- Fixed Tauri bundle build failure caused by invalid category value in `tauri.conf.json` by removing the optional category property.
 - Removed redundant and accidental-click-prone delete button from DetailsSidebar header, centralizing delete action to the quick-action grid hover overlay.
 - Fixed PDF extraction crashing due to reference error when parsing titles.
 - Fixed `App.css` to properly support manual `[data-theme]` toggles for light/dark mode override.

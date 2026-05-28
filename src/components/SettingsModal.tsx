@@ -145,6 +145,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   <option value="Inter, system-ui, Avenir, Helvetica, Arial, sans-serif">Inter</option>
                   <option value="Georgia, serif">Georgia</option>
                   <option value="ui-monospace, monospace">Monospace</option>
+                  <option value="Outfit, sans-serif">Outfit</option>
+                  <option value="Livvic, sans-serif">Livvic</option>
+                  <option value="'M PLUS U', sans-serif">M PLUS U</option>
+                  <option value="Bellota, sans-serif">Bellota</option>
+                  <option value="Elsie, serif">Elsie</option>
                 </select>
               </div>
               <div className="flex items-center justify-between">
@@ -157,6 +162,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   <option value="12px">Small (12px)</option>
                   <option value="14px">Medium (14px)</option>
                   <option value="16px">Large (16px)</option>
+                  <option value="18px">Extra Large (18px)</option>
                 </select>
               </div>
             </div>

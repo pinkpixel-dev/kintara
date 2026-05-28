@@ -82,7 +82,7 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
     setPromptConfig(prev => ({ ...prev, isOpen: false }));
   };
 
-  const handlePromptSubmit = async (e: React.FormEvent) => {
+  const handlePromptSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
     if (promptValue.trim()) {
       await promptConfig.onSave(promptValue.trim());
@@ -98,7 +98,7 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
         <div className="sidebar-header flex justify-between items-center px-4 py-3 border-b border-[var(--border-color)]">
           <div className="flex items-center gap-2">
             <img src="/logo.png" alt="Kintara Logo" className="w-12 h-12 object-contain p-1" />
-            <span className="font-bold text-lg text-primary tracking-wide">Kintara</span>
+            <span className="text-lg text-primary tracking-wide" style={{ fontFamily: "'Bellota', sans-serif", fontWeight: 700 }}>Kintara</span>
           </div>
           <button className="btn btn-ghost p-1.5 hover:bg-[var(--bg-tertiary)] rounded text-muted hover:text-primary transition-colors border-none bg-transparent cursor-pointer" onClick={onImport} title="Import Document">
             <Plus size={18} />
