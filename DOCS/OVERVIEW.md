@@ -1,5 +1,30 @@
 # Kintara Technical Overview
 
+## Direction
+Kintara is mid-transition from a Tauri desktop reader to a **server-first, self-hosted
+document library** that runs in Docker on a NAS and is served as an installable PWA.
+
+- A single Rust/Axum binary will serve both the JSON API and the built frontend.
+- The frontend will speak only HTTP, so there is no dual data layer to maintain.
+- `apps/desktop/` is **frozen**. It still contains the working Tauri shell and is kept
+  so the option of a local sidecar build stays open, but it is not part of any build.
+
+Everything below the Repository Structure section describes the current desktop
+implementation and remains accurate until the port replaces it.
+
+## Repository Structure
+```
+apps/
+  web/       React + Vite frontend (npm workspace @kintara/web)
+  server/    Rust + Axum backend — not yet implemented
+  desktop/   Tauri shell — frozen, retained for reference
+assets/      Brand source images, not bundled
+docker/      Dockerfile, entrypoint, compose — not yet implemented
+DOCS/        This file, ROADMAP.md, to-do.md
+```
+The root `package.json` is the version source of truth and delegates scripts to the
+`apps/web` workspace.
+
 ## Architecture
 - **Frontend**: React, Vite, TypeScript
 - **Styling**: Vanilla CSS (monochromatic dark/light modes with purple `#410186` accents)
@@ -11,7 +36,7 @@ The UI relies on a flexible 3-pane layout: Sidebar (Libraries/Collections), Main
 
 ## Data Flow
 - Frontend interacts with Rust backend via Tauri IPC (`invoke` commands).
-- Backend manages the managed library folder and SQLite instance for fast metadata retrieval and full-text search (FTS5).
+- Backend manages the managed library folder and SQLite instance for metadata retrieval. Search is currently a `LIKE '%term%'` scan across title/author/summary/keywords — FTS5 is planned for the server rewrite, not yet implemented.
 - Local resource loading is enabled securely via Tauri's `assetProtocol` configured with scopes inside `tauri.conf.json`, allowing the React frontend to render cached PDF and custom cover thumbnails via `convertFileSrc()`.
 - Native Tauri dialog bindings (`@tauri-apps/plugin-dialog`) are used selectively for destructive confirmations (e.g. deleting imports).
 
@@ -24,12 +49,16 @@ The UI relies on a flexible 3-pane layout: Sidebar (Libraries/Collections), Main
 ## Library & Collection Management
 - Libraries and Collections are stored in SQLite with cascade-delete foreign keys.
 - Each library supports a custom **Lucide icon** and **icon color** (stored as `icon TEXT` and `icon_color TEXT` columns, added in migration v3).
-- A **LibrarySettingsModal** (`src/components/LibrarySettingsModal.tsx`) provides a unified UI for renaming, deleting, and customizing icons/colors for both libraries and collections.
+- A **LibrarySettingsModal** (`apps/web/src/components/LibrarySettingsModal.tsx`) provides a unified UI for renaming, deleting, and customizing icons/colors for both libraries and collections.
 - The sidebar renders the library's chosen icon with the stored color, falling back to `FolderOpen` if none is set.
 - Settings and delete controls appear in the main header bar when a library or collection view is active.
 
 
 ## Distribution & Bundling
-- **Linux Packages**: Configured via `tauri.conf.json` to generate `.deb`, `.appimage`, and `.rpm` files natively.
-- **Windows Executables**: Configured to build standalone `.exe` installers via NSIS.
-- **CI/CD Pipeline**: A dedicated GitHub Actions workflow (`build-windows.yml`) runs manually via `workflow_dispatch` on a `windows-latest` VM runner, caching node modules and cargo targets, compiling the codebase, and outputting build artifacts for easy testing.
+Frozen alongside the desktop shell. `apps/desktop/tauri.conf.json` still declares `.deb`,
+`.appimage`, `.rpm`, and NSIS targets, but nothing builds them — the Windows CI workflow
+was removed in 0.6.2.
+
+The replacement is a multi-arch (`linux/amd64`, `linux/arm64`) Docker image published
+from `docker/`, mounting `/library` for documents and `/data` for the database and
+thumbnails, with `PUID`/`PGID` handling for NAS filesystem permissions.

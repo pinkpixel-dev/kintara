@@ -1,8 +1,8 @@
 [package]
-name = "tauri-app"
-version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+name = "kintara-desktop"
+version = "0.6.2"
+description = "Kintara desktop shell (frozen — see DOCS/OVERVIEW.md)"
+authors = ["Pink Pixel <admin@pinkpixel.dev>"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

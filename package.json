@@ -1,42 +1,14 @@
 {
-  "name": "tauri-app",
+  "name": "kintara",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.6.2",
   "type": "module",
+  "workspaces": [
+    "apps/web"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
-    "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build",
-    "tauri:icon": "tauri icon",
-    "tauri:clean": "tauri clean",
-    "tauri:update": "tauri update",
-    "tauri:doctor": "tauri doctor"
-  },
-  "dependencies": {
-    "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-dialog": "^2.7.1",
-    "@tauri-apps/plugin-fs": "^2.5.1",
-    "@tauri-apps/plugin-opener": "^2",
-    "@tauri-apps/plugin-os": "^2.3.2",
-    "@tauri-apps/plugin-sql": "^2.4.0",
-    "lucide-react": "^1.16.0",
-    "pdfjs-dist": "^5.7.284",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "react-markdown": "^10.1.0",
-    "rehype-raw": "^7.0.0",
-    "remark-gfm": "^4.0.1",
-    "shiki": "^4.1.0"
-  },
-  "devDependencies": {
-    "@tauri-apps/cli": "^2",
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
-    "@vitejs/plugin-react": "^4.6.0",
-    "typescript": "~5.8.3",
-    "vite": "^7.0.4"
+    "dev": "npm run dev --workspace apps/web",
+    "build": "npm run build --workspace apps/web",
+    "preview": "npm run preview --workspace apps/web"
   }
 }

@@ -3,6 +3,33 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+Work has begun on a server-first rewrite. Kintara is becoming a self-hosted document
+library that runs in Docker on a NAS, served as an installable PWA, with a Rust/Axum
+backend replacing the Tauri IPC layer. See `DOCS/OVERVIEW.md` for the target architecture.
+
+## [0.6.2] - 2026-08-10
+### Changed
+- **Repository restructured as a monorepo** in preparation for the server-first rewrite.
+  `src/` moved to `apps/web/src/`, `src-tauri/` moved to `apps/desktop/`, and new empty
+  `apps/server/` and `docker/` directories were added for the incoming Rust backend.
+- Frontend is now an npm workspace (`@kintara/web`). The root `package.json` is the
+  version source of truth and delegates `dev`, `build`, and `preview` to the workspace.
+- Documentation moved into `DOCS/` (`OVERVIEW.md`, `ROADMAP.md`, `to-do.md`).
+  `README.md`, `CHANGELOG.md`, and `LICENSE` remain at the repository root.
+- Brand source images (`icon.png`, `logo.png`) moved to `assets/` so they are not
+  copied into the web bundle.
+- **Version fields reconciled.** `package.json`, `tauri.conf.json`, and `Cargo.toml`
+  had drifted to `0.1.0` while the changelog had advanced to `0.6.1`. All now read `0.6.2`.
+- Desktop crate renamed from `tauri-app` to `kintara-desktop`, with real author and
+  description metadata.
+
+### Removed
+- `.github/workflows/build-windows.yml` — it built the now-frozen desktop shell. A
+  multi-arch Docker workflow replaces it once the server exists.
+
+### Notes
+- No application logic changed in this release. The frontend still talks to Tauri and
+  still builds; `apps/desktop/` is retained but frozen and not wired into any build.
 
 ## [0.6.1] - 2026-05-27
 ### Added
