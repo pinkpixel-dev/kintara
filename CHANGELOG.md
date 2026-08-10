@@ -8,6 +8,54 @@ library that runs in Docker on a NAS, served as an installable PWA, with a Rust/
 backend replacing the Tauri IPC layer. See `DOCS/OVERVIEW.md` for the target architecture.
 The frontend still talks to Tauri; porting it to the API is the next step.
 
+## [0.9.0] - 2026-08-10
+### Added
+- **Document write API.** `POST /api/documents` (multipart upload),
+  `PATCH /api/documents/{id}` (metadata), `DELETE /api/documents/{id}`,
+  `PUT /api/documents/{id}/progress`, `PUT /api/documents/{id}/favorite`.
+- **Libraries, collections, and tags.** Full CRUD plus membership endpoints, each returning
+  a `documentCount` so the sidebar renders without a request per row. Deleting a library
+  removes the library and its collections but never the documents — a library is a view
+  over documents, not a container that owns them.
+- **Annotations.** `POST /api/annotations`, `DELETE /api/annotations/{id}`, and
+  `GET /api/documents/{id}/annotations`, all scoped to the requesting user. The position
+  blob is opaque to the server and round-trips byte-identical, so the Markdown reader's
+  text offsets and the PDF reader's bounding boxes both work unchanged.
+- **Metadata extraction and thumbnails** (`media.rs`). Uploaded PDFs get their title,
+  author, keywords, page count, and year read via `pdfinfo`, and a cover rendered via
+  `pdftoppm`. Poppler is used rather than a native crate because pdfium means shipping a
+  shared library and the mupdf bindings are AGPL, which conflicts with this project's
+  Apache-2.0 licence. The same module will serve the filesystem scanner, so a document is
+  treated identically however it arrives.
+- **Upload safety.** Filenames are stripped of directory components, so
+  `../../../etc/passwd.pdf` lands in the library root as `passwd.pdf`. Content is hashed
+  with blake3, so the same file uploaded twice is a 409 rather than a duplicate entry.
+  Two genuinely different documents may still share a filename — the second becomes
+  `name (2).pdf` rather than failing or overwriting.
+- **48 new tests** covering uploads, deduplication, filename collisions, metadata edits,
+  progress and favourites, deletion, library and collection CRUD, tag attachment, and
+  annotation user-scoping.
+
+### Fixed
+- **Patch fields could not be cleared.** `#[serde(default)]` on `Option<Option<T>>`
+  collapses a JSON `null` into `None`, making "clear this field" indistinguishable from
+  "leave it alone", so clearing an author silently did nothing. A `double_option`
+  deserializer now keeps absent, null, and value apart.
+- **The year was never extracted from PDF metadata.** The `CreationDate` parser took the
+  last whitespace token, but real poppler output ends with a timezone
+  (`Sun Jun 11 20:00:00 2017 EDT`), so it parsed `EDT` and gave up. It now scans for the
+  first plausible four-digit year. Found by testing against real poppler output rather
+  than the hand-written sample the unit test used.
+- Unique constraint violations now return 409 with a readable message instead of a 500.
+- Referencing a missing library or document returns 404 rather than surfacing a raw
+  foreign key error.
+
+### Changed
+- Creating a tag that already exists returns the existing tag with a 200 instead of a
+  conflict. Tagging is a high-frequency free-text action, so a repeat is expected input.
+- `DELETE /api/documents/{id}` removes the file from the library as well as the row.
+  Removing only the row would let the scanner re-index it, making delete look broken.
+
 ## [0.8.0] - 2026-08-10
 ### Added
 - **Document read API.**

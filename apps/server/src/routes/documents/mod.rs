@@ -1,7 +1,9 @@
 mod content;
+mod mutate;
+mod upload;
 
 use axum::extract::{Path, Query, State};
-use axum::routing::get;
+use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use sqlx::{QueryBuilder, Sqlite};
 use tower_http::compression::CompressionLayer;
@@ -14,8 +16,16 @@ use crate::state::AppState;
 pub fn router() -> Router<AppState> {
     // JSON metadata: small, repetitive, worth compressing.
     let metadata = Router::new()
-        .route("/", get(list))
-        .route("/{id}", get(get_one))
+        .route("/", get(list).post(upload::upload))
+        .route("/{id}", get(get_one).patch(mutate::update).delete(mutate::delete))
+        .route("/{id}/progress", put(mutate::set_progress))
+        .route("/{id}/favorite", put(mutate::set_favorite))
+        .route("/{id}/tags", get(crate::routes::tags::for_document))
+        .route(
+            "/{id}/tags/{tag_id}",
+            post(crate::routes::tags::attach).delete(crate::routes::tags::detach),
+        )
+        .route("/{id}/annotations", get(crate::routes::annotations::for_document))
         .layer(CompressionLayer::new());
 
     // Document bytes: served by ServeFile with Range support, and never
@@ -169,4 +179,25 @@ pub async fn get_one(
         .ok_or(AppError::NotFound)?;
 
     Ok(Json(row.into()))
+}
+
+/// Fetches one document as the wire format, for handlers that need to return a
+/// freshly created or updated row.
+pub(crate) async fn fetch_one(state: &AppState, id: i64, user_id: i64) -> AppResult<Document> {
+    const SQL: &str = concat!(
+        "SELECT ",
+        select_columns!(),
+        " FROM documents d
+          LEFT JOIN user_document_state s ON s.document_id = d.id AND s.user_id = ?
+          WHERE d.id = ?"
+    );
+
+    let row: DocumentRow = sqlx::query_as(SQL)
+        .bind(user_id)
+        .bind(id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or(AppError::NotFound)?;
+
+    Ok(row.into())
 }

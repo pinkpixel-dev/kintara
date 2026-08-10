@@ -1,5 +1,10 @@
 //! Shared test scaffolding. Every helper here builds the real router over a
 //! real SQLite file and a real library directory on disk.
+//!
+//! This module is compiled into each integration-test binary separately, so
+//! helpers a given binary does not use look like dead code. That is expected
+//! rather than a sign anything is unused.
+#![allow(dead_code)]
 
 use std::net::SocketAddr;
 use std::path::Path;
@@ -65,6 +70,80 @@ impl TestApp {
     pub async fn request(&self, request: Request<Body>) -> Response {
         use tower::ServiceExt;
         self.router.clone().oneshot(request).await.unwrap()
+    }
+
+    pub async fn send_json(&self, method: &str, uri: &str, body: serde_json::Value) -> Response {
+        self.request(
+            Request::builder()
+                .method(method)
+                .uri(uri)
+                .header("content-type", "application/json")
+                .body(Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+    }
+
+    pub async fn post(&self, uri: &str) -> Response {
+        self.request(
+            Request::builder()
+                .method("POST")
+                .uri(uri)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+    }
+
+    pub async fn delete(&self, uri: &str) -> Response {
+        self.request(
+            Request::builder()
+                .method("DELETE")
+                .uri(uri)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+    }
+
+    /// Posts a `multipart/form-data` upload, hand-building the body so the test
+    /// exercises the same parsing path a browser would produce.
+    pub async fn upload(&self, filename: &str, contents: &[u8], fields: &[(&str, &str)]) -> Response {
+        const BOUNDARY: &str = "kintaratestboundary";
+        let mut body: Vec<u8> = Vec::new();
+
+        for (name, value) in fields {
+            body.extend_from_slice(format!("--{BOUNDARY}\r\n").as_bytes());
+            body.extend_from_slice(
+                format!("Content-Disposition: form-data; name=\"{name}\"\r\n\r\n").as_bytes(),
+            );
+            body.extend_from_slice(value.as_bytes());
+            body.extend_from_slice(b"\r\n");
+        }
+
+        body.extend_from_slice(format!("--{BOUNDARY}\r\n").as_bytes());
+        body.extend_from_slice(
+            format!(
+                "Content-Disposition: form-data; name=\"file\"; filename=\"{filename}\"\r\n\
+                 Content-Type: application/octet-stream\r\n\r\n"
+            )
+            .as_bytes(),
+        );
+        body.extend_from_slice(contents);
+        body.extend_from_slice(format!("\r\n--{BOUNDARY}--\r\n").as_bytes());
+
+        self.request(
+            Request::builder()
+                .method("POST")
+                .uri("/api/documents")
+                .header(
+                    "content-type",
+                    format!("multipart/form-data; boundary={BOUNDARY}"),
+                )
+                .body(Body::from(body))
+                .unwrap(),
+        )
+        .await
     }
 
     /// Writes a real file into the library and indexes it.
@@ -139,4 +218,50 @@ pub fn header(response: &Response, name: &str) -> Option<String> {
         .get(name)
         .and_then(|v| v.to_str().ok())
         .map(|v| v.to_string())
+}
+
+/// A real, minimal PDF so metadata extraction and thumbnail generation run the
+/// same path they will in production.
+pub fn sample_pdf() -> Vec<u8> {
+    let mut objects: Vec<(usize, Vec<u8>)> = Vec::new();
+    objects.push((1, b"<< /Type /Catalog /Pages 2 0 R >>".to_vec()));
+    objects.push((2, b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_vec()));
+    objects.push((
+        3,
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents 4 0 R >>".to_vec(),
+    ));
+    let stream = b"BT /F1 12 Tf 20 100 Td (kintara) Tj ET";
+    objects.push((
+        4,
+        [
+            format!("<< /Length {} >>\nstream\n", stream.len()).as_bytes(),
+            stream,
+            b"\nendstream",
+        ]
+        .concat(),
+    ));
+
+    let mut out: Vec<u8> = b"%PDF-1.4\n".to_vec();
+    let mut offsets = vec![0usize; objects.len() + 1];
+    for (num, body) in &objects {
+        offsets[*num] = out.len();
+        out.extend_from_slice(format!("{num} 0 obj\n").as_bytes());
+        out.extend_from_slice(body);
+        out.extend_from_slice(b"\nendobj\n");
+    }
+
+    let xref = out.len();
+    out.extend_from_slice(format!("xref\n0 {}\n", objects.len() + 1).as_bytes());
+    out.extend_from_slice(b"0000000000 65535 f \n");
+    for num in 1..=objects.len() {
+        out.extend_from_slice(format!("{:010} 00000 n \n", offsets[num]).as_bytes());
+    }
+    out.extend_from_slice(
+        format!(
+            "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n",
+            objects.len() + 1
+        )
+        .as_bytes(),
+    );
+    out
 }

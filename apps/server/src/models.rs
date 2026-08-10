@@ -1,4 +1,19 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+
+/// Deserializer for patch fields that need to tell "absent" from "null".
+///
+/// `#[serde(default)]` alone is not enough: serde deserializes a JSON `null`
+/// into `None`, so `Option<Option<T>>` collapses and an explicit null becomes
+/// indistinguishable from an omitted field. Going through `Option<T>` first and
+/// wrapping the result keeps the three cases apart — absent stays `None`, null
+/// becomes `Some(None)`, and a value becomes `Some(Some(v))`.
+pub fn double_option<'de, T, D>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    T: Deserialize<'de>,
+    D: Deserializer<'de>,
+{
+    Deserialize::deserialize(deserializer).map(Some)
+}
 
 /// A document as it comes back from the database, including the per-user
 /// reading state joined on.

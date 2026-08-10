@@ -13,6 +13,11 @@ pub enum AppError {
     #[error("{0}")]
     BadRequest(String),
 
+    /// The request was valid but conflicts with existing state — a duplicate
+    /// upload, or a name already taken.
+    #[error("{0}")]
+    Conflict(String),
+
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 
@@ -25,6 +30,13 @@ impl IntoResponse for AppError {
         let (status, message) = match &self {
             AppError::NotFound => (StatusCode::NOT_FOUND, "not found".to_string()),
             AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
+            AppError::Conflict(msg) => (StatusCode::CONFLICT, msg.clone()),
+            // A UNIQUE violation reaching this point is a conflict, not a bug —
+            // two users racing to create the same library name, for instance.
+            AppError::Database(sqlx::Error::Database(db)) if db.is_unique_violation() => (
+                StatusCode::CONFLICT,
+                "that name is already taken".to_string(),
+            ),
             AppError::Database(sqlx::Error::RowNotFound) => {
                 (StatusCode::NOT_FOUND, "not found".to_string())
             }

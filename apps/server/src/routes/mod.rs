@@ -1,7 +1,11 @@
+pub mod annotations;
+pub mod collections;
 pub mod documents;
 pub mod health;
+pub mod libraries;
+pub mod tags;
 
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::Router;
 use tower::Layer;
 use tower_http::compression::CompressionLayer;
@@ -22,6 +26,11 @@ pub fn router(state: AppState) -> Router {
     let api = Router::new()
         .route("/health", get(health::health))
         .nest("/documents", documents::router())
+        .nest("/libraries", libraries::router())
+        .nest("/collections", collections::router())
+        .nest("/tags", tags::router())
+        .route("/annotations", post(annotations::create))
+        .route("/annotations/{id}", axum::routing::delete(annotations::delete))
         .fallback(api_not_found)
         .with_state(state.clone());
 
