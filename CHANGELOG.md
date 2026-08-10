@@ -15,8 +15,15 @@ All notable changes to this project will be documented in this file.
   cache an earlier build left behind, so affected machines heal themselves on next load.
   The worker also skips Vite's `/@`, `/src/`, and `/node_modules/` paths as a backstop,
   and its cache version was bumped so installed copies replace themselves.
-- **The tab close button was hard to see.** At `--text-muted` it sat around 4:1 against
-  the tab — legible in theory, easy to miss for a 14px glyph. It now uses
+- **The tab close button rendered as a grey box instead of an X.** The old markup gave it
+  no `border`, so the browser's default button border drew a rounded rectangle around the
+  icon. The project has no global button reset, and every other button happens to set
+  `border-none` explicitly. The `.tab-close` class now sets `border: none` and a
+  transparent background. A scan of every button in the running app found no other case;
+  the only remaining bordered button is the cover upload's dashed drop zone, which is
+  deliberate.
+- **The tab close button was also hard to see.** At `--text-muted` it sat around 4:1
+  against the tab — legible in theory, easy to miss for a 14px glyph. It now uses
   `--text-secondary`.
 
 ## [1.1.1] - 2026-08-10
