@@ -8,6 +8,54 @@ library that runs in Docker on a NAS, served as an installable PWA, with a Rust/
 backend replacing the Tauri IPC layer. See `DOCS/OVERVIEW.md` for the target architecture.
 The frontend still talks to Tauri; porting it to the API is the next step.
 
+## [0.10.0] - 2026-08-10
+### Added
+- **Kintara runs in a browser.** The frontend now talks to the server over HTTP and has no
+  Tauri dependency at all. Verified end to end: a PDF uploads, gets its metadata and cover
+  extracted, appears in the grid, and renders in a browser tab with working page controls.
+- **`apps/web/src/api/`** replaces `db.ts`. The client no longer runs SQL — it calls the
+  API, which means a browser tab can no longer issue arbitrary queries against the library.
+- **Download button** on every document card. On a NAS the point is getting a copy onto the
+  device you are actually reading on.
+- **`ConfirmDialog`** replaces the desktop build's native `ask()` dialogs, with a focus
+  trap, Escape to dismiss, and initial focus on Cancel so a stray Enter never deletes
+  anything.
+- **Responsive layout.** Below 900px both side panels become overlay drawers with a
+  tap-to-dismiss scrim, instead of fixed columns that pushed the reader off screen.
+- **Settings moved to localStorage**, per device. A phone and a desktop genuinely want
+  different font sizes, and reading them synchronously means the theme is applied before
+  first paint rather than flashing.
+
+### Fixed
+- **The pdf.js worker was loaded from unpkg**, so PDFs would not render at all on an
+  offline or firewalled NAS. It is now bundled by Vite and served from the app itself.
+- **Horizontal overflow at every mobile width.** `.app-container` used `width: 100vw` with
+  two fixed-width side panels, which at 375px was wider than the screen. Now `100%` with
+  drawers, verified clean at 320px, 375px, and desktop.
+- **PDF highlights drifted once the canvas was scaled.** Highlight boxes were positioned in
+  raw canvas pixels, which stopped matching the page as soon as the canvas shrank to fit a
+  phone. Coordinates are now converted through the display scale in both directions.
+- **The overlay actions on document cards were hover-only**, making them unreachable on
+  touch and invisible to keyboard users. They are now always visible on touch devices,
+  revealed on keyboard focus, and have larger tap targets on touch.
+- **`.hidden` was never defined**, so the file inputs behind the Import buttons rendered as
+  visible "Choose File" controls.
+- **The sidebar logo had been broken since before the rewrite** — it referenced
+  `/logo.png`, which has never existed in `public/`. A 20 KB version now ships there,
+  down from the 1 MB original.
+- `100vh` replaced with `100dvh`, so the bottom of the app is not hidden under mobile
+  browser chrome.
+
+### Changed
+- Every library view is now one endpoint with different filters, rather than a separate
+  query per view.
+- Adding a tag no longer fetches every tag first to look for a match — the server dedupes.
+- Refreshing a document's details fetches that one document instead of listing the library.
+- `App.tsx` split: tab and split-view state moved to a `useDocumentTabs` hook and the tab
+  strip to a `TabBar` component, keeping every file under 500 lines.
+- Cleared metadata fields are sent as null rather than empty strings, so the server clears
+  them instead of storing blanks.
+
 ## [0.9.0] - 2026-08-10
 ### Added
 - **Document write API.** `POST /api/documents` (multipart upload),

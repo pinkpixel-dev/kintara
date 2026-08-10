@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
-import { Document, documentService, tagService, Tag } from "../db";
+import { useRef } from "react";
+import { documentService, documentUrls, tagService, type Document, type Tag } from "../api";
 import { Save, Image as ImageIcon, X } from "lucide-react";
-import { convertFileSrc } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
 
 interface DetailsSidebarProps {
   document: Document;
@@ -15,6 +14,8 @@ export function DetailsSidebar({ document, onUpdate }: DetailsSidebarProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [tags, setTags] = useState<Tag[]>([]);
   const [newTagInput, setNewTagInput] = useState("");
+  const [coverVersion, setCoverVersion] = useState(0);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setDocState(document);
@@ -23,8 +24,7 @@ export function DetailsSidebar({ document, onUpdate }: DetailsSidebarProps) {
 
   const loadTags = async (docId: number) => {
     try {
-      const docTags = await tagService.getForDocument(docId);
-      setTags(docTags);
+      setTags(await documentService.tags(docId));
     } catch (err) {
       console.error("Failed to load tags", err);
     }
@@ -34,25 +34,18 @@ export function DetailsSidebar({ document, onUpdate }: DetailsSidebarProps) {
     setDocState(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleUploadCover = async () => {
-    const selected = await open({
-      multiple: false,
-      filters: [{ name: 'Images', extensions: ['png', 'jpeg', 'jpg', 'webp'] }]
-    });
-    if (!selected) return;
-    
-    const sourcePath = selected as string;
-    const { basename } = await import('@tauri-apps/api/path');
-    const baseName = await basename(sourcePath);
-    
+  const handleCoverSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    // Reset so picking the same file twice still fires a change event.
+    event.target.value = "";
+    if (!file) return;
+
     try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      const destPath = await invoke<string>("copy_thumbnail_to_library", { 
-        sourcePath, 
-        filename: `${Date.now()}_${baseName}` 
-      });
-      await documentService.updateThumbnail(document.id, destPath);
-      setDocState(prev => ({ ...prev, thumbnail_path: destPath }));
+      await documentService.uploadCover(document.id, file);
+      setDocState(prev => ({ ...prev, hasThumbnail: true }));
+      // The thumbnail URL is stable but its contents changed, and the response
+      // is cached hard, so a cache-busting parameter is needed to see the new one.
+      setCoverVersion(v => v + 1);
       onUpdate();
     } catch (err) {
       console.error("Failed to update cover", err);
@@ -66,17 +59,12 @@ export function DetailsSidebar({ document, onUpdate }: DetailsSidebarProps) {
       setNewTagInput("");
       
       try {
-        let allTags = await tagService.getAll();
-        let tag = allTags.find(t => t.name.toLowerCase() === tagName.toLowerCase());
-        let tagId: number;
-        if (tag) {
-          tagId = tag.id;
-        } else {
-          const colors = ['rgba(248, 113, 113, 0.2)', 'rgba(251, 146, 60, 0.2)', 'rgba(251, 191, 36, 0.2)', 'rgba(163, 230, 53, 0.2)', 'rgba(74, 222, 128, 0.2)', 'rgba(45, 212, 191, 0.2)', 'rgba(56, 189, 248, 0.2)', 'rgba(129, 140, 248, 0.2)', 'rgba(167, 139, 250, 0.2)', 'rgba(232, 121, 249, 0.2)'];
-          const randomColor = colors[Math.floor(Math.random() * colors.length)];
-          tagId = await tagService.create(tagName, randomColor);
-        }
-        await tagService.addTagToDocument(document.id, tagId);
+        const colors = ['rgba(248, 113, 113, 0.2)', 'rgba(251, 146, 60, 0.2)', 'rgba(251, 191, 36, 0.2)', 'rgba(163, 230, 53, 0.2)', 'rgba(74, 222, 128, 0.2)', 'rgba(45, 212, 191, 0.2)', 'rgba(56, 189, 248, 0.2)', 'rgba(129, 140, 248, 0.2)', 'rgba(167, 139, 250, 0.2)', 'rgba(232, 121, 249, 0.2)'];
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+        // The server returns the existing tag when the name is taken, so there
+        // is no need to fetch every tag first just to look for a match.
+        const tag = await tagService.create(tagName, randomColor);
+        await documentService.addTag(document.id, tag.id);
         await loadTags(document.id);
       } catch (err) {
         console.error("Failed to add tag", err);
@@ -86,7 +74,7 @@ export function DetailsSidebar({ document, onUpdate }: DetailsSidebarProps) {
 
   const handleRemoveTag = async (tagId: number) => {
     try {
-      await tagService.removeTagFromDocument(document.id, tagId);
+      await documentService.removeTag(document.id, tagId);
       await loadTags(document.id);
     } catch (err) {
       console.error("Failed to remove tag", err);
@@ -96,13 +84,18 @@ export function DetailsSidebar({ document, onUpdate }: DetailsSidebarProps) {
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      const orNull = (value: string | null) => {
+        const trimmed = (value ?? "").trim();
+        return trimmed === "" ? null : trimmed;
+      };
+
       await documentService.update(docState.id, {
-        title: docState.title,
-        author: docState.author,
-        summary: docState.summary,
-        keywords: docState.keywords,
-        doi: docState.doi,
-        isbn: docState.isbn
+        title: docState.title.trim(),
+        author: orNull(docState.author),
+        summary: orNull(docState.summary),
+        keywords: orNull(docState.keywords),
+        doi: orNull(docState.doi),
+        isbn: orNull(docState.isbn),
       });
       onUpdate();
     } catch (err) {
@@ -121,20 +114,33 @@ export function DetailsSidebar({ document, onUpdate }: DetailsSidebarProps) {
       <div className="inspector-content p-4 overflow-y-auto flex-1 flex flex-col gap-4 text-sm">
         
         {/* Thumbnail Preview Area */}
-        <div 
-          className="w-full aspect-3-4 bg-[var(--bg-tertiary)] rounded flex flex-col items-center justify-center border border-dashed border-[var(--border-color)] relative overflow-hidden cursor-pointer hover:border-[var(--accent)] transition-colors group"
-          onClick={handleUploadCover}
-          title="Click to change cover image"
+        <input
+          ref={coverInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="hidden"
+          onChange={handleCoverSelected}
+        />
+        <button
+          type="button"
+          className="w-full aspect-3-4 bg-[var(--bg-tertiary)] rounded flex flex-col items-center justify-center border border-dashed border-[var(--border-color)] relative overflow-hidden cursor-pointer hover:border-[var(--accent)] transition-colors group p-0"
+          onClick={() => coverInputRef.current?.click()}
+          title="Change cover image"
+          aria-label="Change cover image"
         >
-          {docState.thumbnail_path ? (
-            <img src={convertFileSrc(docState.thumbnail_path)} alt="Thumbnail" className="object-cover w-full h-full" />
+          {docState.hasThumbnail ? (
+            <img
+              src={`${documentUrls.thumbnail(docState.id)}?v=${coverVersion}`}
+              alt=""
+              className="object-cover w-full h-full"
+            />
           ) : (
             <>
               <ImageIcon size={32} className="text-muted mb-2 opacity-50 group-hover:text-[var(--accent)] transition-colors" />
               <span className="text-xs text-muted group-hover:text-primary transition-colors">Click to upload cover</span>
             </>
           )}
-        </div>
+        </button>
 
         <div className="flex flex-col gap-1">
           <label className="text-xs text-muted font-medium uppercase tracking-wider">Title</label>

@@ -159,6 +159,87 @@ pub async fn upload(
     Ok((StatusCode::CREATED, Json(document)))
 }
 
+/// Image types accepted as a custom cover.
+const ALLOWED_COVER: [&str; 4] = ["png", "jpg", "jpeg", "webp"];
+
+/// Replaces a document's cover with an uploaded image.
+///
+/// Covers live in the data directory alongside generated thumbnails, not in the
+/// library, because they are derived assets rather than documents.
+pub async fn upload_cover(
+    State(state): State<AppState>,
+    axum::extract::Path(id): axum::extract::Path<i64>,
+    mut multipart: Multipart,
+) -> AppResult<StatusCode> {
+    let previous: Option<Option<String>> =
+        sqlx::query_scalar("SELECT thumbnail_name FROM documents WHERE id = ?")
+            .bind(id)
+            .fetch_optional(&state.db)
+            .await?;
+    let previous = previous.ok_or(AppError::NotFound)?;
+
+    let mut filename: Option<String> = None;
+    let mut bytes: Option<Vec<u8>> = None;
+
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|err| AppError::BadRequest(format!("malformed upload: {err}")))?
+    {
+        if field.name().unwrap_or_default() == "file" {
+            filename = field.file_name().map(media::sanitize_filename);
+            bytes = Some(
+                field
+                    .bytes()
+                    .await
+                    .map_err(|err| AppError::BadRequest(format!("upload failed: {err}")))?
+                    .to_vec(),
+            );
+        }
+    }
+
+    let filename = filename.ok_or_else(|| AppError::BadRequest("no file provided".into()))?;
+    let bytes = bytes.ok_or_else(|| AppError::BadRequest("no file provided".into()))?;
+
+    if bytes.is_empty() {
+        return Err(AppError::BadRequest("the uploaded image is empty".into()));
+    }
+
+    let extension = StdPath::new(&filename)
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_lowercase())
+        .unwrap_or_default();
+
+    if !ALLOWED_COVER.contains(&extension.as_str()) {
+        return Err(AppError::BadRequest(format!(
+            "unsupported image type '{extension}' (supported: {})",
+            ALLOWED_COVER.join(", ")
+        )));
+    }
+
+    // A new filename each time, so the long cache header on the thumbnail route
+    // never serves a stale cover.
+    let name = format!("cover-{id}-{}.{extension}", chrono::Utc::now().timestamp());
+    tokio::fs::write(state.config.thumbnail_dir().join(&name), &bytes)
+        .await
+        .map_err(|err| AppError::Internal(err.into()))?;
+
+    sqlx::query("UPDATE documents SET thumbnail_name = ? WHERE id = ?")
+        .bind(&name)
+        .bind(id)
+        .execute(&state.db)
+        .await?;
+
+    if let Some(old) = previous {
+        if let Ok(path) = crate::files::resolve_in_root(&state.config.thumbnail_dir(), &old) {
+            let _ = tokio::fs::remove_file(&path).await;
+        }
+    }
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
 /// Finds a free path for `filename`, appending ` (2)`, ` (3)` and so on.
 ///
 /// Two different documents can legitimately share a filename, and

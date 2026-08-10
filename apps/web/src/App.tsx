@@ -1,27 +1,34 @@
-import { useState, useEffect } from "react";
-import { 
-  FileText, 
+import { useEffect, useRef, useState } from "react";
+import {
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
-  X,
   Columns,
   Settings
 } from "lucide-react";
 import "./App.css";
-import { documentService, libraryService, collectionService, Library, Collection, Document } from "./db";
+import {
+  collectionService,
+  documentService,
+  libraryService,
+  type Collection,
+  type Document,
+  type Library,
+} from "./api";
 import { MarkdownReader } from "./components/MarkdownReader";
 import { PdfReader } from "./components/PdfReader";
 import { Sidebar } from "./components/Sidebar";
 import { DocumentGrid } from "./components/DocumentGrid";
 import { DetailsSidebar } from "./components/DetailsSidebar";
-import { SettingsModal, defaultSettings } from "./components/SettingsModal";
+import { SettingsModal } from "./components/SettingsModal";
 import { HelpModal } from "./components/HelpModal";
 import { ImportModal } from "./components/ImportModal";
 import { OnboardingOverlay } from "./components/OnboardingOverlay";
 import { LibrarySettingsModal } from "./components/LibrarySettingsModal";
-import { BaseDirectory, readTextFile, exists } from "@tauri-apps/plugin-fs";
+import { TabBar } from "./components/TabBar";
+import { useDocumentTabs } from "./hooks/useDocumentTabs";
+import { applySettings, loadSettings, saveSettings } from "./lib/settings";
 
 type ViewType = 'all' | 'recent' | 'favorites' | 'library' | 'collection';
 type ActiveView = { type: ViewType, id?: number };
@@ -33,12 +40,25 @@ function App() {
   const [activeView, setActiveView] = useState<ActiveView>({ type: 'recent' });
   const [viewMode, setViewMode] = useState<'grid' | 'reading'>('grid');
 
-  const [openTabs, setOpenTabs] = useState<Document[]>([]);
-  const [activeTabIndex, setActiveTabIndex] = useState<number>(0);
-  const [isSplitView, setIsSplitView] = useState(false);
-  const [splitRightTabIndex, setSplitRightTabIndex] = useState<number | null>(null);
+  const {
+    openTabs,
+    activeTabIndex,
+    setActiveTabIndex,
+    isSplitView,
+    splitRightTabIndex,
+    setSplitRightTabIndex,
+    activeDocument,
+    openDocument,
+    closeTab,
+    closeTabForDocument,
+    toggleSplitView,
+    replaceDocument,
+  } = useDocumentTabs();
 
-  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
+  // Both panels are drawers below 900px, so starting them open would cover the
+  // library on a phone.
+  const isNarrow = () => typeof window !== "undefined" && window.innerWidth <= 900;
+  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(() => !isNarrow());
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
   const [detailsDocument, setDetailsDocument] = useState<Document | null>(null);
 
@@ -47,6 +67,9 @@ function App() {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [importingDoc, setImportingDoc] = useState<Document | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Library / Collection settings modal
   const [isLibSettingsOpen, setIsLibSettingsOpen] = useState(false);
@@ -54,37 +77,12 @@ function App() {
   const [libSettingsCollection, setLibSettingsCollection] = useState<Collection | null>(null);
   const [libSettingsMode, setLibSettingsMode] = useState<'library' | 'collection'>('library');
 
-  // Load app settings on mount
+  // Settings are read synchronously from localStorage, so the theme is in place
+  // before first paint rather than flashing the default one.
   useEffect(() => {
-    const initApp = async () => {
-      try {
-        let currentSettings = { ...defaultSettings };
-        if (await exists('settings.json', { baseDir: BaseDirectory.AppLocalData })) {
-          const data = await readTextFile('settings.json', { baseDir: BaseDirectory.AppLocalData });
-          currentSettings = { ...defaultSettings, ...JSON.parse(data) };
-        }
-        
-        // Apply theme and fonts
-        document.documentElement.style.setProperty('--font-family', currentSettings.fontFamily);
-        document.documentElement.style.fontSize = currentSettings.fontSize;
-        document.documentElement.style.setProperty('--highlight-color', currentSettings.highlightColor ?? defaultSettings.highlightColor);
-        if (currentSettings.theme !== 'system') {
-          document.documentElement.setAttribute('data-theme', currentSettings.theme);
-        } else {
-          document.documentElement.removeAttribute('data-theme');
-        }
-        if (currentSettings.readerTheme) {
-          document.documentElement.setAttribute('data-reader-theme', currentSettings.readerTheme);
-        }
-
-        if (!currentSettings.hasSeenOnboarding) {
-          setShowOnboarding(true);
-        }
-      } catch (err) {
-        console.error("Failed to init app settings", err);
-      }
-    };
-    initApp();
+    const settings = loadSettings();
+    applySettings(settings);
+    if (!settings.hasSeenOnboarding) setShowOnboarding(true);
   }, []);
 
   // Keyboard Shortcuts
@@ -112,7 +110,7 @@ function App() {
           case 'w':
             e.preventDefault();
             if (viewMode === 'reading' && openTabs.length > 0) {
-              closeTab(e as any, activeTabIndex);
+              if (closeTab(activeTabIndex)) setViewMode('grid');
             }
             break;
           case 'b':
@@ -143,27 +141,24 @@ function App() {
 
   const loadDocuments = async () => {
     try {
+      // Every view is the same endpoint with different filters now, rather than
+      // a separate query per view.
+      const query: Parameters<typeof documentService.list>[0] = {};
+
       if (searchQuery.trim().length > 0) {
-        const docs = await documentService.search(searchQuery);
-        setDocuments(docs);
-        return;
-      }
-      
-      let docs: Document[] = [];
-      if (activeView.type === 'all') {
-        docs = await documentService.getAll();
+        query.q = searchQuery.trim();
       } else if (activeView.type === 'recent') {
-        docs = await documentService.getRecent();
+        query.limit = 10;
       } else if (activeView.type === 'favorites') {
-        docs = await documentService.getFavorites();
+        query.favorite = true;
       } else if (activeView.type === 'library' && activeView.id) {
-        docs = await libraryService.getDocuments(activeView.id);
+        query.libraryId = activeView.id;
       } else if (activeView.type === 'collection' && activeView.id) {
-        docs = await collectionService.getDocuments(activeView.id);
-      } else {
-        docs = await documentService.getAll();
+        query.collectionId = activeView.id;
       }
-      setDocuments(docs);
+
+      const page = await documentService.list(query);
+      setDocuments(page.items);
     } catch (err) {
       console.error("Failed to load documents", err);
     }
@@ -177,32 +172,36 @@ function App() {
     return () => window.removeEventListener('refresh-documents', handleRefresh);
   }, [searchQuery, activeView]);
 
-  const handleImport = async () => {
+  const handleImport = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    // Reset so choosing the same file again still fires a change event.
+    event.target.value = "";
+    if (!file) return;
+
+    setImportError(null);
+    setIsUploading(true);
     try {
-      const newDoc = await documentService.importDocument();
-      if (newDoc) {
-        setImportingDoc(newDoc);
-      }
+      // The upload happens before the modal because the server needs the bytes
+      // to read metadata and render a cover; the modal then edits the result.
+      setImportingDoc(await documentService.upload(file));
     } catch (err) {
-      alert(`Import failed in App: ${err}`);
       console.error("Failed to import document", err);
+      setImportError(err instanceof Error ? err.message : "Import failed.");
+    } finally {
+      setIsUploading(false);
     }
   };
 
   const handleSidebarSelect = (view: ActiveView) => {
     setActiveView(view);
     setViewMode('grid');
-  };
-
-  const openDocumentInTab = (doc: Document) => {
-    const existingIndex = openTabs.findIndex(t => t.id === doc.id);
-    if (existingIndex >= 0) {
-      setActiveTabIndex(existingIndex);
-    } else {
-      setOpenTabs(prev => [...prev, doc]);
-      setActiveTabIndex(openTabs.length);
-    }
-    setViewMode('reading');
+    // On a phone the sidebar covers the library, so choosing a view should
+    // reveal the result rather than leaving the drawer in the way.
+    if (isNarrow()) setIsLeftSidebarOpen(false);
   };
 
   const openDetails = (doc: Document) => {
@@ -210,47 +209,13 @@ function App() {
     setIsRightSidebarOpen(true);
   };
 
-  const closeTab = (e: React.MouseEvent, index: number) => {
-    if (e && e.stopPropagation) e.stopPropagation();
-    const newTabs = [...openTabs];
-    newTabs.splice(index, 1);
-    setOpenTabs(newTabs);
-    
-    if (newTabs.length === 0) {
-      setViewMode('grid');
-    } else if (activeTabIndex >= newTabs.length) {
-      setActiveTabIndex(Math.max(0, newTabs.length - 1));
-    } else if (activeTabIndex > index) {
-      setActiveTabIndex(activeTabIndex - 1);
-    }
-
-    if (isSplitView && splitRightTabIndex === index) {
-      setIsSplitView(false);
-      setSplitRightTabIndex(null);
-    } else if (splitRightTabIndex !== null && splitRightTabIndex > index) {
-      setSplitRightTabIndex(splitRightTabIndex - 1);
-    }
-  };
-
-  const toggleSplitView = () => {
-    if (isSplitView) {
-      setIsSplitView(false);
-      setSplitRightTabIndex(null);
-    } else {
-      setIsSplitView(true);
-      setSplitRightTabIndex(activeTabIndex);
-    }
-  };
-
-  const activeDocument = openTabs.length > 0 ? openTabs[activeTabIndex] : null;
-
   const renderReaderContent = (doc: Document | null, inSplitView: boolean = false) => {
     if (!doc) return null;
-    if (doc.document_type === 'md' || doc.document_type === 'txt') {
-      return <MarkdownReader documentId={doc.id} filePath={doc.file_path} />;
+    if (doc.documentType === 'md' || doc.documentType === 'txt') {
+      return <MarkdownReader documentId={doc.id} />;
     }
-    if (doc.document_type === 'pdf') {
-      return <PdfReader documentId={doc.id} filePath={doc.file_path} isSplitView={inSplitView} />;
+    if (doc.documentType === 'pdf') {
+      return <PdfReader documentId={doc.id} isSplitView={inSplitView} />;
     }
     return <div>Unsupported file format</div>;
   };
@@ -259,13 +224,11 @@ function App() {
     loadDocuments();
     // Update open tabs if modified
     if (detailsDocument) {
-      documentService.getAll().then(allDocs => {
-        const updatedDoc = allDocs.find(d => d.id === detailsDocument.id);
-        if (updatedDoc) {
-          setDetailsDocument(updatedDoc);
-          setOpenTabs(prev => prev.map(t => t.id === updatedDoc.id ? updatedDoc : t));
-        }
-      });
+      // One document by id, rather than listing the whole library to find it.
+      documentService.get(detailsDocument.id).then(updated => {
+        setDetailsDocument(updated);
+        replaceDocument(updated);
+      }).catch(err => console.error("Failed to refresh document", err));
     }
   };
 
@@ -274,53 +237,31 @@ function App() {
     setDetailsDocument(null);
     loadDocuments();
     // Close tab if open
-    if (detailsDocument) {
-      const idx = openTabs.findIndex(t => t.id === detailsDocument.id);
-      if (idx !== -1) {
-        closeTab({ stopPropagation: () => {} } as any, idx);
-      }
+    if (detailsDocument && closeTabForDocument(detailsDocument.id)) {
+      setViewMode('grid');
     }
   };
 
-  const handleOnboardingComplete = async () => {
+  const handleOnboardingComplete = () => {
     setShowOnboarding(false);
-    try {
-      let currentSettings = { ...defaultSettings };
-      if (await exists('settings.json', { baseDir: BaseDirectory.AppLocalData })) {
-        const data = await readTextFile('settings.json', { baseDir: BaseDirectory.AppLocalData });
-        currentSettings = { ...currentSettings, ...JSON.parse(data) };
-      }
-      
-      currentSettings.hasSeenOnboarding = true;
-      const { writeTextFile, mkdir } = await import("@tauri-apps/plugin-fs");
-      
-      const hasDir = await exists('', { baseDir: BaseDirectory.AppLocalData });
-      if (!hasDir) {
-        await mkdir('', { baseDir: BaseDirectory.AppLocalData, recursive: true });
-      }
-      
-      await writeTextFile('settings.json', JSON.stringify(currentSettings, null, 2), { baseDir: BaseDirectory.AppLocalData });
-      
-      // Trigger prompt to rename first library
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('prompt-rename-first-library'));
-      }, 400);
-      
-    } catch (err) {
-      console.error("Failed to save onboarding completion", err);
-    }
+    saveSettings({ ...loadSettings(), hasSeenOnboarding: true });
+
+    // Trigger prompt to rename first library
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('prompt-rename-first-library'));
+    }, 400);
   };
 
   const handleOpenLibSettings = async () => {
     if (activeView.type === 'library' && activeView.id) {
-      const libs = await libraryService.getAll();
+      const libs = await libraryService.list();
       const lib = libs.find(l => l.id === activeView.id) ?? null;
       setLibSettingsLibrary(lib);
       setLibSettingsCollection(null);
       setLibSettingsMode('library');
       setIsLibSettingsOpen(true);
     } else if (activeView.type === 'collection' && activeView.id) {
-      const col = await collectionService.getById(activeView.id);
+      const col = await collectionService.get(activeView.id);
       setLibSettingsCollection(col);
       setLibSettingsLibrary(null);
       setLibSettingsMode('collection');
@@ -352,9 +293,46 @@ function App() {
         onSaved={handleLibSettingsSaved}
         onDeleted={handleLibDeleted}
       />
+      {/* The browser's file picker replaces the desktop build's native dialog. */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.md,.txt"
+        className="hidden"
+        onChange={handleFileSelected}
+      />
+
+      {isUploading && (
+        <div className="fixed-overlay z-100" role="status" aria-live="polite">
+          <div className="modal-content" style={{ maxWidth: "320px" }}>
+            <div className="modal-body text-center">
+              <p className="text-sm text-secondary m-0">Uploading and indexing…</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {importError && (
+        <div className="fixed-overlay z-100" role="alertdialog" aria-modal="true">
+          <div className="modal-content" style={{ maxWidth: "420px" }}>
+            <div className="modal-header">
+              <h2 className="font-semibold text-base m-0">Import failed</h2>
+            </div>
+            <div className="modal-body">
+              <p className="text-sm text-secondary m-0">{importError}</p>
+              <div className="flex justify-end mt-6">
+                <button className="btn btn-primary" onClick={() => setImportError(null)} autoFocus>
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {importingDoc && (
-        <ImportModal 
-          document={importingDoc} 
+        <ImportModal
+          document={importingDoc}
           onClose={() => setImportingDoc(null)} 
           onComplete={() => {
             setImportingDoc(null);
@@ -363,7 +341,22 @@ function App() {
         />
       )}
 
-      <Sidebar 
+      {/* Tapping outside a drawer closes it, which is the gesture people expect
+          and the only way to dismiss it one-handed. */}
+      {(isLeftSidebarOpen || isRightSidebarOpen) && (
+        <div
+          className="drawer-backdrop"
+          onClick={() => {
+            if (isNarrow()) {
+              setIsLeftSidebarOpen(false);
+              setIsRightSidebarOpen(false);
+            }
+          }}
+          aria-hidden="true"
+        />
+      )}
+
+      <Sidebar
         isOpen={isLeftSidebarOpen}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
@@ -396,29 +389,13 @@ function App() {
             </div>
           )}
 
-          {/* Tabs Area */}
-          <div className="flex flex-1 overflow-x-auto no-scrollbar items-center h-full">
-            {openTabs.map((tab, idx) => (
-              <div 
-                key={`${tab.id}-${idx}`}
-                className={`flex items-center gap-2 px-4 h-full cursor-pointer border-r border-[var(--border-color)] text-sm max-w-[200px] transition-colors
-                  ${viewMode === 'reading' && idx === activeTabIndex 
-                    ? 'bg-[var(--bg-primary)] border-t-3 border-t-[var(--accent)] text-primary font-medium' 
-                    : 'bg-[var(--bg-secondary)] text-secondary border-t-3 border-t-transparent hover:bg-[var(--bg-tertiary)]'
-                  }`}
-                onClick={() => { setActiveTabIndex(idx); setViewMode('reading'); }}
-              >
-                <FileText size={14} className={viewMode === 'reading' && idx === activeTabIndex ? "text-primary" : "text-muted"} />
-                <span className="truncate select-none">{tab.title}</span>
-                <button 
-                  className="p-1 rounded hover:bg-black/10 text-muted ml-1"
-                  onClick={(e) => closeTab(e, idx)}
-                >
-                  <X size={12} />
-                </button>
-              </div>
-            ))}
-          </div>
+          <TabBar
+            tabs={openTabs}
+            activeIndex={activeTabIndex}
+            isReading={viewMode === 'reading'}
+            onSelect={(idx) => { setActiveTabIndex(idx); setViewMode('reading'); }}
+            onClose={(idx) => { if (closeTab(idx)) setViewMode('grid'); }}
+          />
           
           <div className="flex items-center gap-2 flex-shrink-0 ml-auto pr-2">
             {viewMode === 'reading' && isSplitView && splitRightTabIndex !== null && (
@@ -459,7 +436,10 @@ function App() {
             <div className="w-full h-full animate-in fade-in duration-200">
               <DocumentGrid 
                 documents={documents} 
-                onOpenDocument={openDocumentInTab}
+                onOpenDocument={(doc) => {
+                  openDocument(doc);
+                  setViewMode('reading');
+                }}
                 onOpenDetails={openDetails}
                 onRefresh={loadDocuments}
               />
@@ -467,14 +447,14 @@ function App() {
           ) : (
             <>
               {/* Left Reader Panel */}
-              <div className={`flex-1 min-w-0 h-full w-full relative ${activeDocument?.document_type === 'pdf' ? 'bg-[var(--bg-secondary)]' : 'reader-bg'}`}>
+              <div className={`flex-1 min-w-0 h-full w-full relative ${activeDocument?.documentType === 'pdf' ? 'bg-[var(--bg-secondary)]' : 'reader-bg'}`}>
                 <div className="absolute inset-0 overflow-y-auto">
                   {renderReaderContent(activeDocument, isSplitView)}
                 </div>
               </div>
 
               {isSplitView && splitRightTabIndex !== null && (
-                <div className={`flex-1 min-w-0 border-l border-[var(--border-color)] h-full w-full relative ${openTabs[splitRightTabIndex]?.document_type === 'pdf' ? 'bg-[var(--bg-secondary)]' : 'reader-bg'}`}>
+                <div className={`flex-1 min-w-0 border-l border-[var(--border-color)] h-full w-full relative ${openTabs[splitRightTabIndex]?.documentType === 'pdf' ? 'bg-[var(--bg-secondary)]' : 'reader-bg'}`}>
                   <div className="absolute inset-0 overflow-y-auto">
                     {renderReaderContent(openTabs[splitRightTabIndex] || null, true)}
                   </div>

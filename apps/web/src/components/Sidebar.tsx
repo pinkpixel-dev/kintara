@@ -9,7 +9,7 @@ import {
   GraduationCap, Microscope, Landmark, Building2,
   ChefHat, TreePine, Waves, Rocket, Bot
 } from "lucide-react";
-import { Library, Collection, libraryService, collectionService } from "../db";
+import { collectionService, libraryService, type Collection, type Library } from "../api";
 
 // Map icon name strings → components for rendering
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -47,17 +47,17 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
 
   const loadData = async () => {
     try {
-      let libs = await libraryService.getAll();
+      let libs = await libraryService.list();
       if (libs.length === 0) {
-        await libraryService.create("My Library", "#410186");
-        libs = await libraryService.getAll();
+        await libraryService.create({ name: "My Library", themeColor: "#410186" });
+        libs = await libraryService.list();
       }
       setLibraries(libs);
 
       const colMap: Record<number, Collection[]> = {};
       const expMap: Record<number, boolean> = { ...expandedLibraries };
       for (const lib of libs) {
-        const cols = await collectionService.getAllForLibrary(lib.id);
+        const cols = await collectionService.list(lib.id);
         colMap[lib.id] = cols;
         if (expMap[lib.id] === undefined) expMap[lib.id] = true;
       }
@@ -74,9 +74,9 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
     // Listen for custom event to trigger library rename for onboarding
     const handleRenamePrompt = () => {
       openPrompt("Name your first library", "Library name...", "My Library", async (val) => {
-        const libs = await libraryService.getAll();
+        const libs = await libraryService.list();
         if (libs.length > 0) {
-          await libraryService.rename(libs[0].id, val);
+          await libraryService.update(libs[0].id, { name: val });
           await loadData();
         }
       });
@@ -181,7 +181,7 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
                 title="New Library"
                 onClick={() => {
                   openPrompt("Create Library", "Library name...", "", async (val) => {
-                    await libraryService.create(val);
+                    await libraryService.create({ name: val });
                     await loadData();
                   });
                 }}
@@ -197,7 +197,7 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
 
                 // Resolve icon component
                 const LibIcon = (lib.icon && ICON_MAP[lib.icon]) ? ICON_MAP[lib.icon] : FolderOpen;
-                const iconColor = lib.icon_color || undefined;
+                const iconColor = lib.iconColor || undefined;
 
                 return (
                   <div key={`lib-${lib.id}`}>

@@ -26,6 +26,7 @@ pub fn router() -> Router<AppState> {
             post(crate::routes::tags::attach).delete(crate::routes::tags::detach),
         )
         .route("/{id}/annotations", get(crate::routes::annotations::for_document))
+        .route("/{id}/cover", post(upload::upload_cover))
         .layer(CompressionLayer::new());
 
     // Document bytes: served by ServeFile with Range support, and never

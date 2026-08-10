@@ -1,24 +1,6 @@
 import { useState, useEffect } from "react";
-import { BaseDirectory, readTextFile, writeTextFile, exists, mkdir } from "@tauri-apps/plugin-fs";
+import { applySettings, defaultSettings, loadSettings, saveSettings, type Settings } from "../lib/settings";
 import { X, Settings as SettingsIcon, Type, Palette } from "lucide-react";
-
-interface AppSettings {
-  fontFamily: string;
-  fontSize: string;
-  theme: 'dark' | 'light' | 'system';
-  readerTheme: 'dark' | 'light' | 'system';
-  highlightColor: string;
-  hasSeenOnboarding: boolean;
-}
-
-const defaultSettings: AppSettings = {
-  fontFamily: 'Inter, system-ui, Avenir, Helvetica, Arial, sans-serif',
-  fontSize: '14px',
-  theme: 'dark',
-  readerTheme: 'light',
-  highlightColor: 'rgba(139, 92, 246, 0.35)',
-  hasSeenOnboarding: false
-};
 
 // Preset highlight colors: [label, rgba value]
 const HIGHLIGHT_PRESETS: { label: string; value: string; swatch: string }[] = [
@@ -38,59 +20,23 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
-  const [settings, setSettings] = useState<AppSettings>(defaultSettings);
+  const [settings, setSettings] = useState<Settings>(defaultSettings);
 
   useEffect(() => {
     if (isOpen) {
-      loadSettings();
+      readSettings();
     }
   }, [isOpen]);
 
-  const loadSettings = async () => {
-    try {
-      if (await exists('settings.json', { baseDir: BaseDirectory.AppLocalData })) {
-        const data = await readTextFile('settings.json', { baseDir: BaseDirectory.AppLocalData });
-        const parsed = JSON.parse(data);
-        setSettings({ ...defaultSettings, ...parsed });
-      } else {
-        await saveSettings(defaultSettings);
-      }
-    } catch (err) {
-      console.error("Failed to load settings", err);
-    }
+  const readSettings = () => {
+    setSettings(loadSettings());
   };
 
-  const saveSettings = async (newSettings: AppSettings) => {
-    applySettingsToDom(newSettings);
-    try {
-      const hasDir = await exists('', { baseDir: BaseDirectory.AppLocalData });
-      if (!hasDir) {
-        await mkdir('', { baseDir: BaseDirectory.AppLocalData, recursive: true });
-      }
-      await writeTextFile('settings.json', JSON.stringify(newSettings, null, 2), { baseDir: BaseDirectory.AppLocalData });
-      setSettings(newSettings);
-    } catch (err) {
-      console.error("Failed to save settings", err);
-    }
-  };
-
-  const applySettingsToDom = (s: AppSettings) => {
-    document.documentElement.style.setProperty('--font-family', s.fontFamily);
-    document.documentElement.style.fontSize = s.fontSize;
-    document.documentElement.style.setProperty('--highlight-color', s.highlightColor ?? defaultSettings.highlightColor);
-    if (s.theme !== 'system') {
-      document.documentElement.setAttribute('data-theme', s.theme);
-    } else {
-      document.documentElement.removeAttribute('data-theme');
-    }
-    if (s.readerTheme) {
-      document.documentElement.setAttribute('data-reader-theme', s.readerTheme);
-    }
-  };
-
-  const updateSetting = (key: keyof AppSettings, value: any) => {
+  /** Settings apply immediately and persist to localStorage — no Save button. */
+  const updateSetting = (key: keyof Settings, value: any) => {
     const next = { ...settings, [key]: value };
     setSettings(next);
+    applySettings(next);
     saveSettings(next);
   };
 
@@ -238,4 +184,4 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   );
 }
 
-export { defaultSettings, type AppSettings };
+export { defaultSettings, type Settings };

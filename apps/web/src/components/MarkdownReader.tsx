@@ -3,14 +3,12 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import { codeToHtml } from "shiki";
-import { invoke } from "@tauri-apps/api/core";
-import { annotationService, Annotation } from "../db";
+import { annotationService, documentService, type Annotation } from "../api";
 import "./MarkdownReader.css";
 import { Link } from "lucide-react";
 
 interface MarkdownReaderProps {
   documentId: number;
-  filePath: string;
 }
 
 /** Read the current --highlight-color CSS variable from the document root. */
@@ -19,7 +17,7 @@ const getHighlightColor = () =>
     .getPropertyValue('--highlight-color')
     .trim() || "rgba(139, 92, 246, 0.35)";
 
-export const MarkdownReader: React.FC<MarkdownReaderProps> = ({ documentId, filePath }) => {
+export const MarkdownReader: React.FC<MarkdownReaderProps> = ({ documentId }) => {
   const [content, setContent] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
@@ -27,8 +25,7 @@ export const MarkdownReader: React.FC<MarkdownReaderProps> = ({ documentId, file
 
   const loadAnnotations = useCallback(async () => {
     try {
-      const anns = await annotationService.getByDocument(documentId);
-      setAnnotations(anns);
+      setAnnotations(await documentService.annotations(documentId));
     } catch (err) {
       console.error("Failed to load annotations:", err);
     }
@@ -37,10 +34,7 @@ export const MarkdownReader: React.FC<MarkdownReaderProps> = ({ documentId, file
   useEffect(() => {
     const loadFile = async () => {
       try {
-        const data = await invoke<number[]>("read_file_from_library", { filePath });
-        const fileData = new Uint8Array(data);
-        const text = new TextDecoder().decode(fileData);
-        setContent(text);
+        setContent(await documentService.text(documentId));
         loadAnnotations();
       } catch (err) {
         console.error("Failed to read markdown file:", err);
@@ -48,7 +42,7 @@ export const MarkdownReader: React.FC<MarkdownReaderProps> = ({ documentId, file
       }
     };
     loadFile();
-  }, [filePath, documentId]);
+  }, [documentId]);
 
   /** On mouseup — immediately highlight selected text, no confirmation dialog. */
   const handleTextSelection = async () => {
@@ -62,9 +56,9 @@ export const MarkdownReader: React.FC<MarkdownReaderProps> = ({ documentId, file
 
     try {
       await annotationService.create({
-        document_id: documentId,
-        annotation_type: "highlight",
-        serialized_position: "text_match",
+        documentId,
+        annotationType: "highlight",
+        serializedPosition: "text_match",
         content: text,
         color,
       });
@@ -85,7 +79,7 @@ export const MarkdownReader: React.FC<MarkdownReaderProps> = ({ documentId, file
 
     e.stopPropagation();
     try {
-      await annotationService.delete(annotationId);
+      await annotationService.remove(annotationId);
       await loadAnnotations();
     } catch (err) {
       console.error("Failed to delete annotation", err);

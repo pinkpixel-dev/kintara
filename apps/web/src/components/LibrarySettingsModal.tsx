@@ -9,7 +9,7 @@ import {
   GraduationCap, Microscope, Landmark, Building2,
   ChefHat, TreePine, Waves, Rocket, Bot
 } from "lucide-react";
-import { Library, Collection, libraryService, collectionService } from "../db";
+import { collectionService, libraryService, type Collection, type Library } from "../api";
 
 // ─── Icon catalogue ──────────────────────────────────────────────────────────
 const ICONS: { name: string; component: React.ElementType }[] = [
@@ -98,7 +98,7 @@ export function LibrarySettingsModal({
     if (mode === "library" && library) {
       setName(library.name);
       setSelectedIcon(library.icon ?? null);
-      const c = library.icon_color ?? "#6366f1";
+      const c = library.iconColor ?? "#6366f1";
       setSelectedColor(c);
       setCustomColor(c);
     } else if (mode === "collection" && collection) {
@@ -119,7 +119,7 @@ export function LibrarySettingsModal({
         await libraryService.update(library.id, {
           name: name.trim(),
           icon: selectedIcon,
-          icon_color: selectedColor,
+          iconColor: selectedColor,
         });
       } else if (mode === "collection" && collection) {
         await collectionService.rename(collection.id, name.trim());
@@ -141,9 +141,9 @@ export function LibrarySettingsModal({
     setDeleting(true);
     try {
       if (mode === "library" && library) {
-        await libraryService.delete(library.id);
+        await libraryService.remove(library.id);
       } else if (mode === "collection" && collection) {
-        await collectionService.delete(collection.id);
+        await collectionService.remove(collection.id);
       }
       onDeleted();
       onClose();
