@@ -220,14 +220,19 @@ function App() {
 
   const handleDocumentUpdate = () => {
     loadDocuments();
-    // Update open tabs if modified
-    if (detailsDocument) {
-      // One document by id, rather than listing the whole library to find it.
-      documentService.get(detailsDocument.id).then(updated => {
-        setDetailsDocument(updated);
-        replaceDocument(updated);
-      }).catch(err => console.error("Failed to refresh document", err));
-    }
+
+    // The details panel shows detailsDocument when one was picked from a card,
+    // and otherwise falls back to the document open in the reader. Refreshing
+    // only the former left the reader's copy stale, so edited metadata saved
+    // correctly to the server and then appeared to vanish on reopening.
+    const shown = detailsDocument ?? activeDocument;
+    if (!shown) return;
+
+    // One document by id, rather than listing the whole library to find it.
+    documentService.get(shown.id).then(updated => {
+      setDetailsDocument(prev => (prev ? updated : prev));
+      replaceDocument(updated);
+    }).catch(err => console.error("Failed to refresh document", err));
   };
 
   const handleDocumentDelete = () => {

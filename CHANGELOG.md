@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-08-10
+### Fixed
+- **Edited author, summary, and keywords appeared to vanish after saving.** They were
+  saved correctly — the server had them the whole time — but the details panel was showing
+  a stale copy. When a document is opened in the reader and the panel is toggled from the
+  header, it renders the open tab's document rather than one picked from a card, and only
+  the latter was being refreshed after a save. Tags looked fine because they are fetched
+  from the server on every open. No data was lost by this.
+
 ## [1.0.4] - 2026-08-10
 ### Fixed
 - **"Name your first library" reappeared on every new device, and renamed the library you
