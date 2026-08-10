@@ -19,16 +19,5 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <script>
-      // Registered after load so it never competes with the first render.
-      if ("serviceWorker" in navigator) {
-        window.addEventListener("load", () => {
-          navigator.serviceWorker.register("/sw.js").catch(() => {
-            // Unsupported or blocked (a non-secure origin that is not
-            // localhost). The app works fine without it.
-          });
-        });
-      }
-    </script>
   </body>
 </html>

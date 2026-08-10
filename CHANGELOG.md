@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-08-10
+### Fixed
+- **The service worker cached the development bundle, so code changes never appeared.**
+  It registered in development as well as production and served static assets cache-first.
+  That is correct for a production build, where Vite content-hashes every filename, and
+  actively harmful in development, where modules are served at stable URLs like
+  `/src/App.tsx` — the first version fetched was then served forever. It now registers
+  only in production, and in development actively unregisters any worker and clears any
+  cache an earlier build left behind, so affected machines heal themselves on next load.
+  The worker also skips Vite's `/@`, `/src/`, and `/node_modules/` paths as a backstop,
+  and its cache version was bumped so installed copies replace themselves.
+- **The tab close button was hard to see.** At `--text-muted` it sat around 4:1 against
+  the tab — legible in theory, easy to miss for a 14px glyph. It now uses
+  `--text-secondary`.
+
 ## [1.1.1] - 2026-08-10
 ### Fixed
 - **Tabs stayed open for documents that no longer exist.** Open tabs are client state, so

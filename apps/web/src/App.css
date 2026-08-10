@@ -1055,7 +1055,9 @@ select, option {
   border: none;
   border-radius: var(--radius-md);
   background: transparent;
-  color: var(--text-muted);
+  /* --text-muted sits around 4:1 against the tab, which is legible in theory
+     and easy to miss in practice for a 14px glyph. */
+  color: var(--text-secondary);
   cursor: pointer;
   transition: color 0.2s ease, background-color 0.2s ease;
 }
