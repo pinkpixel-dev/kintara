@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-08-10
+### Fixed
+- **Photographs were missing from PDFs.** Pages rendered their text, vector art, and links
+  correctly and simply left the images blank. pdf.js 5 decodes JPEG 2000 and JBIG2 — the
+  two codecs scanned magazines reach for most — through WebAssembly modules it fetches at
+  runtime, and only `workerSrc` had been configured. Without `wasmUrl` the decode fails
+  quietly, so it looks like missing pictures rather than an error.
+  `cMapUrl` (CJK text), `standardFontDataUrl` (base-14 fonts), and `iccUrl` (colour
+  profiles) were missing for the same reason and are now set too.
+- A Vite plugin serves these assets from `node_modules` in development and copies them into
+  the build, rather than vendoring 4 MB of binaries into the repository where they would
+  drift out of step with the installed pdf.js.
+
 ## [1.0.2] - 2026-08-10
 ### Fixed
 - **Uploading any real PDF failed** with "Error parsing `multipart/form-data` request". Axum

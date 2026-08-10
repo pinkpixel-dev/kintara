@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { pdfjsLib } from "../lib/pdf";
+import { pdfAssetOptions, pdfjsLib } from "../lib/pdf";
 import { annotationService, documentService, documentUrls, type Annotation } from "../api";
 import "./PdfReader.css";
 
@@ -64,7 +64,10 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ documentId }) => {
         // Loading by URL rather than by passing bytes lets pdf.js issue Range
         // requests and fetch only the pages it needs, which is the difference
         // between a snappy reader and re-downloading a 200 MB scan per page.
-        const loadingTask = pdfjsLib.getDocument({ url: documentUrls.file(documentId) });
+        const loadingTask = pdfjsLib.getDocument({
+          url: documentUrls.file(documentId),
+          ...pdfAssetOptions,
+        });
         const doc = await loadingTask.promise;
         if (cancelled) return;
 
