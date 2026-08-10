@@ -29,6 +29,13 @@ pub async fn full_scan(state: &AppState) -> AppResult<()> {
             .filter(|entry| entry.file_type().is_file())
             .map(|entry| entry.into_path())
             .filter(|path| index::is_indexable(path))
+            // Skip @eaDir, #recycle and friends, which NAS software keeps
+            // beside your files and which would otherwise fill the library.
+            .filter(|path| {
+                index::relative_to_root(&root, path)
+                    .map(|rel| !index::is_ignored_relative(&rel))
+                    .unwrap_or(false)
+            })
             .collect()
     })
     .await
@@ -130,13 +137,16 @@ pub fn spawn_watcher(state: AppState) {
                     continue;
                 }
 
+                let relative = index::relative_to_root(&state.config.library_dir, &path);
+                if relative.as_deref().map(index::is_ignored_relative).unwrap_or(true) {
+                    continue;
+                }
+
                 if path.exists() {
                     if let Err(err) = index::index_file(&state, &path).await {
                         tracing::warn!(path = %path.display(), ?err, "failed to index");
                     }
-                } else if let Some(relative) =
-                    index::relative_to_root(&state.config.library_dir, &path)
-                {
+                } else if let Some(relative) = relative {
                     if let Err(err) = index::forget_path(&state, &relative).await {
                         tracing::warn!(%relative, ?err, "failed to remove");
                     }

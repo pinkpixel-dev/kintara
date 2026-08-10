@@ -4,7 +4,7 @@
 //! call into it, so a file gets identical treatment whether it was dropped over
 //! SMB, copied in by hand, or uploaded through the API.
 
-use std::path::Path;
+use std::path::{Component, Path};
 
 use crate::error::AppResult;
 use crate::media;
@@ -13,6 +13,24 @@ use crate::state::AppState;
 /// Extensions the readers can display. Everything else on the share is ignored
 /// rather than indexed into an entry that cannot be opened.
 pub const INDEXABLE: [&str; 3] = ["pdf", "md", "txt"];
+
+/// Directories NAS software keeps beside your files. Indexing their contents
+/// produces a library full of thumbnails and deleted files.
+const IGNORED_DIRS: [&str; 5] = ["@eaDir", "#recycle", "#snapshot", "lost+found", "$RECYCLE.BIN"];
+
+/// True when any component of a library-relative path should be skipped.
+///
+/// Checked against the relative path, not the absolute one — the library may
+/// itself sit under a dotted directory, and that is no reason to ignore it.
+pub fn is_ignored_relative(relative: &str) -> bool {
+    Path::new(relative).components().any(|component| {
+        let Component::Normal(part) = component else {
+            return false;
+        };
+        let part = part.to_str().unwrap_or_default();
+        part.starts_with('.') || IGNORED_DIRS.iter().any(|dir| part.eq_ignore_ascii_case(dir))
+    })
+}
 
 pub fn is_indexable(path: &Path) -> bool {
     // Editors and sync clients litter the share with partial files; indexing
@@ -26,6 +44,27 @@ pub fn is_indexable(path: &Path) -> bool {
         .and_then(|e| e.to_str())
         .map(|e| INDEXABLE.contains(&e.to_lowercase().as_str()))
         .unwrap_or(false)
+}
+
+/// Streams a file through the hasher, returning its hash and size.
+async fn hash_file(path: &Path) -> std::io::Result<(String, i64)> {
+    use tokio::io::AsyncReadExt;
+
+    let mut file = tokio::fs::File::open(path).await?;
+    let mut hasher = blake3::Hasher::new();
+    let mut buffer = vec![0u8; 128 * 1024];
+    let mut size: i64 = 0;
+
+    loop {
+        let read = file.read(&mut buffer).await?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+        size += read as i64;
+    }
+
+    Ok((hasher.finalize().to_hex().to_string(), size))
 }
 
 /// Path relative to the library root, in the form stored in the database.
@@ -54,8 +93,15 @@ pub async fn index_file(state: &AppState, path: &Path) -> AppResult<Outcome> {
         return Ok(Outcome::Skipped);
     };
 
-    let bytes = match tokio::fs::read(path).await {
-        Ok(bytes) => bytes,
+    if is_ignored_relative(&relative_path) {
+        return Ok(Outcome::Skipped);
+    }
+
+    // Hashed in chunks rather than read whole: a magazine scan can be hundreds
+    // of megabytes, and a scan of a full library would otherwise load each one
+    // into memory in turn.
+    let (hash, size) = match hash_file(path).await {
+        Ok(result) => result,
         // Racing a copy still in progress is normal on a network share.
         Err(err) => {
             tracing::debug!(path = %path.display(), %err, "could not read file; skipping");
@@ -63,13 +109,9 @@ pub async fn index_file(state: &AppState, path: &Path) -> AppResult<Outcome> {
         }
     };
 
-    if bytes.is_empty() {
+    if size == 0 {
         return Ok(Outcome::Skipped);
     }
-
-    let hash = media::hash_bytes(&bytes);
-    let size = bytes.len() as i64;
-    drop(bytes);
 
     let existing: Option<(i64, Option<String>)> =
         sqlx::query_as("SELECT id, file_hash FROM documents WHERE relative_path = ?")

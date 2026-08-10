@@ -27,6 +27,9 @@ pub struct Config {
     /// share where inotify watches are scarce or the filesystem does not
     /// report events at all.
     pub watch: bool,
+    /// Largest upload accepted, in bytes. Scanned books run to hundreds of
+    /// megabytes, and axum's 2 MB default rejects almost any real PDF.
+    pub max_upload_bytes: usize,
 }
 
 impl Config {
@@ -48,6 +51,11 @@ impl Config {
             bind,
             scan_on_start: bool_var("KINTARA_SCAN_ON_START", true),
             watch: bool_var("KINTARA_WATCH", true),
+            max_upload_bytes: std::env::var("KINTARA_MAX_UPLOAD_MB")
+                .ok()
+                .and_then(|v| v.trim().parse::<usize>().ok())
+                .unwrap_or(1024)
+                .saturating_mul(1024 * 1024),
         })
     }
 

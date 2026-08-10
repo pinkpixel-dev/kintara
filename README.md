@@ -56,6 +56,7 @@ subtle failure.
 | `KINTARA_BIND` | `0.0.0.0:8080` | Listen address. |
 | `KINTARA_SCAN_ON_START` | `true` | Sweep the library at startup. |
 | `KINTARA_WATCH` | `true` | Watch for changes while running. Turn off if your share does not report filesystem events. |
+| `KINTARA_MAX_UPLOAD_MB` | `1024` | Largest upload accepted. Magazine scans are big. |
 | `KINTARA_LOG` | `kintara_server=info` | Log filter. |
 
 ## Developing
@@ -64,15 +65,20 @@ You need Rust, Node, and `poppler-utils` (for `pdfinfo` and `pdftoppm`).
 
 ```bash
 npm install
-npm run build --workspace apps/web    # build the frontend once
-
-cd apps/server
-cargo run                             # serves the API and the built frontend on :8080
-cargo test                            # 106 tests, no mocks
+npm run dev      # starts the API on :8080 and the frontend on :1420
+npm test         # 110 tests, no mocks
 ```
 
-Defaults are relative paths, so `cargo run` works from `apps/server` with no setup. For
-frontend work, `npm run dev` gives you Vite's dev server against the running API.
+`npm run dev` runs both halves — the frontend proxies `/api` to the server, so starting
+only one gives you an app that cannot reach its backend. Point the proxy elsewhere with
+`KINTARA_DEV_API`.
+
+To run it the way the NAS does, build the frontend once and let the server host it:
+
+```bash
+npm run build
+cd apps/server && cargo run    # everything on :8080, no proxy involved
+```
 
 ### Layout
 

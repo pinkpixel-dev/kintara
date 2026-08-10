@@ -27,6 +27,7 @@ async fn test_app() -> (tempfile::TempDir, axum::Router) {
         // their assertions.
         scan_on_start: false,
         watch: false,
+        max_upload_bytes: 64 * 1024 * 1024,
     };
     config.ensure_dirs().expect("create dirs");
     std::fs::create_dir_all(&config.web_dir).expect("create web dir");
@@ -134,6 +135,7 @@ fn database_lives_in_the_data_dir_not_the_library() {
         bind: "0.0.0.0:8080".parse().unwrap(),
         scan_on_start: false,
         watch: false,
+        max_upload_bytes: 64 * 1024 * 1024,
     };
 
     assert!(config.database_path().starts_with("/data"));

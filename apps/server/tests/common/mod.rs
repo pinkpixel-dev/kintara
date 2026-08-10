@@ -38,6 +38,7 @@ impl TestApp {
             // race their assertions.
             scan_on_start: false,
             watch: false,
+            max_upload_bytes: 64 * 1024 * 1024,
         };
         config.ensure_dirs().expect("create dirs");
         std::fs::create_dir_all(&config.web_dir).expect("create web dir");

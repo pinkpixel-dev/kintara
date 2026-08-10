@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-08-10
+### Fixed
+- **Uploading any real PDF failed** with "Error parsing `multipart/form-data` request". Axum
+  applies a 2 MB body limit by default, and every document worth adding is bigger than that.
+  The limit is now configurable via `KINTARA_MAX_UPLOAD_MB` and defaults to 1 GB. Every test
+  had used a ~900-byte synthetic PDF, which is exactly why this was missed.
+- **Uploads were buffered entirely in memory.** A 120 MB magazine meant 120 MB of RAM per
+  upload, which a NAS does not have to spare. Uploads now stream to disk while hashing;
+  server memory stayed flat at 19 MB across a 122 MB upload. Failed and rejected uploads
+  clean up after themselves.
+- **The scanner also read whole files into memory** to hash them, so scanning a library of
+  magazines loaded each one in turn. It now hashes in 128 KB chunks.
+- **NAS metadata directories were indexed as documents.** `@eaDir`, `#recycle`,
+  `#snapshot`, `lost+found`, and `$RECYCLE.BIN` are now skipped, along with any dot
+  directory, so Synology thumbnails and deleted files no longer fill the library.
+
+### Added
+- `npm run dev` at the repository root now starts the API and the frontend together. Running
+  only the frontend produced a wall of `ECONNREFUSED` proxy errors and an app that looked
+  broken for no visible reason.
+- The app shows **"Can't reach the Kintara server"** with a retry button when the API does
+  not answer, instead of rendering an empty library with a dead Save button.
+- `KINTARA_MAX_UPLOAD_MB` (default 1024) caps upload size. Covers are separately capped at
+  32 MB.
+
 ## [1.0.1] - 2026-08-10
 ### Fixed
 - **The Save button did nothing in the welcome flow and when creating a library.** The Vite

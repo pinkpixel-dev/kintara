@@ -16,6 +16,7 @@ interface AuthGateProps {
  */
 export function AuthGate({ children }: AuthGateProps) {
   const [status, setStatus] = useState<AuthStatus | null>(null);
+  const [unreachable, setUnreachable] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -24,11 +25,13 @@ export function AuthGate({ children }: AuthGateProps) {
   const refresh = async () => {
     try {
       setStatus(await authService.status());
+      setUnreachable(false);
     } catch {
-      // The server is unreachable. Render the app anyway rather than trapping
-      // the user behind a login screen that cannot be satisfied — every request
-      // will surface its own error.
-      setStatus({ needsSetup: false, authenticated: true, user: null });
+      // Rendering the app anyway would give an empty library, a dead Save
+      // button, and a console full of noise. Saying so plainly is far more
+      // useful than letting every request fail on its own.
+      setUnreachable(true);
+      setStatus(null);
     }
   };
 
@@ -64,6 +67,30 @@ export function AuthGate({ children }: AuthGateProps) {
       setBusy(false);
     }
   };
+
+  if (unreachable) {
+    return (
+      <div className="auth-screen">
+        <div className="auth-card" role="alert">
+          <h1 className="auth-title">Can&rsquo;t reach the Kintara server</h1>
+          <p className="auth-subtitle">
+            The app loaded, but the API did not answer. In development this usually means
+            the server is not running &mdash; start both with <code>npm run dev</code> from
+            the repository root.
+          </p>
+          <button
+            className="btn btn-primary auth-submit"
+            onClick={() => {
+              setUnreachable(false);
+              refresh();
+            }}
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (status === null) {
     return (

@@ -1,8 +1,9 @@
-use std::path::Path as StdPath;
+use std::path::{Path as StdPath, PathBuf};
 
 use axum::extract::{Multipart, State};
 use axum::http::StatusCode;
 use axum::Json;
+use tokio::io::AsyncWriteExt;
 
 use crate::error::{AppError, AppResult};
 use crate::media;
@@ -13,32 +14,101 @@ use crate::state::AppState;
 /// door rather than being indexed into a library entry that cannot be opened.
 const ALLOWED: [&str; 3] = ["pdf", "md", "txt"];
 
+/// Image types accepted as a custom cover.
+const ALLOWED_COVER: [&str; 4] = ["png", "jpg", "jpeg", "webp"];
+
+/// Uploads land here first, then get renamed into place.
+///
+/// Inside the library root so the rename is atomic — a temp file in the data
+/// directory would be on a different mount on any real NAS, turning the rename
+/// into a full copy. The leading dot keeps the scanner out of it.
+const INCOMING_DIR: &str = ".kintara-incoming";
+
 /// Accepts a `multipart/form-data` upload with a `file` part, plus optional
 /// `libraryId` and `collectionId` parts to file it on arrival.
+///
+/// The file is streamed to disk rather than buffered. A magazine scan can run
+/// to hundreds of megabytes, and holding that in memory per upload is how a
+/// NAS with 2 GB of RAM falls over.
 pub async fn upload(
     State(state): State<AppState>,
     mut multipart: Multipart,
 ) -> AppResult<(StatusCode, Json<Document>)> {
-    let mut filename: Option<String> = None;
-    let mut bytes: Option<Vec<u8>> = None;
+    let incoming = state.config.library_dir.join(INCOMING_DIR);
+    tokio::fs::create_dir_all(&incoming)
+        .await
+        .map_err(|err| AppError::Internal(err.into()))?;
+
+    let mut upload: Option<StreamedUpload> = None;
     let mut library_id: Option<i64> = None;
     let mut collection_id: Option<i64> = None;
 
-    while let Some(field) = multipart
+    while let Some(mut field) = multipart
         .next_field()
         .await
         .map_err(|err| AppError::BadRequest(format!("malformed upload: {err}")))?
     {
         match field.name().unwrap_or_default() {
             "file" => {
-                filename = field.file_name().map(media::sanitize_filename);
-                bytes = Some(
-                    field
-                        .bytes()
-                        .await
-                        .map_err(|err| AppError::BadRequest(format!("upload failed: {err}")))?
-                        .to_vec(),
-                );
+                let filename = field
+                    .file_name()
+                    .map(media::sanitize_filename)
+                    .ok_or_else(|| AppError::BadRequest("no filename provided".into()))?;
+
+                let extension = extension_of(&filename);
+                if !ALLOWED.contains(&extension.as_str()) {
+                    return Err(AppError::BadRequest(format!(
+                        "unsupported file type '{extension}' (supported: {})",
+                        ALLOWED.join(", ")
+                    )));
+                }
+
+                let temp_path = incoming.join(format!(
+                    ".upload-{}-{}",
+                    std::process::id(),
+                    chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
+                ));
+
+                let mut file = tokio::fs::File::create(&temp_path)
+                    .await
+                    .map_err(|err| AppError::Internal(err.into()))?;
+                let mut hasher = blake3::Hasher::new();
+                let mut size: u64 = 0;
+
+                loop {
+                    let chunk = match field.chunk().await {
+                        Ok(Some(chunk)) => chunk,
+                        Ok(None) => break,
+                        Err(err) => {
+                            // Clean up before bailing, or a failed upload leaves
+                            // a partial file behind for every retry.
+                            let _ = tokio::fs::remove_file(&temp_path).await;
+                            return Err(AppError::BadRequest(format!("upload failed: {err}")));
+                        }
+                    };
+
+                    hasher.update(&chunk);
+                    size += chunk.len() as u64;
+
+                    if let Err(err) = file.write_all(&chunk).await {
+                        let _ = tokio::fs::remove_file(&temp_path).await;
+                        return Err(AppError::Internal(err.into()));
+                    }
+                }
+
+                if let Err(err) = file.flush().await {
+                    let _ = tokio::fs::remove_file(&temp_path).await;
+                    return Err(AppError::Internal(err.into()));
+                }
+                drop(file);
+
+                upload = Some(StreamedUpload {
+                    filename,
+                    extension,
+                    temp_path,
+                    hash: hasher.finalize().to_hex().to_string(),
+                    size: size as i64,
+                });
             }
             "libraryId" => library_id = field.text().await.ok().and_then(|v| v.parse().ok()),
             "collectionId" => collection_id = field.text().await.ok().and_then(|v| v.parse().ok()),
@@ -46,31 +116,37 @@ pub async fn upload(
         }
     }
 
-    let filename = filename.ok_or_else(|| AppError::BadRequest("no file provided".into()))?;
-    let bytes = bytes.ok_or_else(|| AppError::BadRequest("no file provided".into()))?;
+    let upload = upload.ok_or_else(|| AppError::BadRequest("no file provided".into()))?;
 
-    if bytes.is_empty() {
+    // From here on any early return has to remove the temp file.
+    let result = finish(&state, &upload, library_id, collection_id).await;
+    if result.is_err() {
+        let _ = tokio::fs::remove_file(&upload.temp_path).await;
+    }
+    result
+}
+
+struct StreamedUpload {
+    filename: String,
+    extension: String,
+    temp_path: PathBuf,
+    hash: String,
+    size: i64,
+}
+
+async fn finish(
+    state: &AppState,
+    upload: &StreamedUpload,
+    library_id: Option<i64>,
+    collection_id: Option<i64>,
+) -> AppResult<(StatusCode, Json<Document>)> {
+    if upload.size == 0 {
         return Err(AppError::BadRequest("the uploaded file is empty".into()));
     }
 
-    let extension = StdPath::new(&filename)
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| e.to_lowercase())
-        .unwrap_or_default();
-
-    if !ALLOWED.contains(&extension.as_str()) {
-        return Err(AppError::BadRequest(format!(
-            "unsupported file type '{extension}' (supported: {})",
-            ALLOWED.join(", ")
-        )));
-    }
-
-    let hash = media::hash_bytes(&bytes);
-
     // The same file uploaded twice should not become two library entries.
     let existing: Option<i64> = sqlx::query_scalar("SELECT id FROM documents WHERE file_hash = ?")
-        .bind(&hash)
+        .bind(&upload.hash)
         .fetch_optional(&state.db)
         .await?;
 
@@ -80,7 +156,7 @@ pub async fn upload(
         )));
     }
 
-    let relative_path = unique_relative_path(&state, &filename).await?;
+    let relative_path = unique_relative_path(state, &upload.filename).await?;
     let destination = state.config.library_dir.join(&relative_path);
 
     if let Some(parent) = destination.parent() {
@@ -89,11 +165,12 @@ pub async fn upload(
             .map_err(|err| AppError::Internal(err.into()))?;
     }
 
-    tokio::fs::write(&destination, &bytes)
+    // Same filesystem as the temp file, so this is atomic rather than a copy.
+    tokio::fs::rename(&upload.temp_path, &destination)
         .await
         .map_err(|err| AppError::Internal(err.into()))?;
 
-    let metadata = if extension == "pdf" {
+    let metadata = if upload.extension == "pdf" {
         media::extract_pdf_metadata(&destination).await
     } else {
         media::Metadata::default()
@@ -101,8 +178,9 @@ pub async fn upload(
 
     let title = metadata
         .title
+        .clone()
         .filter(|t| !t.trim().is_empty())
-        .unwrap_or_else(|| media::title_from_filename(&filename));
+        .unwrap_or_else(|| media::title_from_filename(&upload.filename));
 
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO documents
@@ -114,16 +192,16 @@ pub async fn upload(
     .bind(&title)
     .bind(&metadata.author)
     .bind(&relative_path)
-    .bind(&extension)
-    .bind(&hash)
-    .bind(bytes.len() as i64)
+    .bind(&upload.extension)
+    .bind(&upload.hash)
+    .bind(upload.size)
     .bind(&metadata.keywords)
     .bind(metadata.page_count)
     .bind(metadata.year)
     .fetch_one(&state.db)
     .await?;
 
-    if extension == "pdf" {
+    if upload.extension == "pdf" {
         if let Some(name) =
             media::generate_thumbnail(&destination, &state.config.thumbnail_dir(), id).await
         {
@@ -155,12 +233,9 @@ pub async fn upload(
         .await?;
     }
 
-    let document = super::fetch_one(&state, id, 0).await?;
+    let document = super::fetch_one(state, id, 0).await?;
     Ok((StatusCode::CREATED, Json(document)))
 }
-
-/// Image types accepted as a custom cover.
-const ALLOWED_COVER: [&str; 4] = ["png", "jpg", "jpeg", "webp"];
 
 /// Replaces a document's cover with an uploaded image.
 ///
@@ -188,6 +263,7 @@ pub async fn upload_cover(
     {
         if field.name().unwrap_or_default() == "file" {
             filename = field.file_name().map(media::sanitize_filename);
+            // Covers are images sized for a grid tile, so buffering one is fine.
             bytes = Some(
                 field
                     .bytes()
@@ -205,12 +281,7 @@ pub async fn upload_cover(
         return Err(AppError::BadRequest("the uploaded image is empty".into()));
     }
 
-    let extension = StdPath::new(&filename)
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| e.to_lowercase())
-        .unwrap_or_default();
-
+    let extension = extension_of(&filename);
     if !ALLOWED_COVER.contains(&extension.as_str()) {
         return Err(AppError::BadRequest(format!(
             "unsupported image type '{extension}' (supported: {})",
@@ -238,6 +309,14 @@ pub async fn upload_cover(
     }
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+fn extension_of(filename: &str) -> String {
+    StdPath::new(filename)
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_lowercase())
+        .unwrap_or_default()
 }
 
 /// Finds a free path for `filename`, appending ` (2)`, ` (3)` and so on.

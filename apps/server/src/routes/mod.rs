@@ -28,7 +28,7 @@ pub fn router(state: AppState) -> Router {
         .route("/health", get(health::health))
         .nest("/auth", auth::router())
         .route("/me", get(auth::me))
-        .nest("/documents", documents::router())
+        .nest("/documents", documents::router(state.config.max_upload_bytes))
         .nest("/libraries", libraries::router())
         .nest("/collections", collections::router())
         .nest("/tags", tags::router())

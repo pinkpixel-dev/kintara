@@ -2,7 +2,7 @@ mod content;
 mod mutate;
 mod upload;
 
-use axum::extract::{Path, Query, State};
+use axum::extract::{DefaultBodyLimit, Path, Query, State};
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use sqlx::{QueryBuilder, Sqlite};
@@ -13,10 +13,13 @@ use crate::error::{AppError, AppResult};
 use crate::models::{fts_query, Document, DocumentRow, ListQuery, Page};
 use crate::state::AppState;
 
-pub fn router() -> Router<AppState> {
+pub fn router(max_upload_bytes: usize) -> Router<AppState> {
     // JSON metadata: small, repetitive, worth compressing.
     let metadata = Router::new()
-        .route("/", get(list).post(upload::upload))
+        .route(
+            "/",
+            get(list).post(upload::upload).layer(DefaultBodyLimit::max(max_upload_bytes)),
+        )
         .route("/{id}", get(get_one).patch(mutate::update).delete(mutate::delete))
         .route("/{id}/progress", put(mutate::set_progress))
         .route("/{id}/favorite", put(mutate::set_favorite))
@@ -26,7 +29,11 @@ pub fn router() -> Router<AppState> {
             post(crate::routes::tags::attach).delete(crate::routes::tags::detach),
         )
         .route("/{id}/annotations", get(crate::routes::annotations::for_document))
-        .route("/{id}/cover", post(upload::upload_cover))
+        .route(
+            "/{id}/cover",
+            // Covers are images; a much smaller ceiling than whole documents.
+            post(upload::upload_cover).layer(DefaultBodyLimit::max(32 * 1024 * 1024)),
+        )
         .layer(CompressionLayer::new());
 
     // Document bytes: served by ServeFile with Range support, and never
