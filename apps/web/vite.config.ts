@@ -17,6 +17,15 @@ export default defineConfig(async () => ({
     port: 1420,
     strictPort: true,
     host: host || false,
+    // Without this, /api requests hit Vite itself, which answers every unknown
+    // path with index.html. The client then gets 200 text/html where it expects
+    // JSON, and every call fails with a parse error instead of working.
+    proxy: {
+      "/api": {
+        target: process.env.KINTARA_DEV_API || "http://127.0.0.1:8080",
+        changeOrigin: true,
+      },
+    },
     hmr: host
       ? {
           protocol: "ws",

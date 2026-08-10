@@ -10,7 +10,7 @@ import {
   GraduationCap, Microscope, Landmark, Building2,
   ChefHat, TreePine, Waves, Rocket, Bot
 } from "lucide-react";
-import { collectionService, libraryService, type Collection, type Library } from "../api";
+import { ApiError, collectionService, libraryService, type Collection, type Library } from "../api";
 import { authService } from "../api/auth";
 
 // Map icon name strings → components for rendering
@@ -31,6 +31,32 @@ interface SidebarProps {
   onImport: () => void;
 }
 
+/**
+ * Shared across callers so the default library is only ever created once.
+ *
+ * `loadData` both reads and writes, and React invokes effects twice in
+ * development, so two overlapping calls would each see an empty list and both
+ * POST. Deduping here means one request rather than one plus a 409.
+ */
+let defaultLibraryInFlight: Promise<void> | null = null;
+
+async function ensureDefaultLibrary(): Promise<void> {
+  defaultLibraryInFlight ??= (async () => {
+    try {
+      await libraryService.create({ name: "My Library", themeColor: "#410186" });
+    } catch (err) {
+      // Another tab or an earlier run got there first; that is the desired end
+      // state either way.
+      if (!(err instanceof ApiError && err.status === 409)) {
+        defaultLibraryInFlight = null;
+        throw err;
+      }
+    }
+  })();
+
+  return defaultLibraryInFlight;
+}
+
 export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setActiveView, onImport }: SidebarProps) {
   const [libraries, setLibraries] = useState<Library[]>([]);
   const [collectionsByLibrary, setCollectionsByLibrary] = useState<Record<number, Collection[]>>({});
@@ -46,12 +72,14 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
     isOpen: false, title: '', placeholder: '', initialValue: '', onSave: async () => {}
   });
   const [promptValue, setPromptValue] = useState("");
+  const [promptError, setPromptError] = useState<string | null>(null);
+  const [promptSaving, setPromptSaving] = useState(false);
 
   const loadData = async () => {
     try {
       let libs = await libraryService.list();
       if (libs.length === 0) {
-        await libraryService.create({ name: "My Library", themeColor: "#410186" });
+        await ensureDefaultLibrary();
         libs = await libraryService.list();
       }
       setLibraries(libs);
@@ -77,10 +105,14 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
     const handleRenamePrompt = () => {
       openPrompt("Name your first library", "Library name...", "My Library", async (val) => {
         const libs = await libraryService.list();
+        // Create rather than give up if the default library never got made —
+        // otherwise onboarding finishes with no library at all.
         if (libs.length > 0) {
           await libraryService.update(libs[0].id, { name: val });
-          await loadData();
+        } else {
+          await libraryService.create({ name: val, themeColor: "#410186" });
         }
+        await loadData();
       });
     };
     window.addEventListener('prompt-rename-first-library', handleRenamePrompt);
@@ -102,6 +134,7 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
 
   const openPrompt = (title: string, placeholder: string, initialValue: string, onSave: (val: string) => Promise<void>) => {
     setPromptValue(initialValue);
+    setPromptError(null);
     setPromptConfig({ isOpen: true, title, placeholder, initialValue, onSave });
   };
 
@@ -111,9 +144,20 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
 
   const handlePromptSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (promptValue.trim()) {
+    if (!promptValue.trim()) return;
+
+    setPromptError(null);
+    setPromptSaving(true);
+    try {
       await promptConfig.onSave(promptValue.trim());
       closePrompt();
+    } catch (err) {
+      // Without this a failed save left the dialog open and silent, which reads
+      // as "the Save button does nothing".
+      console.error("Failed to save", err);
+      setPromptError(err instanceof Error ? err.message : "Could not save. Please try again.");
+    } finally {
+      setPromptSaving(false);
     }
   };
 
@@ -329,9 +373,14 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
                 value={promptValue}
                 onChange={(e) => setPromptValue(e.target.value)}
               />
+              {promptError && (
+                <p className="auth-error" role="alert">{promptError}</p>
+              )}
               <div className="flex justify-end gap-2 mt-2">
                 <button type="button" className="btn btn-ghost" onClick={closePrompt}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={!promptValue.trim()}>Save</button>
+                <button type="submit" className="btn btn-primary" disabled={!promptValue.trim() || promptSaving}>
+                  {promptSaving ? "Saving..." : "Save"}
+                </button>
               </div>
             </form>
           </div>

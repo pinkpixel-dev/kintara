@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-08-10
+### Fixed
+- **The Save button did nothing in the welcome flow and when creating a library.** The Vite
+  dev server had no `/api` proxy, so in development every API call hit Vite, which answers
+  unknown paths with `index.html`. The client saw `200 text/html`, tried to parse it as
+  JSON, and threw — leaving the dialog open with no explanation. `vite.config.ts` now
+  proxies `/api` to the server (override with `KINTARA_DEV_API`). Production builds were
+  never affected, since the server serves both.
+- **A failed save left dialogs open and silent**, which reads as a dead button. The library
+  prompt and the library settings modal now show the error and re-enable the button.
+- **The API client threw a raw `SyntaxError` when a response was not JSON.** It now reports
+  that the API did not answer, rather than surfacing "Unexpected token '<'" from inside a
+  component.
+- **The default library was created twice on startup.** `loadData` both reads and writes,
+  and React invokes effects twice in development, so two overlapping calls each saw an
+  empty list and both posted — producing a 409 and, depending on timing, an empty sidebar.
+  Creation is now deduplicated.
+- Finishing onboarding with no library present silently did nothing. It now creates the
+  library instead of giving up.
+
 ## [1.0.0] - 2026-08-10
 The server-first rewrite is complete. Kintara is a self-hosted document library that runs
 in Docker on a NAS, watches a folder you already drop PDFs into, and is read through the

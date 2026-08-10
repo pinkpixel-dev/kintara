@@ -56,6 +56,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   // 204 No Content is the normal reply to writes and has no body to parse.
   if (response.status === 204) return undefined as T;
 
+  // A 200 that is not JSON means something answered instead of the API — a dev
+  // server with no proxy, or a captive portal. Left alone this surfaces as an
+  // opaque "Unexpected token '<'" from deep inside a component.
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    throw new ApiError(
+      response.status,
+      "The server did not return JSON. Is the Kintara API running and reachable?",
+    );
+  }
+
   return (await response.json()) as T;
 }
 

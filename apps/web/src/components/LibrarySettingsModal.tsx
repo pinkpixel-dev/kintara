@@ -89,6 +89,7 @@ export function LibrarySettingsModal({
   const [customColor, setCustomColor] = useState("#6366f1");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   // Reset form whenever the target changes
@@ -114,6 +115,7 @@ export function LibrarySettingsModal({
   const handleSave = async () => {
     if (!name.trim()) return;
     setSaving(true);
+    setSaveError(null);
     try {
       if (mode === "library" && library) {
         await libraryService.update(library.id, {
@@ -127,7 +129,9 @@ export function LibrarySettingsModal({
       onSaved();
       onClose();
     } catch (err) {
+      // A silent failure here reads as a dead Save button.
       console.error("Failed to save", err);
+      setSaveError(err instanceof Error ? err.message : "Could not save. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -343,6 +347,9 @@ export function LibrarySettingsModal({
           gap: "0.5rem",
           background: "var(--bg-primary)",
         }}>
+          {saveError && (
+            <p className="auth-error" role="alert" style={{ flex: 1, margin: 0 }}>{saveError}</p>
+          )}
           <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
           <button
             className="btn btn-primary"
