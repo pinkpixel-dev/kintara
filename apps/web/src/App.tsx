@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import "./App.css";
 import {
+  ApiError,
   collectionService,
   documentService,
   libraryService,
@@ -167,13 +168,42 @@ function App() {
     }
   };
 
+  /**
+   * Closes tabs whose document no longer exists.
+   *
+   * A file removed from the share is dropped by the scanner, but an open tab is
+   * client state and knows nothing about it — leaving a tab that opens a reader
+   * for a document that is gone. Only a definite 404 closes a tab; a network
+   * blip must not throw away what someone was reading.
+   */
+  const reconcileTabs = async () => {
+    for (const tab of openTabs) {
+      try {
+        await documentService.get(tab.id);
+      } catch (err) {
+        if (err instanceof ApiError && err.isNotFound) {
+          if (closeTabForDocument(tab.id)) setViewMode('grid');
+        }
+      }
+    }
+  };
+
   useEffect(() => {
     loadDocuments();
-    
-    const handleRefresh = () => loadDocuments();
+
+    const handleRefresh = () => {
+      loadDocuments();
+      reconcileTabs();
+    };
     window.addEventListener('refresh-documents', handleRefresh);
     return () => window.removeEventListener('refresh-documents', handleRefresh);
   }, [searchQuery, activeView]);
+
+  // Checked when the view changes rather than on every keystroke, so typing in
+  // the search box does not fire a request per open tab.
+  useEffect(() => {
+    reconcileTabs();
+  }, [activeView]);
 
   const handleImport = () => {
     fileInputRef.current?.click();

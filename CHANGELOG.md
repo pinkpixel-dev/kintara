@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-08-10
+### Fixed
+- **Tabs stayed open for documents that no longer exist.** Open tabs are client state, so
+  a document removed from the library — deleted, or its file taken off the share and
+  dropped by the scanner — left a tab behind that opened a reader for nothing. Tabs are
+  now reconciled when the view changes, and a tab whose document returns a definite 404
+  closes itself. A network error does not close anything.
+- **The tab close button was a 20px target**, fiddly with a trackpad and unusable on
+  touch. It is now 24px, and 40px on touch devices.
+
+### Added
+- Middle-click a tab to close it, matching browsers and editors. `Ctrl+W` already worked
+  and still does.
+
 ## [1.1.0] - 2026-08-10
 ### Changed
 - **Library and collection settings moved onto the sidebar rows.** Each library and
