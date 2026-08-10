@@ -3,9 +3,44 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
-Work has begun on a server-first rewrite. Kintara is becoming a self-hosted document
+The server-first rewrite is in progress. Kintara is becoming a self-hosted document
 library that runs in Docker on a NAS, served as an installable PWA, with a Rust/Axum
 backend replacing the Tauri IPC layer. See `DOCS/OVERVIEW.md` for the target architecture.
+The frontend still talks to Tauri; porting it to the API is the next step.
+
+## [0.7.0] - 2026-08-10
+### Added
+- **`kintara-server`** — new Rust/Axum backend in `apps/server/`. Runs, serves the built
+  frontend, applies its own migrations, and answers `GET /api/health` with a live document
+  count (which doubles as a container healthcheck, since it proves the database is reachable).
+- **Server schema (migration 0001).** Ported from the desktop migrations with four
+  deliberate changes for multi-user, containerised operation:
+  - `documents.relative_path` replaces the desktop's absolute `file_path`, so the library
+    volume can be remounted anywhere without invalidating every row.
+  - `reading_progress` and `is_favorite` move off `documents` into `user_document_state`,
+    keyed by `(user_id, document_id)`. `annotations` gains a `user_id`.
+  - `documents` gains `file_hash`, `file_size`, and `indexed_at` for the incoming scanner.
+  - Search is backed by an FTS5 external-content table with sync triggers, replacing the
+    desktop's `LIKE '%term%'` full scan.
+- **Configuration via environment** — `KINTARA_LIBRARY_DIR`, `KINTARA_DATA_DIR`,
+  `KINTARA_WEB_DIR`, `KINTARA_BIND`, `KINTARA_LOG`. Defaults are relative so `cargo run`
+  works with no setup; the container overrides them with absolute paths. The database
+  deliberately lives under the data directory, never the library share, because SQLite
+  over SMB/NFS corrupts.
+- **Graceful SIGTERM shutdown**, so `docker stop` does not wait out the kill timeout.
+- **12 integration tests** covering migrations, WAL and foreign-key enforcement on pool
+  connections, cascade deletes, the `annotation_type` CHECK constraint, `relative_path`
+  uniqueness, FTS insert/update/delete sync, and HTTP routing. They run against real
+  SQLite files and the real router — no mocks.
+
+### Fixed
+- Unmatched `/api/*` routes returned the SPA `index.html` with a 200 instead of a JSON
+  404, which would have made every client-side fetch bug look like an HTML-parsed-as-JSON
+  error. Caught by the test written for it.
+
+### Notes
+- `apps/desktop/` stays pinned at 0.6.2. It is frozen, so its version reflects where it
+  froze rather than tracking the server.
 
 ## [0.6.2] - 2026-08-10
 ### Changed

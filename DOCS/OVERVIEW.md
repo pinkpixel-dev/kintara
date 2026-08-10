@@ -16,14 +16,52 @@ implementation and remains accurate until the port replaces it.
 ```
 apps/
   web/       React + Vite frontend (npm workspace @kintara/web)
-  server/    Rust + Axum backend — not yet implemented
+  server/    Rust + Axum backend
+    migrations/  sqlx migrations — the schema source of truth
+    src/         config, db, error, state, routes/
+    tests/       schema.rs, api.rs
   desktop/   Tauri shell — frozen, retained for reference
 assets/      Brand source images, not bundled
 docker/      Dockerfile, entrypoint, compose — not yet implemented
 DOCS/        This file, ROADMAP.md, to-do.md
 ```
 The root `package.json` is the version source of truth and delegates scripts to the
-`apps/web` workspace.
+`apps/web` workspace. `apps/desktop` is pinned at 0.6.2 because it is frozen.
+
+## Server
+A single binary serves both the JSON API (under `/api`) and the built frontend. Unmatched
+paths fall back to `index.html` for the client router, except under `/api`, which returns
+a JSON 404.
+
+### Configuration
+All configuration is environment-driven. Defaults are relative paths so `cargo run` works
+from `apps/server` with no setup; the container overrides them with absolute paths.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `KINTARA_LIBRARY_DIR` | `./data/library` | Document root. All `relative_path` values resolve against it. |
+| `KINTARA_DATA_DIR` | `./data` | Database and thumbnails. Kept off the library share — SQLite over SMB/NFS corrupts. |
+| `KINTARA_WEB_DIR` | `../web/dist` | Built frontend to serve. |
+| `KINTARA_BIND` | `0.0.0.0:8080` | Listen address. |
+| `KINTARA_LOG` | `kintara_server=info` | `tracing` filter. |
+
+### Database
+SQLite via sqlx, opened with WAL, `synchronous=NORMAL`, foreign keys on, and a 10s busy
+timeout. WAL is what makes concurrent reads viable during a write; the busy timeout covers
+the rest. Foreign key enforcement is per-connection in SQLite, so it is set on the pool's
+connect options and asserted in the test suite rather than assumed.
+
+Schema differences from the desktop version are listed in `migrations/0001_initial.sql`
+and in the 0.7.0 changelog entry. The important one: paths are stored relative to the
+library root, so the volume can move.
+
+Search uses an FTS5 external-content table kept in sync by insert/update/delete triggers,
+so the document text is not stored twice.
+
+### Tests
+`cargo test` from `apps/server`. Tests run against real SQLite files in temp directories
+and drive the real router — there are no mocks. They cover migrations, pragma enforcement,
+cascade deletes, constraints, FTS trigger sync, and routing.
 
 ## Architecture
 - **Frontend**: React, Vite, TypeScript
