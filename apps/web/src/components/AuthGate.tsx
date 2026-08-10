@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { authService, type AuthStatus } from "../api/auth";
 import { ApiError } from "../api";
 
@@ -21,6 +22,7 @@ export function AuthGate({ children }: AuthGateProps) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const refresh = async () => {
     try {
@@ -131,16 +133,30 @@ export function AuthGate({ children }: AuthGateProps) {
         <label className="auth-label" htmlFor="auth-password">
           Password
         </label>
-        <input
-          id="auth-password"
-          className="input"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete={isSetup ? "new-password" : "current-password"}
-          minLength={isSetup ? 8 : undefined}
-          required
-        />
+        <div className="password-field">
+          <input
+            id="auth-password"
+            className="input"
+            type={showPassword ? "text" : "password"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete={isSetup ? "new-password" : "current-password"}
+            minLength={isSetup ? 8 : undefined}
+            required
+          />
+          <button
+            type="button"
+            className="password-toggle"
+            onClick={() => setShowPassword((shown) => !shown)}
+            // Labelled rather than titled alone: a screen reader needs to hear
+            // what the control does, and aria-pressed conveys its state.
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            aria-pressed={showPassword}
+            title={showPassword ? "Hide password" : "Show password"}
+          >
+            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        </div>
         {isSetup && <p className="auth-hint">At least 8 characters.</p>}
 
         {error && (

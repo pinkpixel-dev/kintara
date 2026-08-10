@@ -102,14 +102,27 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
     loadData();
 
     // Listen for custom event to trigger library rename for onboarding
-    const handleRenamePrompt = () => {
+    const handleRenamePrompt = async () => {
+      // Onboarding is tracked per device in localStorage, but libraries live on
+      // the server and are shared. A second device, a different browser, or
+      // cleared site data would otherwise re-run onboarding and rename a
+      // library the user had already set up. Ask the server what actually
+      // exists rather than trusting the local flag.
+      const libs = await libraryService.list().catch(() => null);
+      if (libs === null) return;
+
+      const isUntouchedInstall =
+        libs.length === 0 ||
+        (libs.length === 1 && libs[0].name === "My Library" && libs[0].documentCount === 0);
+
+      if (!isUntouchedInstall) return;
+
       openPrompt("Name your first library", "Library name...", "My Library", async (val) => {
-        const libs = await libraryService.list();
-        // Create rather than give up if the default library never got made —
-        // otherwise onboarding finishes with no library at all.
-        if (libs.length > 0) {
-          await libraryService.update(libs[0].id, { name: val });
+        const current = await libraryService.list();
+        if (current.length > 0) {
+          await libraryService.update(current[0].id, { name: val });
         } else {
+          // The default library never got made, so create rather than give up.
           await libraryService.create({ name: val, themeColor: "#410186" });
         }
         await loadData();

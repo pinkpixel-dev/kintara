@@ -1,13 +1,13 @@
 {
   "name": "kintara",
   "private": true,
-  "version": "1.0.3",
+  "version": "1.0.4",
   "type": "module",
   "workspaces": [
     "apps/web"
   ],
   "scripts": {
-    "dev": "concurrently --names server,web --prefix-colors magenta,cyan --kill-others-on-fail \"npm run dev:server\" \"npm run dev:web\"",
+    "dev": "concurrently --names server,web --prefix-colors magenta,cyan --kill-others \"npm run dev:server\" \"npm run dev:web\"",
     "dev:server": "cd apps/server && cargo run",
     "dev:web": "npm run dev --workspace apps/web",
     "build": "npm run build --workspace apps/web",

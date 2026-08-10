@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-08-10
+### Fixed
+- **"Name your first library" reappeared on every new device, and renamed the library you
+  already had.** Onboarding is tracked in localStorage, which is per device, while
+  libraries live on the server and are shared. A second browser, a second device, or
+  cleared site data re-ran onboarding — and the handler renamed the first existing library
+  to whatever was typed. It now asks the server what exists and only offers to name a
+  library when the install is genuinely untouched.
+
+### Added
+- **Show/hide toggle on the password field**, on both the sign-in and first-run setup
+  forms. Keyboard reachable and labelled for screen readers, with `aria-pressed` conveying
+  its state and a tap target sized for a phone.
+
 ## [1.0.3] - 2026-08-10
 ### Fixed
 - **Photographs were missing from PDFs.** Pages rendered their text, vector art, and links
