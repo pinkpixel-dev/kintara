@@ -12,6 +12,24 @@ dist
 dist-ssr
 *.local
 
+# Rust build output. Each crate also ignores its own, but a stray target/ at
+# any level should never be committed.
+target/
+
+# Your library and its database.
+#
+# docker-compose.yml mounts ./kintara-data as /data, so running compose from
+# docker/ creates a directory holding the SQLite database, the session table,
+# and every generated thumbnail. That must never end up in the repository.
+docker/kintara-data/
+/data/
+*.db
+*.db-shm
+*.db-wal
+
+# Left over from the desktop build, which now lives in apps/desktop.
+src-tauri/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
