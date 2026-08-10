@@ -1,0 +1,33 @@
+services:
+  kintara:
+    image: ghcr.io/pinkpixel-dev/kintara:latest
+    container_name: kintara
+    restart: unless-stopped
+
+    ports:
+      - "8080:8080"
+
+    environment:
+      # Match these to the owner of your library share, or uploads will fail.
+      # `id -u yourname` and `id -g yourname` on the NAS will tell you.
+      PUID: 1000
+      PGID: 1000
+      TZ: Etc/UTC
+
+      # Turn the watcher off if your share does not report filesystem events
+      # (some SMB and NFS mounts do not). The startup scan still picks changes up.
+      # KINTARA_WATCH: "false"
+
+    volumes:
+      # Your documents. Point this at the share you already drop PDFs into.
+      - /volume1/documents:/library
+      # Database and generated thumbnails. Keep this on local disk — SQLite on
+      # an SMB or NFS mount corrupts.
+      - ./kintara-data:/data
+
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

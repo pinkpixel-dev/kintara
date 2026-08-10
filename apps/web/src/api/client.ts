@@ -43,7 +43,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
 
-  if (!response.ok) throw await toError(response);
+  if (!response.ok) {
+    const error = await toError(response);
+    // A session can expire mid-session; tell the app once rather than letting
+    // every caller invent its own handling.
+    if (error.status === 401) {
+      window.dispatchEvent(new CustomEvent("kintara-unauthorized"));
+    }
+    throw error;
+  }
 
   // 204 No Content is the normal reply to writes and has no body to parse.
   if (response.status === 204) return undefined as T;

@@ -1,0 +1,7 @@
+**/node_modules
+**/target
+**/dist
+apps/desktop
+.git
+docker/kintara-data
+assets

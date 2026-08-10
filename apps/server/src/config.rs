@@ -20,6 +20,13 @@ pub struct Config {
     /// Directory containing the built frontend (`apps/web/dist`).
     pub web_dir: PathBuf,
     pub bind: SocketAddr,
+    /// Sweep the library at startup. Files arrive over SMB while the server is
+    /// down, so this is on by default.
+    pub scan_on_start: bool,
+    /// Watch the library for changes while running. Worth turning off on a
+    /// share where inotify watches are scarce or the filesystem does not
+    /// report events at all.
+    pub watch: bool,
 }
 
 impl Config {
@@ -39,6 +46,8 @@ impl Config {
             data_dir,
             web_dir,
             bind,
+            scan_on_start: bool_var("KINTARA_SCAN_ON_START", true),
+            watch: bool_var("KINTARA_WATCH", true),
         })
     }
 
@@ -58,6 +67,17 @@ impl Config {
 
     pub fn database_path(&self) -> PathBuf {
         self.data_dir.join("kintara.db")
+    }
+}
+
+/// Accepts the spellings people actually type in a compose file.
+fn bool_var(key: &str, default: bool) -> bool {
+    match std::env::var(key) {
+        Ok(value) => matches!(
+            value.trim().to_ascii_lowercase().as_str(),
+            "1" | "true" | "yes" | "on"
+        ),
+        Err(_) => default,
     }
 }
 

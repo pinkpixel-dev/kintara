@@ -13,6 +13,9 @@ pub enum AppError {
     #[error("{0}")]
     BadRequest(String),
 
+    #[error("{0}")]
+    Unauthorized(String),
+
     /// The request was valid but conflicts with existing state — a duplicate
     /// upload, or a name already taken.
     #[error("{0}")]
@@ -30,6 +33,7 @@ impl IntoResponse for AppError {
         let (status, message) = match &self {
             AppError::NotFound => (StatusCode::NOT_FOUND, "not found".to_string()),
             AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
+            AppError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg.clone()),
             AppError::Conflict(msg) => (StatusCode::CONFLICT, msg.clone()),
             // A UNIQUE violation reaching this point is a conflict, not a bug —
             // two users racing to create the same library name, for instance.

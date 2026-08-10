@@ -1,4 +1,5 @@
 pub mod annotations;
+pub mod auth;
 pub mod collections;
 pub mod documents;
 pub mod health;
@@ -25,6 +26,8 @@ async fn api_not_found() -> AppError {
 pub fn router(state: AppState) -> Router {
     let api = Router::new()
         .route("/health", get(health::health))
+        .nest("/auth", auth::router())
+        .route("/me", get(auth::me))
         .nest("/documents", documents::router())
         .nest("/libraries", libraries::router())
         .nest("/collections", collections::router())

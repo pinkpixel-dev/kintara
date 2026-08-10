@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import {
   Search, Library as LibraryIcon, Star, Plus, ChevronRight, ChevronDown,
-  FolderOpen, Settings, HelpCircle, X, Clock,
+  FolderOpen, Settings, HelpCircle,
+  LogOut, X, Clock,
   BookOpen, BookMarked, Palette,
   Monitor, Code2, Music, Film, Camera,
   Dumbbell, Plane, Heart, Coffee,
@@ -10,6 +11,7 @@ import {
   ChefHat, TreePine, Waves, Rocket, Bot
 } from "lucide-react";
 import { collectionService, libraryService, type Collection, type Library } from "../api";
+import { authService } from "../api/auth";
 
 // Map icon name strings → components for rendering
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -292,6 +294,18 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
             title="Help & Shortcuts (F1)"
           >
             <HelpCircle size={18} />
+          </button>
+          <button
+            className="p-2 rounded text-muted hover:text-primary hover:bg-[var(--bg-tertiary)] transition-colors flex items-center justify-center border-none cursor-pointer bg-transparent"
+            onClick={async () => {
+              await authService.logout().catch(() => {});
+              // The gate listens for this and drops back to the sign-in form.
+              window.dispatchEvent(new CustomEvent("kintara-unauthorized"));
+            }}
+            title="Sign out"
+            aria-label="Sign out"
+          >
+            <LogOut size={18} />
           </button>
         </div>
       </aside>

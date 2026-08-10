@@ -23,6 +23,10 @@ async fn test_app() -> (tempfile::TempDir, axum::Router) {
         data_dir: dir.path().to_path_buf(),
         web_dir: dir.path().join("web"),
         bind: "127.0.0.1:0".parse::<SocketAddr>().unwrap(),
+        // Tests drive the scanner explicitly; a background watcher would race
+        // their assertions.
+        scan_on_start: false,
+        watch: false,
     };
     config.ensure_dirs().expect("create dirs");
     std::fs::create_dir_all(&config.web_dir).expect("create web dir");
@@ -128,6 +132,8 @@ fn database_lives_in_the_data_dir_not_the_library() {
         data_dir: PathBuf::from("/data"),
         web_dir: PathBuf::from("/app/web"),
         bind: "0.0.0.0:8080".parse().unwrap(),
+        scan_on_start: false,
+        watch: false,
     };
 
     assert!(config.database_path().starts_with("/data"));

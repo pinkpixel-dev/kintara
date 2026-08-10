@@ -28,7 +28,7 @@ import { OnboardingOverlay } from "./components/OnboardingOverlay";
 import { LibrarySettingsModal } from "./components/LibrarySettingsModal";
 import { TabBar } from "./components/TabBar";
 import { useDocumentTabs } from "./hooks/useDocumentTabs";
-import { applySettings, loadSettings, saveSettings } from "./lib/settings";
+import { loadSettings, saveSettings } from "./lib/settings";
 
 type ViewType = 'all' | 'recent' | 'favorites' | 'library' | 'collection';
 type ActiveView = { type: ViewType, id?: number };
@@ -77,12 +77,10 @@ function App() {
   const [libSettingsCollection, setLibSettingsCollection] = useState<Collection | null>(null);
   const [libSettingsMode, setLibSettingsMode] = useState<'library' | 'collection'>('library');
 
-  // Settings are read synchronously from localStorage, so the theme is in place
-  // before first paint rather than flashing the default one.
+  // Theming is applied in main.tsx before the first render; this only decides
+  // whether the onboarding overlay is due.
   useEffect(() => {
-    const settings = loadSettings();
-    applySettings(settings);
-    if (!settings.hasSeenOnboarding) setShowOnboarding(true);
+    if (!loadSettings().hasSeenOnboarding) setShowOnboarding(true);
   }, []);
 
   // Keyboard Shortcuts

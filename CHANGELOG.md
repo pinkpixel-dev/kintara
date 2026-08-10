@@ -3,10 +3,59 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
-The server-first rewrite is in progress. Kintara is becoming a self-hosted document
-library that runs in Docker on a NAS, served as an installable PWA, with a Rust/Axum
-backend replacing the Tauri IPC layer. See `DOCS/OVERVIEW.md` for the target architecture.
-The frontend still talks to Tauri; porting it to the API is the next step.
+
+## [1.0.0] - 2026-08-10
+The server-first rewrite is complete. Kintara is a self-hosted document library that runs
+in Docker on a NAS, watches a folder you already drop PDFs into, and is read through the
+browser on any device.
+
+### Added
+- **Library scanner.** A startup sweep plus a live filesystem watcher, so files copied
+  onto the share over SMB appear without touching the app. Handles new files, edits,
+  deletions, and renames. A rename keeps the document's id, so reading progress and
+  highlights survive it. Identical content under two names is indexed once.
+  Non-documents, dotfiles, and half-written `.part` files are ignored.
+- **Authentication.** First run asks for a username and password; after that the API
+  requires a session. Passwords are argon2-hashed, sessions live in the database so
+  logging out actually revokes access, and the cookie is HttpOnly and SameSite=Lax.
+  Setup reuses the seeded account, so anything indexed before you set a password keeps
+  its reading state.
+- **Docker image.** Multi-stage build with cargo-chef dependency caching, poppler in the
+  runtime, non-root execution, and PUID/PGID remapping so files land with an ownership
+  your NAS agrees with. Separate `/library` and `/data` volumes, because SQLite on an SMB
+  or NFS mount corrupts. A healthcheck that runs a real query rather than probing a port.
+- **Multi-arch publishing** for `linux/amd64` and `linux/arm64` via GitHub Actions, plus
+  a `docker-compose.yml` ready to edit.
+- **PWA.** Installable on desktop and phone, with a manifest, icons, and a service worker
+  that caches the app shell so Kintara opens instantly. The API is deliberately never
+  cached — a stale library listing is worse than none.
+- **30 more tests**, covering scanning, rescanning, deletion, renames, duplicate content,
+  reindexing without clobbering hand-corrected metadata, setup, login, logout, session
+  expiry, and forged cookies. 106 total.
+
+### Fixed
+- **The sign-in screen rendered in light theme and flipped to dark after signing in.**
+  `AuthGate` mounts before `App`, which was where settings were applied. Theming now
+  happens before the first render, which also removes the flash the app itself had.
+- `favicon.png` was a 989 KB image served on every load. It and the sidebar logo are now
+  8 KB and 20 KB.
+
+### Changed
+- `CurrentUser` resolves from the session cookie. Handlers were written against that
+  extractor from the start, so adding authentication changed one function rather than
+  every route. While no password is set it falls back to the owner account, so a first
+  run can scan and reach the setup screen.
+- `KINTARA_SCAN_ON_START` and `KINTARA_WATCH` control the scanner. Worth turning the
+  watcher off on shares that do not report filesystem events.
+
+### Known issues
+- **Fonts are still loaded from Google Fonts**, in `App.css` and `index.html`. On a NAS
+  with no outbound access they fall back to system fonts — the app works, it just looks
+  wrong. This is the last external dependency.
+- The PDF reader has no pinch-zoom or swipe paging. It is usable on a phone but not yet
+  pleasant.
+- The Docker image is unbuilt: no daemon was running in the environment where it was
+  written. Everything else here was verified end to end.
 
 ## [0.10.0] - 2026-08-10
 ### Added

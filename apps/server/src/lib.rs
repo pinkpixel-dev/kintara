@@ -1,3 +1,4 @@
+pub mod auth;
 pub mod config;
 pub mod current_user;
 pub mod db;
@@ -6,4 +7,5 @@ pub mod files;
 pub mod media;
 pub mod models;
 pub mod routes;
+pub mod scanner;
 pub mod state;

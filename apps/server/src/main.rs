@@ -3,7 +3,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 
 use kintara_server::config::Config;
 use kintara_server::state::AppState;
-use kintara_server::{db, routes};
+use kintara_server::{auth, db, routes, scanner};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -22,7 +22,32 @@ async fn main() -> Result<()> {
 
     let pool = db::connect(&config.database_path()).await?;
     let bind = config.bind;
-    let app = routes::router(AppState::new(pool, config));
+    let scan_on_start = config.scan_on_start;
+    let watch = config.watch;
+    let state = AppState::new(pool, config);
+
+    auth::purge_expired_sessions(&state).await?;
+
+    if scan_on_start {
+        if let Err(err) = scanner::full_scan(&state).await {
+            // A failed scan must not stop the server: the library is still
+            // readable from whatever is already indexed.
+            tracing::error!(?err, "library scan failed");
+        }
+    }
+
+    if watch {
+        scanner::spawn_watcher(state.clone());
+    }
+
+    if auth::needs_setup(&state).await? {
+        tracing::warn!(
+            "no password is set — open the app to create the owner account. \
+             Until then the library is reachable by anyone who can connect."
+        );
+    }
+
+    let app = routes::router(state);
 
     let listener = tokio::net::TcpListener::bind(bind)
         .await
