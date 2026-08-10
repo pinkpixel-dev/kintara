@@ -4,8 +4,7 @@ import {
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
-  Columns,
-  Settings
+  Columns
 } from "lucide-react";
 import "./App.css";
 import {
@@ -129,11 +128,17 @@ function App() {
   useEffect(() => {
     const handleOpenSettings = () => setIsSettingsOpen(true);
     const handleOpenHelp = () => setIsHelpOpen(true);
+    const handleEntitySettings = (e: Event) => {
+      const detail = (e as CustomEvent<{ type: 'library' | 'collection'; id: number }>).detail;
+      if (detail) openEntitySettings(detail.type, detail.id);
+    };
     window.addEventListener('open-settings', handleOpenSettings);
     window.addEventListener('open-help', handleOpenHelp);
+    window.addEventListener('open-entity-settings', handleEntitySettings);
     return () => {
       window.removeEventListener('open-settings', handleOpenSettings);
       window.removeEventListener('open-help', handleOpenHelp);
+      window.removeEventListener('open-entity-settings', handleEntitySettings);
     };
   }, []);
 
@@ -255,20 +260,33 @@ function App() {
     }, 400);
   };
 
-  const handleOpenLibSettings = async () => {
-    if (activeView.type === 'library' && activeView.id) {
-      const libs = await libraryService.list();
-      const lib = libs.find(l => l.id === activeView.id) ?? null;
-      setLibSettingsLibrary(lib);
-      setLibSettingsCollection(null);
-      setLibSettingsMode('library');
+  /**
+   * Opens library or collection settings for a specific entity.
+   *
+   * Driven by the gear on each sidebar row rather than the active view, so a
+   * library can be renamed without first navigating into it. Errors are caught
+   * because an unhandled rejection in a click handler fails silently, which
+   * reads as a button that does nothing.
+   */
+  const openEntitySettings = async (type: 'library' | 'collection', id: number) => {
+    try {
+      if (type === 'library') {
+        const libs = await libraryService.list();
+        const lib = libs.find(l => l.id === id) ?? null;
+        if (!lib) return;
+        setLibSettingsLibrary(lib);
+        setLibSettingsCollection(null);
+        setLibSettingsMode('library');
+      } else {
+        const col = await collectionService.get(id);
+        if (!col) return;
+        setLibSettingsCollection(col);
+        setLibSettingsLibrary(null);
+        setLibSettingsMode('collection');
+      }
       setIsLibSettingsOpen(true);
-    } else if (activeView.type === 'collection' && activeView.id) {
-      const col = await collectionService.get(activeView.id);
-      setLibSettingsCollection(col);
-      setLibSettingsLibrary(null);
-      setLibSettingsMode('collection');
-      setIsLibSettingsOpen(true);
+    } catch (err) {
+      console.error("Failed to open settings", err);
     }
   };
 
@@ -379,18 +397,6 @@ function App() {
             {isLeftSidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
           </button>
 
-          {/* Library / Collection context actions */}
-          {(activeView.type === 'library' || activeView.type === 'collection') && activeView.id && viewMode === 'grid' && (
-            <div className="flex items-center gap-1 mr-2 flex-shrink-0">
-              <button
-                className="btn btn-ghost p-1.5 rounded text-muted hover:text-primary hover:bg-[var(--bg-tertiary)]"
-                title={activeView.type === 'library' ? 'Library Settings' : 'Collection Settings'}
-                onClick={handleOpenLibSettings}
-              >
-                <Settings size={16} />
-              </button>
-            </div>
-          )}
 
           <TabBar
             tabs={openTabs}

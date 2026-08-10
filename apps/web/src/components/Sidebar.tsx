@@ -289,7 +289,7 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
                       </div>
 
                       {/* Only the + (new collection) button on hover */}
-                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                      <div className="row-actions flex items-center gap-0.5 flex-shrink-0">
                         <button
                           className="p-1 text-muted hover:text-primary bg-transparent border-none cursor-pointer rounded hover:bg-black/10"
                           title="New Collection"
@@ -304,6 +304,21 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
                         >
                           <Plus size={12} />
                         </button>
+                        <button
+                          className="p-1 text-muted hover:text-primary bg-transparent border-none cursor-pointer rounded hover:bg-black/10"
+                          title="Library settings"
+                          aria-label={`Settings for ${lib.name}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.dispatchEvent(
+                              new CustomEvent("open-entity-settings", {
+                                detail: { type: "library", id: lib.id },
+                              }),
+                            );
+                          }}
+                        >
+                          <Settings size={12} />
+                        </button>
                       </div>
                     </div>
 
@@ -312,7 +327,7 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
                       return (
                         <div
                           key={`col-${col.id}`}
-                          className={`sidebar-item flex items-center gap-2 pl-9 pr-3 py-1.5 rounded-md cursor-pointer text-sm ${isActiveCol ? 'active' : ''}`}
+                          className={`sidebar-item group flex items-center gap-2 pl-9 pr-2 py-1.5 rounded-md cursor-pointer text-sm ${isActiveCol ? 'active' : ''}`}
                           onClick={() => setActiveView({ type: 'collection', id: col.id })}
                           onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
                           onDrop={async (e) => {
@@ -325,7 +340,22 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
                           }}
                         >
                           <span className="w-1.5 h-1.5 rounded-full bg-current opacity-50 flex-shrink-0"></span>
-                          <span className="truncate">{col.name}</span>
+                          <span className="truncate flex-1 min-w-0">{col.name}</span>
+                          <button
+                            className="row-action p-1 text-muted hover:text-primary bg-transparent border-none cursor-pointer rounded hover:bg-black/10 flex-shrink-0"
+                            title="Collection settings"
+                            aria-label={`Settings for ${col.name}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.dispatchEvent(
+                                new CustomEvent("open-entity-settings", {
+                                  detail: { type: "collection", id: col.id },
+                                }),
+                              );
+                            }}
+                          >
+                            <Settings size={12} />
+                          </button>
                         </div>
                       );
                     })}

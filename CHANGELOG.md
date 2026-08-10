@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-10
+### Changed
+- **Library and collection settings moved onto the sidebar rows.** Each library and
+  collection now has its own gear, so renaming or deleting one no longer requires
+  navigating into it first and finding a control in the header. The header gear is gone —
+  it was easily mistaken for the app Settings in the sidebar footer, which uses the same
+  icon and does something entirely different.
+- Row actions are visible on hover and on keyboard focus, always visible on touch devices
+  where there is no hover, and use larger tap targets there.
+
+### Fixed
+- Opening library or collection settings swallowed errors. An unhandled rejection in a
+  click handler fails silently, so any failure looked like a button that does nothing.
+
 ## [1.0.5] - 2026-08-10
 ### Fixed
 - **Edited author, summary, and keywords appeared to vanish after saving.** They were

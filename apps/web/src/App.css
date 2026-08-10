@@ -993,3 +993,45 @@ select, option {
   outline-offset: 2px;
   color: var(--text-primary);
 }
+
+/*
+  Per-row actions in the sidebar.
+
+  These were hover-only, which makes them unreachable on a phone and invisible
+  to keyboard users. Touch devices get them permanently, and keyboard focus
+  reveals them anywhere.
+*/
+.row-actions,
+.sidebar-item .row-action {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.sidebar-item:hover .row-actions,
+.sidebar-item:hover .row-action,
+.sidebar-item:focus-within .row-actions,
+.sidebar-item:focus-within .row-action,
+.sidebar-item.active .row-actions,
+.sidebar-item.active .row-action {
+  opacity: 1;
+}
+
+.row-actions button:focus-visible,
+.row-action:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+@media (hover: none) {
+  .row-actions,
+  .sidebar-item .row-action {
+    opacity: 1;
+  }
+
+  /* Comfortable tap targets, where a 12px icon is a miss. */
+  .row-actions button,
+  .sidebar-item .row-action {
+    padding: 0.5rem;
+  }
+}
