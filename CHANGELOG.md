@@ -8,6 +8,49 @@ library that runs in Docker on a NAS, served as an installable PWA, with a Rust/
 backend replacing the Tauri IPC layer. See `DOCS/OVERVIEW.md` for the target architecture.
 The frontend still talks to Tauri; porting it to the API is the next step.
 
+## [0.8.0] - 2026-08-10
+### Added
+- **Document read API.**
+  - `GET /api/documents` — paged listing with FTS5 search (`q`), filters
+    (`libraryId`, `collectionId`, `tagId`, `favorite`), and sorting
+    (`recent`, `added`, `title`, `author`, `year`). Returns `{ items, total, limit, offset }`
+    with `limit` clamped to 200 so one request cannot pull an entire library.
+  - `GET /api/documents/{id}` — single document.
+  - `GET /api/documents/{id}/file` — the document itself, served with Range support.
+  - `GET /api/documents/{id}/download` — same bytes with `Content-Disposition: attachment`.
+  - `GET /api/documents/{id}/thumbnail` — generated thumbnail, cacheable for a week.
+- **Range request support** on document serving. pdf.js fetches PDFs in chunks, so without
+  it every page turn re-downloads the whole document and a 200 MB scan means a 200 MB
+  allocation per reader. Verified end to end: two range-fetched halves of a real PDF
+  reassemble into a valid file.
+- **Local user** (migration 0002). Reading progress, favourites, and annotations are keyed
+  by user, so reads need one before sessions exist. Seeded with an empty password hash,
+  which argon2 can never verify against, so the account cannot be logged into until a
+  password is set in the auth step.
+- **34 new tests** covering listing, paging, clamping, search, filters, sorting, content
+  types, Range (exact bytes, open-ended, suffix, unsatisfiable), downloads with non-ASCII
+  filenames, path traversal, and missing files.
+
+### Security
+- **Documents are resolved against the library root and confined to it.** Paths are
+  rejected up front for `..` and absolute components, then the canonicalised result is
+  confirmed to still live under the root, which is what catches symlinks pointing at
+  `/etc/shadow`. A row hand-edited to `../outside.txt` is not served.
+- **The wire format never exposes `relative_path`.** Clients address documents by id;
+  publishing filesystem layout to every browser tab leaks the shape of the NAS. Asserted
+  in tests.
+- Internal errors are logged, never returned. Clients get `not found` or
+  `internal server error`.
+
+### Changed
+- Compression is now scoped structurally rather than applied globally: JSON responses and
+  the static bundle are gzipped, document bytes never are. Gzipping a PDF burns NAS CPU for
+  almost nothing, and compressing a 206 range response is simply wrong.
+- Free-text search sanitises input into a quoted FTS5 expression with a prefix wildcard on
+  the final token. Raw FTS5 treats `"`, `*`, `-`, `(`, and `AND` as syntax, so searching
+  for `C++` would otherwise return a 500. An unusable query returns no results rather than
+  silently listing the whole library.
+
 ## [0.7.0] - 2026-08-10
 ### Added
 - **`kintara-server`** — new Rust/Axum backend in `apps/server/`. Runs, serves the built

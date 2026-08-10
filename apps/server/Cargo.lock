@@ -860,12 +860,13 @@ dependencies = [
 
 [[package]]
 name = "kintara-server"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "axum",
  "chrono",
  "http-body-util",
+ "mime_guess",
  "serde",
  "serde_json",
  "sqlx",

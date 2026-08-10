@@ -58,10 +58,46 @@ library root, so the volume can move.
 Search uses an FTS5 external-content table kept in sync by insert/update/delete triggers,
 so the document text is not stored twice.
 
+### API
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/health` | Status, version, indexed document count. Doubles as the container healthcheck. |
+| `GET /api/documents` | Paged listing. Query: `q`, `libraryId`, `collectionId`, `tagId`, `favorite`, `sort`, `limit`, `offset`. |
+| `GET /api/documents/{id}` | Single document. |
+| `GET /api/documents/{id}/file` | The document, with Range support. |
+| `GET /api/documents/{id}/download` | Same bytes as an attachment. |
+| `GET /api/documents/{id}/thumbnail` | Generated thumbnail, cached for a week. |
+
+Responses are camelCase. Listing returns `{ items, total, limit, offset }`; `limit` is
+clamped to 200. Sorting is an enum, so the `ORDER BY` fragment is never user input.
+
+Range support on `/file` is not optional — pdf.js fetches PDFs in chunks, and without it
+every page turn re-downloads the whole document.
+
+### Security posture
+- **Documents are confined to the library root.** `files::resolve_in_root` rejects `..` and
+  absolute components, then confirms the canonicalised path still lives under the root,
+  which is what catches symlinks. A bad database row cannot be used to read arbitrary files.
+- **Paths are never published.** The wire format omits `relative_path`; clients address
+  documents by id. A test asserts this so it cannot regress.
+- **Errors do not leak internals.** Clients see `not found` or `internal server error`;
+  detail goes to the log.
+- **Search input is sanitised into an FTS5 expression.** Raw FTS5 syntax means `C++` would
+  otherwise 500.
+
+### Users
+Reading progress, favourites, and annotations are keyed by user. Migration 0002 seeds a
+single `local` user with an empty password hash, which argon2 can never verify against, so
+it is an owner record rather than a usable credential. The `CurrentUser` extractor resolves
+to it until session auth lands — at which point only that extractor changes, because
+handlers are already user-scoped.
+
 ### Tests
-`cargo test` from `apps/server`. Tests run against real SQLite files in temp directories
-and drive the real router — there are no mocks. They cover migrations, pragma enforcement,
-cascade deletes, constraints, FTS trigger sync, and routing.
+`cargo test` from `apps/server`. Tests run against real SQLite files in temp directories,
+real files on disk, and the real router — there are no mocks. They cover migrations, pragma
+enforcement, cascade deletes, constraints, FTS trigger sync, routing, listing and paging,
+search sanitisation, content types, Range semantics, downloads, and path traversal.
 
 ## Architecture
 - **Frontend**: React, Vite, TypeScript
