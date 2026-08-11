@@ -197,6 +197,50 @@ impl TestApp {
         .expect("insert document")
     }
 
+    /// Creates a library through the API and returns its id.
+    pub async fn create_library(&self, name: &str) -> i64 {
+        body_json(
+            self.send_json("POST", "/api/libraries", serde_json::json!({ "name": name }))
+                .await,
+        )
+        .await["id"]
+            .as_i64()
+            .expect("library id")
+    }
+
+    /// Creates a collection through the API and returns its id.
+    pub async fn create_collection(&self, library_id: i64, name: &str) -> i64 {
+        body_json(
+            self.send_json(
+                "POST",
+                "/api/collections",
+                serde_json::json!({ "libraryId": library_id, "name": name }),
+            )
+            .await,
+        )
+        .await["id"]
+            .as_i64()
+            .expect("collection id")
+    }
+
+    /// Creates a tag if it does not exist and attaches it to a document.
+    pub async fn tag_document(&self, document_id: i64, name: &str) -> i64 {
+        // Creating an existing tag returns the existing row, so callers can tag
+        // several documents with the same name without checking first.
+        let tag_id = body_json(
+            self.send_json("POST", "/api/tags", serde_json::json!({ "name": name }))
+                .await,
+        )
+        .await["id"]
+            .as_i64()
+            .expect("tag id");
+
+        self.post(&format!("/api/documents/{document_id}/tags/{tag_id}"))
+            .await;
+
+        tag_id
+    }
+
     pub async fn user_id(&self) -> i64 {
         sqlx::query_scalar("SELECT id FROM users ORDER BY id LIMIT 1")
             .fetch_one(&self.db)

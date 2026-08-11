@@ -10,7 +10,7 @@ use tower_http::compression::CompressionLayer;
 
 use crate::current_user::CurrentUser;
 use crate::error::{AppError, AppResult};
-use crate::models::{fts_query, Document, DocumentRow, ListQuery, Page};
+use crate::models::{Document, DocumentRow, ListQuery, Page, Search};
 use crate::state::AppState;
 
 pub fn router(max_upload_bytes: usize) -> Router<AppState> {
@@ -68,16 +68,53 @@ macro_rules! select_columns {
     };
 }
 
+/// Matches one term against the tag names attached to a document.
+const TAG_MATCH: &str = "d.id IN (
+    SELECT dt.document_id FROM document_tags dt
+    JOIN tags t ON t.id = dt.tag_id
+    WHERE t.name LIKE ";
+
+/// Emits the free-text clause: the FTS index, OR the document's tag names.
+///
+/// The two are unioned rather than merged into one index. Within the tag half
+/// the terms are ANDed, which mirrors what FTS5 does with its own — a search
+/// for `space opera` should not match everything tagged `space`.
+///
+/// Note the two halves match slightly differently: FTS treats the last term as
+/// a prefix so results narrow as you type, while a tag term matches anywhere in
+/// the name.
+fn push_search(builder: &mut QueryBuilder<Sqlite>, search: &Search) {
+    builder
+        .push(" AND (d.id IN (SELECT rowid FROM documents_fts WHERE documents_fts MATCH ")
+        .push_bind(search.fts.clone())
+        .push(")");
+
+    for (index, pattern) in search.tag_patterns.iter().enumerate() {
+        builder.push(if index == 0 { " OR (" } else { " AND " });
+        builder
+            .push(TAG_MATCH)
+            .push_bind(pattern.clone())
+            .push(" ESCAPE '\\')");
+    }
+
+    if !search.tag_patterns.is_empty() {
+        builder.push(")");
+    }
+
+    builder.push(")");
+}
+
 /// Applies every filter shared by the count and page queries, so the total can
 /// never drift from the rows actually returned.
-fn push_filters(builder: &mut QueryBuilder<Sqlite>, query: &ListQuery, search: Option<&str>) {
+///
+/// Search is one filter among the rest rather than a mode of its own: a query
+/// and a `library_id` arrive together whenever someone searches from inside a
+/// library, and both have to apply.
+fn push_filters(builder: &mut QueryBuilder<Sqlite>, query: &ListQuery, search: Option<&Search>) {
     builder.push(" WHERE 1 = 1");
 
-    if let Some(expression) = search {
-        builder
-            .push(" AND d.id IN (SELECT rowid FROM documents_fts WHERE documents_fts MATCH ")
-            .push_bind(expression)
-            .push(")");
+    if let Some(search) = search {
+        push_search(builder, search);
     }
 
     if let Some(library_id) = query.library_id {
@@ -118,8 +155,8 @@ pub async fn list(
     // An unusable search string (all punctuation, say) must return nothing
     // rather than quietly returning the whole library.
     let search = match query.q.as_deref().map(str::trim) {
-        Some(raw) if !raw.is_empty() => match fts_query(raw) {
-            Some(expression) => Some(expression),
+        Some(raw) if !raw.is_empty() => match Search::parse(raw) {
+            Some(search) => Some(search),
             None => {
                 return Ok(Json(Page {
                     items: Vec::new(),
@@ -137,7 +174,7 @@ pub async fn list(
          LEFT JOIN user_document_state s ON s.document_id = d.id AND s.user_id = ",
     );
     count.push_bind(user_id);
-    push_filters(&mut count, &query, search.as_deref());
+    push_filters(&mut count, &query, search.as_ref());
 
     let total: i64 = count.build_query_scalar().fetch_one(&state.db).await?;
 
@@ -147,7 +184,7 @@ pub async fn list(
           LEFT JOIN user_document_state s ON s.document_id = d.id AND s.user_id = ",
     );
     page.push_bind(user_id);
-    push_filters(&mut page, &query, search.as_deref());
+    push_filters(&mut page, &query, search.as_ref());
 
     // Sort is an enum, so this fragment is a literal rather than user input.
     page.push(" ORDER BY ").push(query.sort.order_by());

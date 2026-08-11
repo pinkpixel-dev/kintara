@@ -148,11 +148,17 @@ function App() {
       // Every view is the same endpoint with different filters now, rather than
       // a separate query per view.
       const query: Parameters<typeof documentService.list>[0] = {};
+      const trimmed = searchQuery.trim();
 
-      if (searchQuery.trim().length > 0) {
-        query.q = searchQuery.trim();
-      } else if (activeView.type === 'recent') {
-        query.limit = 10;
+      if (trimmed.length > 0) query.q = trimmed;
+
+      // Searching happens *inside* the current view rather than replacing it,
+      // so a library stays a library once you start typing. The server ANDs the
+      // two, so both are sent together.
+      if (activeView.type === 'recent') {
+        // The exception. "Recent" is the last ten things, not a scope worth
+        // searching within, so a query here searches everything.
+        if (!trimmed) query.limit = 10;
       } else if (activeView.type === 'favorites') {
         query.favorite = true;
       } else if (activeView.type === 'library' && activeView.id) {
@@ -231,10 +237,25 @@ function App() {
 
   const handleSidebarSelect = (view: ActiveView) => {
     setActiveView(view);
+    // Choosing a view is a fresh start. Carrying the query over would make the
+    // new library look empty for a reason that is off-screen on a phone.
+    setSearchQuery("");
     setViewMode('grid');
     // On a phone the sidebar covers the library, so choosing a view should
     // reveal the result rather than leaving the drawer in the way.
     if (isNarrow()) setIsLeftSidebarOpen(false);
+  };
+
+  /**
+   * Widens the current search to the whole library.
+   *
+   * Deliberately keeps the query — the point of the control is to run the same
+   * search without its scope, not to start over. It also leaves the sidebar
+   * open, because that is where the search box is.
+   */
+  const handleSearchEverywhere = () => {
+    setActiveView({ type: 'all' });
+    setViewMode('grid');
   };
 
   const openDetails = (doc: Document) => {
@@ -413,6 +434,7 @@ function App() {
         setSearchQuery={setSearchQuery}
         activeView={activeView}
         setActiveView={handleSidebarSelect}
+        onSearchEverywhere={handleSearchEverywhere}
         onImport={handleImport}
       />
 

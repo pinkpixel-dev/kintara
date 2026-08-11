@@ -12,6 +12,9 @@ live, run it on your NAS, and read them from any device on your network.
   on a phone and a large scan does not have to download in full first.
 - **Organises without moving anything.** Libraries, collections, and tags are views over
   your files. Deleting a library never touches the documents inside it.
+- **Searches where you are looking.** Open a library or collection and the search box
+  searches inside it, with one click to widen the same query to everything. It matches
+  titles, authors, keywords, summaries, and tag names.
 - **Highlights and remembers where you were.** Per user, so two people reading the same
   paper do not fight over the bookmark.
 - **Installs as an app.** It is a PWA, so you can add it to a home screen and it opens

@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-08-10
+### Added
+- **Search runs inside whatever you are looking at.** Typing in a library or collection
+  now searches that library or collection instead of quietly widening to the whole
+  library. The server already combined `q` with `libraryId`/`collectionId`; the frontend
+  was throwing the scope away as soon as you typed. Favourites scopes the same way.
+  Recent deliberately does not — it is the last ten things, not a scope worth searching
+  within, so a query there searches everything.
+- **A scope chip under the search box** names what you are searching in, with a control
+  that drops the scope and reruns the same query everywhere. It appears only once there
+  is a query; before that the placeholder already says where the search will land. Both
+  the placeholder and the chip are derived from the active view, so they cannot disagree
+  with it.
+- **Search matches tag names.** Title, author, keywords and summary were already indexed;
+  tags were not, because they live in a joined table. A tag query is now unioned with the
+  FTS results rather than denormalised into the index — the index cannot drift out of
+  step with the tags table that way. Multi-word queries need every term to hit a tag, so
+  `space opera` does not return everything tagged `space`.
+
+### Changed
+- Choosing a library, collection, or quick view clears the search box. Carrying a query
+  across a view change would make the new view look empty for a reason that is off-screen
+  on a phone. An empty query in a scoped view lists that whole library or collection, as
+  it always has.
+
 ## [1.1.2] - 2026-08-10
 ### Fixed
 - **The service worker cached the development bundle, so code changes never appeared.**

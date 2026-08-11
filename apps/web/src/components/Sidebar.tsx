@@ -28,6 +28,8 @@ interface SidebarProps {
   setSearchQuery: (q: string) => void;
   activeView: { type: 'all' | 'recent' | 'favorites' | 'library' | 'collection', id?: number };
   setActiveView: (view: { type: 'all' | 'recent' | 'favorites' | 'library' | 'collection', id?: number }) => void;
+  /** Drops the scope but keeps the query, so the same search runs everywhere. */
+  onSearchEverywhere: () => void;
   onImport: () => void;
 }
 
@@ -57,7 +59,7 @@ async function ensureDefaultLibrary(): Promise<void> {
   return defaultLibraryInFlight;
 }
 
-export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setActiveView, onImport }: SidebarProps) {
+export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setActiveView, onSearchEverywhere, onImport }: SidebarProps) {
   const [libraries, setLibraries] = useState<Library[]>([]);
   const [collectionsByLibrary, setCollectionsByLibrary] = useState<Record<number, Collection[]>>({});
   const [expandedLibraries, setExpandedLibraries] = useState<Record<number, boolean>>({});
@@ -174,6 +176,28 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
     }
   };
 
+  /**
+   * What the search box is currently searching inside, or null for everything.
+   *
+   * Derived from the active view rather than held as its own state, so the
+   * scope and the view can never disagree. "Recent" is not a scope — the server
+   * has no filter for it — so searching from there searches everything.
+   */
+  const scopeName = (() => {
+    if (activeView.type === 'library') {
+      return libraries.find(lib => lib.id === activeView.id)?.name ?? null;
+    }
+    if (activeView.type === 'collection') {
+      for (const collections of Object.values(collectionsByLibrary)) {
+        const match = collections.find(col => col.id === activeView.id);
+        if (match) return match.name;
+      }
+      return null;
+    }
+    if (activeView.type === 'favorites') return 'Favorites';
+    return null;
+  })();
+
   if (!isOpen) return null;
 
   return (
@@ -199,15 +223,35 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
         </div>
 
         <div className="sidebar-content flex-1 overflow-y-auto px-2 py-4 flex flex-col gap-4">
-          <div className="relative px-2">
-            <Search className="absolute left-4 top-2.5 text-muted" size={14} />
-            <input
-              type="text"
-              placeholder="Search documents..."
-              className="input pl-8 py-2 text-sm w-full bg-[var(--bg-tertiary)] border-transparent focus:border-[var(--accent)]"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+          <div className="px-2">
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 text-muted" size={14} />
+              <input
+                type="text"
+                placeholder={scopeName ? `Search in ${scopeName}...` : "Search documents..."}
+                aria-label={scopeName ? `Search in ${scopeName}` : "Search all documents"}
+                className="input pl-8 py-2 text-sm w-full bg-[var(--bg-tertiary)] border-transparent focus:border-[var(--accent)]"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+
+            {/* Only while there is something to widen. Before you type, the
+                placeholder already says where the search will land. */}
+            {scopeName && searchQuery.trim().length > 0 && (
+              <div className="search-scope" aria-live="polite">
+                <span className="search-scope-label truncate">in {scopeName}</span>
+                <button
+                  type="button"
+                  className="search-scope-clear"
+                  onClick={onSearchEverywhere}
+                  title="Search everywhere instead"
+                  aria-label={`Stop searching in ${scopeName} and search everywhere`}
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            )}
           </div>
 
           <div>

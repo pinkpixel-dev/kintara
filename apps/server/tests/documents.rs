@@ -127,6 +127,192 @@ async fn a_search_with_no_usable_characters_returns_nothing_not_everything() {
 }
 
 #[tokio::test]
+async fn search_matches_author_and_keywords_not_just_the_title() {
+    let app = TestApp::new().await;
+    let id = app.add_document("papers/1706.03762.pdf", SAMPLE).await;
+    app.add_document("books/rust.pdf", SAMPLE).await;
+
+    sqlx::query("UPDATE documents SET author = ?, keywords = ? WHERE id = ?")
+        .bind("Vaswani")
+        .bind("transformers, attention")
+        .bind(id)
+        .execute(&app.db)
+        .await
+        .unwrap();
+
+    for query in ["vaswani", "transformers"] {
+        let json = body_json(app.get(&format!("/api/documents?q={query}")).await).await;
+        assert_eq!(json["total"], 1, "{query} should match one document");
+        assert_eq!(json["items"][0]["id"], id);
+    }
+}
+
+#[tokio::test]
+async fn search_matches_tag_names_which_are_not_in_the_fts_index() {
+    let app = TestApp::new().await;
+    let tagged = app.add_document("papers/untitled-scan-4.pdf", SAMPLE).await;
+    app.add_document("books/rust.pdf", SAMPLE).await;
+    app.tag_document(tagged, "sci-fi").await;
+
+    // Nothing about the title, author or summary says "sci-fi"; only the tag
+    // does, and tags live in a joined table rather than documents_fts.
+    let json = body_json(app.get("/api/documents?q=sci-fi").await).await;
+    assert_eq!(json["total"], 1);
+    assert_eq!(json["items"][0]["id"], tagged);
+
+    // Tag terms match anywhere in the name, so a compound tag is findable by
+    // either half of it.
+    let json = body_json(app.get("/api/documents?q=fi").await).await;
+    assert_eq!(json["total"], 1);
+    assert_eq!(json["items"][0]["id"], tagged);
+}
+
+#[tokio::test]
+async fn a_multi_word_search_needs_every_term_to_hit_a_tag() {
+    let app = TestApp::new().await;
+    let both = app.add_document("scan-a.pdf", SAMPLE).await;
+    let one = app.add_document("scan-b.pdf", SAMPLE).await;
+    app.tag_document(both, "space").await;
+    app.tag_document(both, "opera").await;
+    app.tag_document(one, "space").await;
+
+    // Matching on any single term would make "space opera" return everything
+    // tagged "space", which is the opposite of narrowing.
+    let json = body_json(app.get("/api/documents?q=space%20opera").await).await;
+    assert_eq!(json["total"], 1);
+    assert_eq!(json["items"][0]["id"], both);
+}
+
+#[tokio::test]
+async fn tag_matching_treats_like_wildcards_as_literal_characters() {
+    let app = TestApp::new().await;
+    let literal = app.add_document("scan-a.pdf", SAMPLE).await;
+    let decoy = app.add_document("scan-b.pdf", SAMPLE).await;
+    app.tag_document(literal, "draft_2").await;
+    app.tag_document(decoy, "draftX2").await;
+
+    // Unescaped, `_` is LIKE's single-character wildcard and this would match
+    // both.
+    let json = body_json(app.get("/api/documents?q=draft_2").await).await;
+    assert_eq!(json["total"], 1);
+    assert_eq!(json["items"][0]["id"], literal);
+}
+
+#[tokio::test]
+async fn a_search_inside_a_library_does_not_escape_it() {
+    let app = TestApp::new().await;
+    let inside = app.add_document("a/quantum-mechanics.pdf", SAMPLE).await;
+    let outside = app.add_document("b/quantum-computing.pdf", SAMPLE).await;
+
+    let library = app.create_library("Physics").await;
+    app.post(&format!("/api/libraries/{library}/documents/{inside}"))
+        .await;
+
+    let json = body_json(app.get("/api/documents?q=quantum").await).await;
+    assert_eq!(json["total"], 2, "unscoped search still sees everything");
+
+    let json = body_json(
+        app.get(&format!("/api/documents?q=quantum&libraryId={library}"))
+            .await,
+    )
+    .await;
+    assert_eq!(json["total"], 1);
+    assert_eq!(json["items"][0]["id"], inside);
+
+    // The document that matched the text but not the scope must be absent
+    // rather than merely ranked lower.
+    let ids: Vec<i64> = json["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["id"].as_i64().unwrap())
+        .collect();
+    assert!(!ids.contains(&outside));
+}
+
+#[tokio::test]
+async fn a_search_inside_a_collection_does_not_escape_it() {
+    let app = TestApp::new().await;
+    let inside = app.add_document("a/quantum-mechanics.pdf", SAMPLE).await;
+    app.add_document("b/quantum-computing.pdf", SAMPLE).await;
+
+    let library = app.create_library("Physics").await;
+    let collection = app.create_collection(library, "To read").await;
+    app.post(&format!("/api/collections/{collection}/documents/{inside}"))
+        .await;
+
+    let json = body_json(
+        app.get(&format!("/api/documents?q=quantum&collectionId={collection}"))
+            .await,
+    )
+    .await;
+    assert_eq!(json["total"], 1);
+    assert_eq!(json["items"][0]["id"], inside);
+}
+
+#[tokio::test]
+async fn a_scoped_search_reports_a_total_that_matches_its_rows() {
+    let app = TestApp::new().await;
+    let library = app.create_library("Physics").await;
+
+    for i in 0..5 {
+        let id = app.add_document(&format!("quantum-{i}.pdf"), SAMPLE).await;
+        if i < 3 {
+            app.post(&format!("/api/libraries/{library}/documents/{id}"))
+                .await;
+        }
+    }
+
+    // The count and the page are built from the same filters; this is what
+    // stops "1-2 of 5" appearing over three results.
+    let json = body_json(
+        app.get(&format!("/api/documents?q=quantum&libraryId={library}&limit=2"))
+            .await,
+    )
+    .await;
+    assert_eq!(json["total"], 3);
+    assert_eq!(json["items"].as_array().unwrap().len(), 2);
+}
+
+#[tokio::test]
+async fn a_scoped_search_that_matches_nothing_in_scope_returns_nothing() {
+    let app = TestApp::new().await;
+    app.add_document("quantum-mechanics.pdf", SAMPLE).await;
+    let library = app.create_library("Empty").await;
+
+    let json = body_json(
+        app.get(&format!("/api/documents?q=quantum&libraryId={library}"))
+            .await,
+    )
+    .await;
+    assert_eq!(
+        json["total"], 0,
+        "a scoped search must not fall back to searching everything"
+    );
+}
+
+#[tokio::test]
+async fn search_combines_with_the_favorite_filter() {
+    let app = TestApp::new().await;
+    let kept = app.add_document("quantum-mechanics.pdf", SAMPLE).await;
+    app.add_document("quantum-computing.pdf", SAMPLE).await;
+    let user_id = app.user_id().await;
+
+    sqlx::query(
+        "INSERT INTO user_document_state (user_id, document_id, is_favorite) VALUES (?, ?, 1)",
+    )
+    .bind(user_id)
+    .bind(kept)
+    .execute(&app.db)
+    .await
+    .unwrap();
+
+    let json = body_json(app.get("/api/documents?q=quantum&favorite=true").await).await;
+    assert_eq!(json["total"], 1);
+    assert_eq!(json["items"][0]["id"], kept);
+}
+
+#[tokio::test]
 async fn the_favorite_filter_uses_the_requesting_users_state() {
     let app = TestApp::new().await;
     let kept = app.add_document("kept.pdf", SAMPLE).await;

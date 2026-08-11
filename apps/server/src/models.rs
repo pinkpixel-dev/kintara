@@ -148,18 +148,14 @@ impl ListQuery {
     }
 }
 
-/// Turns arbitrary user input into a safe FTS5 MATCH expression.
+/// Splits raw user input into the terms both halves of search are built from.
 ///
-/// FTS5 has its own query syntax, so raw input containing `"`, `*`, `(`, `-`
-/// or the bare word `AND` is either a syntax error or silently does something
-/// the user did not ask for. Searching for `C++` should not 500.
-///
-/// Every token is quoted as an FTS5 string literal (doubling any embedded
-/// quotes), and the final token gets a `*` so search feels incremental as you
-/// type. Returns None when the input has no usable characters.
-pub fn fts_query(raw: &str) -> Option<String> {
-    let tokens: Vec<String> = raw
-        .split_whitespace()
+/// Anything that is not a word character is dropped rather than escaped. FTS5
+/// has its own query syntax, so raw input containing `"`, `*`, `(`, `-` or the
+/// bare word `AND` is either a syntax error or silently does something the user
+/// did not ask for — searching for `C++` should not 500.
+fn search_terms(raw: &str) -> Vec<String> {
+    raw.split_whitespace()
         .map(|token| {
             token
                 .chars()
@@ -167,18 +163,54 @@ pub fn fts_query(raw: &str) -> Option<String> {
                 .collect::<String>()
         })
         .filter(|token| !token.is_empty())
-        .collect();
+        .collect()
+}
 
-    if tokens.is_empty() {
-        return None;
+/// A user's search text, prepared for both places it has to be matched.
+///
+/// Title, author, keywords and summary live in `documents_fts`. Tag names do
+/// not — they are in `tags`, reached through a join — so they are matched
+/// separately and the two results are unioned. Denormalising tag names into the
+/// FTS row was the alternative; it keeps search a single query, at the cost of
+/// an index that goes quietly wrong the moment a tag write path forgets to
+/// refresh it.
+#[derive(Debug, Clone)]
+pub struct Search {
+    /// An FTS5 MATCH expression.
+    pub fts: String,
+    /// One LIKE pattern per term, all of which must match some tag on the
+    /// document. Never empty when `parse` returned `Some`.
+    pub tag_patterns: Vec<String>,
+}
+
+impl Search {
+    /// Returns `None` when the input has no usable characters, which callers
+    /// must treat as "matches nothing" rather than "no filter".
+    pub fn parse(raw: &str) -> Option<Search> {
+        let terms = search_terms(raw);
+        if terms.is_empty() {
+            return None;
+        }
+
+        Some(Search {
+            fts: fts_expression(&terms),
+            tag_patterns: terms.iter().map(|term| like_pattern(term)).collect(),
+        })
     }
+}
 
-    let last = tokens.len() - 1;
-    let expression = tokens
+/// Builds the FTS5 MATCH expression.
+///
+/// Every term is quoted as an FTS5 string literal (doubling any embedded
+/// quotes), and the final one gets a `*` so search feels incremental as you
+/// type. Terms are space-separated, which FTS5 reads as an implicit AND.
+fn fts_expression(terms: &[String]) -> String {
+    let last = terms.len() - 1;
+    terms
         .iter()
         .enumerate()
-        .map(|(i, token)| {
-            let escaped = token.replace('"', "\"\"");
+        .map(|(i, term)| {
+            let escaped = term.replace('"', "\"\"");
             if i == last {
                 format!("\"{escaped}\"*")
             } else {
@@ -186,7 +218,19 @@ pub fn fts_query(raw: &str) -> Option<String> {
             }
         })
         .collect::<Vec<_>>()
-        .join(" ");
+        .join(" ")
+}
 
-    Some(expression)
+/// Builds a LIKE pattern for matching one term against a tag name.
+///
+/// Substring rather than prefix, because tags are short and often compound —
+/// `fi` should find `sci-fi`. LIKE's own wildcards are escaped so a tag called
+/// `100%` or `draft_2` is matched literally; `search_terms` already strips most
+/// of them, but the escaping does not depend on that staying true.
+fn like_pattern(term: &str) -> String {
+    let escaped = term
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_");
+    format!("%{escaped}%")
 }
