@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-08-10
+### Fixed
+- **The import dialog changed size with every document and hid its own Save button.** The
+  cover preview was sized with `w-1/3`, which this project's stylesheet does not define —
+  it maintains its utility classes by hand rather than running Tailwind — so the frame
+  collapsed onto the cover's natural pixel dimensions. A tall scan made a tall dialog, a
+  wide one pushed the form out of the dialog entirely, and reaching Save meant scrolling
+  sideways. The preview is now a fixed frame with the cover fitted inside it, so every
+  import opens at the same size whatever shape the page is. Contained rather than cropped,
+  because covers run from portrait pages to square product shots and filling the frame
+  cuts off the part that identifies the document. Below 900px the frame goes landscape and
+  sits above the form, keeping Save on screen without scrolling.
+- **The sidebar's search icon sat on the edge of the input.** It was positioned with
+  `left-4` and `top-2.5`, neither of which is defined either, so it fell back to
+  `left: auto` at its static position. It now has real CSS, matching how the password
+  field already positions its visibility toggle.
+
 ## [1.2.0] - 2026-08-10
 ### Added
 - **Search runs inside whatever you are looking at.** Typing in a library or collection

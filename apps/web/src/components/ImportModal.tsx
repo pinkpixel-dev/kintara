@@ -99,7 +99,7 @@ export function ImportModal({ document, onClose, onComplete }: ImportModalProps)
         onCancel={() => setConfirmCancel(false)}
       />
 
-      <div className="modal-content large" style={{ maxWidth: "600px" }}>
+      <div className="modal-content import-modal">
         <div className="modal-header">
           <h2 className="font-semibold text-lg m-0">Import Document</h2>
           <button
@@ -110,14 +110,10 @@ export function ImportModal({ document, onClose, onComplete }: ImportModalProps)
             <X size={18} />
           </button>
         </div>
-        <div className="modal-body flex-row gap-6">
-          <div className="w-1/3 aspect-4-3 bg-[var(--bg-tertiary)] rounded flex flex-col items-center justify-center border border-dashed border-[var(--border-color)] relative overflow-hidden flex-shrink-0">
+        <div className="modal-body import-layout">
+          <div className="import-preview">
             {docState.hasThumbnail ? (
-              <img
-                src={documentUrls.thumbnail(docState.id)}
-                alt=""
-                className="object-cover w-full h-full"
-              />
+              <img src={documentUrls.thumbnail(docState.id)} alt="" />
             ) : (
               <>
                 <ImageIcon size={32} className="text-muted mb-2 opacity-50" aria-hidden="true" />
@@ -126,7 +122,7 @@ export function ImportModal({ document, onClose, onComplete }: ImportModalProps)
             )}
           </div>
 
-          <div className="flex-1 flex flex-col gap-4">
+          <div className="import-form">
             <div className="flex flex-col gap-1">
               <label className="text-xs text-muted font-medium uppercase tracking-wider" htmlFor="import-title">
                 Title
@@ -189,7 +185,7 @@ export function ImportModal({ document, onClose, onComplete }: ImportModalProps)
                 </div>
               )}
 
-            <div className="flex justify-end gap-3 mt-auto pt-4">
+            <div className="import-actions">
               <button
                 className="btn btn-ghost text-red-400 hover:text-red-500 hover:bg-red-500/10"
                 onClick={() => setConfirmCancel(true)}

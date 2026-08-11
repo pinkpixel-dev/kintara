@@ -224,8 +224,8 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
 
         <div className="sidebar-content flex-1 overflow-y-auto px-2 py-4 flex flex-col gap-4">
           <div className="px-2">
-            <div className="relative">
-              <Search className="absolute left-2 top-2.5 text-muted" size={14} />
+            <div className="search-field">
+              <Search className="search-field-icon" size={14} aria-hidden="true" />
               <input
                 type="text"
                 placeholder={scopeName ? `Search in ${scopeName}...` : "Search documents..."}
