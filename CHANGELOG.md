@@ -4,6 +4,44 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-08-10
+### Added
+- **Document actions in the reader.** Details, favourite, move, download and delete now sit
+  in the reader header. They existed on the library cards and stopped at the reader door,
+  so favouriting something you were actually reading meant going back to the grid to find
+  its card. Same set, same order, so the two surfaces agree. Hidden below 640px where the
+  tab strip needs the room; the details panel carries them there.
+- **Move or add a document to another library or collection.** Two actions rather than
+  one, because libraries here are views over the documents rather than folders that own
+  them — a document can sit in several at once. Move takes it out of the library or
+  collection you are looking at; Add leaves it where it is. Move only appears when there is
+  a scope to remove it from, so it can never silently do nothing from All Documents. The
+  destination is added before the source is removed, which is the recoverable order to
+  fail in.
+- **Import straight into a library or collection.** The + on a library row now offers
+  "Import a document here" or "New collection"; collections get their own +, which imports
+  into that collection. The destination is preselected in the import dialog.
+- **Create a library while importing.** The library picker has a "+ New library..." entry
+  that names it inline, so wanting a new library no longer means cancelling the import to
+  go and make one first.
+
+### Changed
+- **"Base Font Size" is now "Interface Size", and it moves everything.** The old setting
+  only changed text: card columns were pinned at 140px and every icon carried a pixel size
+  prop, so Small and Medium were indistinguishable and the control read as broken rather
+  than subtle. One step now scales text, cards, icons, the logo, and the sidebar together —
+  cards run 148px to 233px across the four steps. The PDF canvas is deliberately excluded
+  so pages stay sharp; the reader has its own controls. An existing font size setting is
+  carried over to the nearest step rather than reset.
+- Interface Size sits under Appearance rather than Typography, since it moves considerably
+  more than the type.
+
+### Fixed
+- **The + and gear on library rows were drawn half again as large as intended.** A blanket
+  `.sidebar-item svg` rule forced every icon inside a row to 18px, including the disclosure
+  chevron and the 12px row controls. The rule is now scoped to a row's own leading icon,
+  and the controls render at the 14px they ask for.
+
 ## [1.2.1] - 2026-08-10
 ### Fixed
 - **The import dialog changed size with every document and hid its own Save button.** The

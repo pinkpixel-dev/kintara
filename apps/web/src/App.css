@@ -78,6 +78,53 @@
   }
 }
 
+/* =========================================
+   UI size
+   =========================================
+
+   One step drives everything that should grow together: text, the cards, the
+   icons, and the fixed-pixel chrome around them.
+
+   This replaced a base-font-size setting that only moved the text. Card columns
+   were pinned at 140px and every icon carried a pixel size prop, so the two
+   smallest steps looked identical and the control read as broken rather than
+   subtle.
+
+   Icons are scaled with `zoom` on lucide's own class instead of a width rule,
+   because each icon is deliberately a different size — 12px row actions, 18px
+   header buttons, 32px empty states — and a single width would flatten all of
+   them to the same thing. `zoom` keeps those relationships and multiplies them.
+
+   The scale deliberately stops at 1.4: past that the sidebar starts eating a
+   phone, and the reader is where large text actually matters, which has its own
+   controls.
+*/
+:root {
+  --ui-scale: 1;
+  --font-base: 14px;
+  --card-min: 140px;
+}
+
+:root[data-ui-size="md"] {
+  --ui-scale: 1.12;
+}
+
+:root[data-ui-size="lg"] {
+  --ui-scale: 1.26;
+}
+
+:root[data-ui-size="xl"] {
+  --ui-scale: 1.4;
+}
+
+html {
+  font-size: calc(var(--font-base) * var(--ui-scale));
+}
+
+.lucide {
+  zoom: var(--ui-scale);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -130,7 +177,7 @@ select, option {
 
 /* Sidebar */
 .sidebar {
-  width: 280px;
+  width: calc(280px * var(--ui-scale));
   background-color: var(--bg-secondary);
   border-right: 1px solid var(--border-color);
   display: flex;
@@ -138,7 +185,7 @@ select, option {
 }
 
 .sidebar-header {
-  min-height: 68px;
+  min-height: calc(68px * var(--ui-scale));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -181,10 +228,39 @@ select, option {
   color: #ffffff;
 }
 
-.sidebar-item svg {
+/*
+  The leading icon on a quick-view row.
+
+  Scoped to a direct child rather than every descendant `svg`. The old blanket
+  rule inflated everything inside a row to 18px — the disclosure chevron, the +,
+  and the gear all ask for 12–14px and were being drawn half again as large,
+  which is what made the library rows look so heavy.
+*/
+.sidebar-item > svg {
   margin-right: 12px;
   width: 18px;
   height: 18px;
+}
+
+/* Row controls stay deliberately small; they are secondary to the row's name. */
+.row-actions svg,
+.sidebar-item .row-action svg {
+  width: 14px;
+  height: 14px;
+}
+
+/*
+  Chevron, icon, and name on a library or collection row.
+
+  A real rule because the markup asked for `gap-1.5`, which does not exist here
+  — the spacing was coming from the blanket `.sidebar-item svg` margin, so
+  scoping that rule left the icon touching the name.
+*/
+.sidebar-row-label {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 0;
 }
 
 /* Main Reader */
@@ -632,7 +708,9 @@ select, option {
 }
 .document-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  /* Cards grow with the UI size rather than staying pinned at one width, which
+     is what made the old setting look like it did nothing to the library. */
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--card-min) * var(--ui-scale)), 1fr));
   gap: 1rem;
 }
 .document-card {
@@ -1091,6 +1169,133 @@ select, option {
   color: var(--text-muted);
   /* So a click on the icon lands on the input and focuses it. */
   pointer-events: none;
+}
+
+/*
+  Per-document actions in the reader header.
+
+  Sized like the panel toggles beside them rather than like the card actions,
+  which are small because they sit on top of a thumbnail. Hidden below 640px,
+  where the tab strip needs the room — the details panel carries the same
+  actions there.
+*/
+.reader-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  padding-right: 0.25rem;
+  margin-right: 0.25rem;
+  border-right: 1px solid var(--border-color);
+}
+
+.reader-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  min-height: 2rem;
+  padding: 0.375rem;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.reader-action:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-tertiary);
+}
+
+.reader-action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  color: var(--text-primary);
+}
+
+.reader-action.is-favorite {
+  color: #eab308;
+}
+
+.reader-action.is-danger:hover {
+  color: #ef4444;
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+@media (hover: none) {
+  .reader-action {
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .reader-actions {
+    display: none;
+  }
+}
+
+/*
+  Row menu on a sidebar library.
+
+  Fixed rather than absolute inside the row: the sidebar scrolls, so an
+  absolutely positioned menu would be clipped by `overflow-y: auto` as soon as
+  it extended past its row.
+*/
+.row-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+}
+
+.row-menu {
+  position: fixed;
+  z-index: 91;
+  min-width: 13rem;
+  /* Backstop for a very narrow phone, where even a right-anchored menu could
+     otherwise reach past the left edge. */
+  max-width: calc(100vw - 1rem);
+  padding: 0.25rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-secondary);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.row-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  /* Comfortable on touch without a separate rule; this is a menu, not a row
+     control, so it can afford the height. */
+  min-height: 2.5rem;
+  padding: 0.5rem 0.625rem;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.row-menu-item:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.row-menu-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  color: var(--text-primary);
 }
 
 /*

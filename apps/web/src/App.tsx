@@ -1,23 +1,7 @@
-import { useEffect, useRef, useState } from "react";
-import {
-  PanelLeftClose,
-  PanelLeftOpen,
-  PanelRightClose,
-  PanelRightOpen,
-  Columns
-} from "lucide-react";
+import { useEffect, useState } from "react";
+import { PanelRightOpen } from "lucide-react";
 import "./App.css";
-import {
-  ApiError,
-  collectionService,
-  documentService,
-  libraryService,
-  type Collection,
-  type Document,
-  type Library,
-} from "./api";
-import { MarkdownReader } from "./components/MarkdownReader";
-import { PdfReader } from "./components/PdfReader";
+import { ApiError, documentService, type Document } from "./api";
 import { Sidebar } from "./components/Sidebar";
 import { DocumentGrid } from "./components/DocumentGrid";
 import { DetailsSidebar } from "./components/DetailsSidebar";
@@ -26,8 +10,14 @@ import { HelpModal } from "./components/HelpModal";
 import { ImportModal } from "./components/ImportModal";
 import { OnboardingOverlay } from "./components/OnboardingOverlay";
 import { LibrarySettingsModal } from "./components/LibrarySettingsModal";
-import { TabBar } from "./components/TabBar";
+import { AppHeader } from "./components/AppHeader";
+import { ReaderPanes } from "./components/ReaderPanes";
+import { MoveDocumentModal } from "./components/MoveDocumentModal";
+import { ConfirmDialog } from "./components/ConfirmDialog";
+import { ImportOverlays } from "./components/ImportOverlays";
 import { useDocumentTabs } from "./hooks/useDocumentTabs";
+import { useDocumentImport } from "./hooks/useDocumentImport";
+import { useEntitySettings } from "./hooks/useEntitySettings";
 import { loadSettings, saveSettings } from "./lib/settings";
 
 type ViewType = 'all' | 'recent' | 'favorites' | 'library' | 'collection';
@@ -66,16 +56,12 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [importingDoc, setImportingDoc] = useState<Document | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [importError, setImportError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [movingDocument, setMovingDocument] = useState<Document | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Document | null>(null);
 
-  // Library / Collection settings modal
-  const [isLibSettingsOpen, setIsLibSettingsOpen] = useState(false);
-  const [libSettingsLibrary, setLibSettingsLibrary] = useState<Library | null>(null);
-  const [libSettingsCollection, setLibSettingsCollection] = useState<Collection | null>(null);
-  const [libSettingsMode, setLibSettingsMode] = useState<'library' | 'collection'>('library');
+  const importFlow = useDocumentImport();
+
+  const entitySettings = useEntitySettings();
 
   // Theming is applied in main.tsx before the first render; this only decides
   // whether the onboarding overlay is due.
@@ -90,7 +76,7 @@ function App() {
         switch (e.key.toLowerCase()) {
           case 'i':
             e.preventDefault();
-            handleImport();
+            importFlow.start();
             break;
           case 'f':
             // focus search logic
@@ -131,7 +117,7 @@ function App() {
     const handleOpenHelp = () => setIsHelpOpen(true);
     const handleEntitySettings = (e: Event) => {
       const detail = (e as CustomEvent<{ type: 'library' | 'collection'; id: number }>).detail;
-      if (detail) openEntitySettings(detail.type, detail.id);
+      if (detail) entitySettings.open(detail.type, detail.id);
     };
     window.addEventListener('open-settings', handleOpenSettings);
     window.addEventListener('open-help', handleOpenHelp);
@@ -211,30 +197,6 @@ function App() {
     reconcileTabs();
   }, [activeView]);
 
-  const handleImport = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    // Reset so choosing the same file again still fires a change event.
-    event.target.value = "";
-    if (!file) return;
-
-    setImportError(null);
-    setIsUploading(true);
-    try {
-      // The upload happens before the modal because the server needs the bytes
-      // to read metadata and render a cover; the modal then edits the result.
-      setImportingDoc(await documentService.upload(file));
-    } catch (err) {
-      console.error("Failed to import document", err);
-      setImportError(err instanceof Error ? err.message : "Import failed.");
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
   const handleSidebarSelect = (view: ActiveView) => {
     setActiveView(view);
     // Choosing a view is a fresh start. Carrying the query over would make the
@@ -263,17 +225,6 @@ function App() {
     setIsRightSidebarOpen(true);
   };
 
-  const renderReaderContent = (doc: Document | null, inSplitView: boolean = false) => {
-    if (!doc) return null;
-    if (doc.documentType === 'md' || doc.documentType === 'txt') {
-      return <MarkdownReader documentId={doc.id} />;
-    }
-    if (doc.documentType === 'pdf') {
-      return <PdfReader documentId={doc.id} isSplitView={inSplitView} />;
-    }
-    return <div>Unsupported file format</div>;
-  };
-
   const handleDocumentUpdate = () => {
     loadDocuments();
 
@@ -289,6 +240,43 @@ function App() {
       setDetailsDocument(prev => (prev ? updated : prev));
       replaceDocument(updated);
     }).catch(err => console.error("Failed to refresh document", err));
+  };
+
+  /**
+   * Favourites the document open in the reader.
+   *
+   * The tab's copy is replaced from the response rather than refetched, so the
+   * star in the header reflects the change without a round trip through the
+   * grid.
+   */
+  const toggleFavorite = async (doc: Document) => {
+    try {
+      await documentService.setFavorite(doc.id, !doc.isFavorite);
+      const updated = await documentService.get(doc.id);
+      replaceDocument(updated);
+      setDetailsDocument(prev => (prev && prev.id === doc.id ? updated : prev));
+      loadDocuments();
+    } catch (err) {
+      console.error("Failed to update favorite", err);
+    }
+  };
+
+  /** Deletes the document open in the reader, once confirmed. */
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    const doc = pendingDelete;
+    setPendingDelete(null);
+    try {
+      await documentService.remove(doc.id);
+      if (closeTabForDocument(doc.id)) setViewMode('grid');
+      if (detailsDocument?.id === doc.id) {
+        setDetailsDocument(null);
+        setIsRightSidebarOpen(false);
+      }
+      loadDocuments();
+    } catch (err) {
+      console.error("Failed to delete document", err);
+    }
   };
 
   const handleDocumentDelete = () => {
@@ -311,36 +299,6 @@ function App() {
     }, 400);
   };
 
-  /**
-   * Opens library or collection settings for a specific entity.
-   *
-   * Driven by the gear on each sidebar row rather than the active view, so a
-   * library can be renamed without first navigating into it. Errors are caught
-   * because an unhandled rejection in a click handler fails silently, which
-   * reads as a button that does nothing.
-   */
-  const openEntitySettings = async (type: 'library' | 'collection', id: number) => {
-    try {
-      if (type === 'library') {
-        const libs = await libraryService.list();
-        const lib = libs.find(l => l.id === id) ?? null;
-        if (!lib) return;
-        setLibSettingsLibrary(lib);
-        setLibSettingsCollection(null);
-        setLibSettingsMode('library');
-      } else {
-        const col = await collectionService.get(id);
-        if (!col) return;
-        setLibSettingsCollection(col);
-        setLibSettingsLibrary(null);
-        setLibSettingsMode('collection');
-      }
-      setIsLibSettingsOpen(true);
-    } catch (err) {
-      console.error("Failed to open settings", err);
-    }
-  };
-
   const handleLibSettingsSaved = () => {
     window.dispatchEvent(new CustomEvent('reload-sidebar'));
   };
@@ -357,59 +315,67 @@ function App() {
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
       <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
       <LibrarySettingsModal
-        isOpen={isLibSettingsOpen}
-        mode={libSettingsMode}
-        library={libSettingsLibrary}
-        collection={libSettingsCollection}
-        onClose={() => setIsLibSettingsOpen(false)}
+        isOpen={entitySettings.isOpen}
+        mode={entitySettings.mode}
+        library={entitySettings.library}
+        collection={entitySettings.collection}
+        onClose={entitySettings.close}
         onSaved={handleLibSettingsSaved}
         onDeleted={handleLibDeleted}
       />
-      {/* The browser's file picker replaces the desktop build's native dialog. */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".pdf,.md,.txt"
-        className="hidden"
-        onChange={handleFileSelected}
+      <ImportOverlays
+        fileInputRef={importFlow.fileInputRef}
+        onFileSelected={importFlow.handleFileSelected}
+        isUploading={importFlow.isUploading}
+        error={importFlow.error}
+        onDismissError={importFlow.dismissError}
       />
 
-      {isUploading && (
-        <div className="fixed-overlay z-100" role="status" aria-live="polite">
-          <div className="modal-content" style={{ maxWidth: "320px" }}>
-            <div className="modal-body text-center">
-              <p className="text-sm text-secondary m-0">Uploading and indexing…</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {importError && (
-        <div className="fixed-overlay z-100" role="alertdialog" aria-modal="true">
-          <div className="modal-content" style={{ maxWidth: "420px" }}>
-            <div className="modal-header">
-              <h2 className="font-semibold text-base m-0">Import failed</h2>
-            </div>
-            <div className="modal-body">
-              <p className="text-sm text-secondary m-0">{importError}</p>
-              <div className="flex justify-end mt-6">
-                <button className="btn btn-primary" onClick={() => setImportError(null)} autoFocus>
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {importingDoc && (
-        <ImportModal
-          document={importingDoc}
-          onClose={() => setImportingDoc(null)} 
-          onComplete={() => {
-            setImportingDoc(null);
+      {movingDocument && (
+        <MoveDocumentModal
+          document={movingDocument}
+          // Only a library or collection view gives it somewhere to be moved
+          // out of; from Recent or All Documents there is nothing to remove.
+          scope={
+            (activeView.type === 'library' || activeView.type === 'collection') && activeView.id
+              ? { type: activeView.type, id: activeView.id }
+              : undefined
+          }
+          onClose={() => setMovingDocument(null)}
+          onMoved={() => {
+            setMovingDocument(null);
             loadDocuments();
-          }} 
+            window.dispatchEvent(new CustomEvent('reload-sidebar'));
+          }}
+        />
+      )}
+
+      <ConfirmDialog
+        isOpen={pendingDelete !== null}
+        title="Delete document"
+        message={
+          pendingDelete
+            ? `"${pendingDelete.title}" and its file will be permanently removed. This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete"
+        danger
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
+
+      {importFlow.importingDoc && (
+        <ImportModal
+          document={importFlow.importingDoc}
+          defaultLibraryId={importFlow.target?.libraryId}
+          defaultCollectionId={importFlow.target?.collectionId}
+          onClose={importFlow.finish}
+          onComplete={() => {
+            importFlow.finish();
+            loadDocuments();
+            // A new library may have been created from inside the modal.
+            window.dispatchEvent(new CustomEvent('reload-sidebar'));
+          }}
         />
       )}
 
@@ -435,68 +401,37 @@ function App() {
         activeView={activeView}
         setActiveView={handleSidebarSelect}
         onSearchEverywhere={handleSearchEverywhere}
-        onImport={handleImport}
+        onImport={importFlow.start}
       />
 
       <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-        {/* Top Header Bar */}
-        <div className="h-12 border-b border-[var(--border-color)] bg-[var(--bg-primary)] flex items-center px-2 z-10 flex-shrink-0">
-          <button 
-            className="btn btn-ghost p-1.5 text-muted hover:text-primary mr-2 flex-shrink-0 rounded" 
-            onClick={() => setIsLeftSidebarOpen(!isLeftSidebarOpen)}
-            title={isLeftSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
-          >
-            {isLeftSidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
-          </button>
+        <AppHeader
+          tabs={openTabs}
+          activeTabIndex={activeTabIndex}
+          activeDocument={activeDocument}
+          isReading={viewMode === 'reading'}
+          isSplitView={isSplitView}
+          splitRightTabIndex={splitRightTabIndex}
+          isLeftSidebarOpen={isLeftSidebarOpen}
+          isRightSidebarOpen={isRightSidebarOpen}
+          onSelectTab={(idx) => { setActiveTabIndex(idx); setViewMode('reading'); }}
+          onCloseTab={(idx) => { if (closeTab(idx)) setViewMode('grid'); }}
+          onSetSplitRightTab={setSplitRightTabIndex}
+          onToggleSplitView={toggleSplitView}
+          onToggleLeftSidebar={() => setIsLeftSidebarOpen(!isLeftSidebarOpen)}
+          onToggleRightSidebar={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
+          onOpenDetails={openDetails}
+          onToggleFavorite={toggleFavorite}
+          onMove={setMovingDocument}
+          onDelete={setPendingDelete}
+        />
 
-
-          <TabBar
-            tabs={openTabs}
-            activeIndex={activeTabIndex}
-            isReading={viewMode === 'reading'}
-            onSelect={(idx) => { setActiveTabIndex(idx); setViewMode('reading'); }}
-            onClose={(idx) => { if (closeTab(idx)) setViewMode('grid'); }}
-          />
-          
-          <div className="flex items-center gap-2 flex-shrink-0 ml-auto pr-2">
-            {viewMode === 'reading' && isSplitView && splitRightTabIndex !== null && (
-              <select 
-                className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-primary rounded px-2 py-1 text-xs mr-2 cursor-pointer focus:outline-none focus:border-[var(--accent)] transition-all"
-                value={splitRightTabIndex}
-                onChange={(e) => setSplitRightTabIndex(Number(e.target.value))}
-                title="Split View Document"
-              >
-                {openTabs.map((t, idx) => (
-                  <option key={idx} value={idx}>{t.title}</option>
-                ))}
-              </select>
-            )}
-            {viewMode === 'reading' && (
-              <button 
-                className={`btn btn-ghost p-1.5 rounded ${isSplitView ? 'text-[var(--accent)] bg-[var(--accent)]/10' : 'text-muted hover:text-primary hover:bg-[var(--bg-tertiary)]'}`}
-                onClick={toggleSplitView}
-                title="Toggle Split View"
-                disabled={openTabs.length === 0}
-              >
-                <Columns size={18} />
-              </button>
-            )}
-            <button 
-              className={`btn btn-ghost p-1.5 ml-1 rounded ${isRightSidebarOpen ? 'text-[var(--accent)] bg-[var(--accent)]/10' : 'text-muted hover:text-primary hover:bg-[var(--bg-tertiary)]'}`} 
-              onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
-              title={isRightSidebarOpen ? "Close Details" : "Open Details"}
-            >
-              {isRightSidebarOpen ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
-            </button>
-          </div>
-        </div>
-        
         {/* Main Content Area */}
         <div className="flex-1 flex overflow-hidden relative bg-[var(--bg-primary)]">
           {viewMode === 'grid' ? (
             <div className="w-full h-full animate-in fade-in duration-200">
-              <DocumentGrid 
-                documents={documents} 
+              <DocumentGrid
+                documents={documents}
                 onOpenDocument={(doc) => {
                   openDocument(doc);
                   setViewMode('reading');
@@ -506,22 +441,11 @@ function App() {
               />
             </div>
           ) : (
-            <>
-              {/* Left Reader Panel */}
-              <div className={`flex-1 min-w-0 h-full w-full relative ${activeDocument?.documentType === 'pdf' ? 'bg-[var(--bg-secondary)]' : 'reader-bg'}`}>
-                <div className="absolute inset-0 overflow-y-auto">
-                  {renderReaderContent(activeDocument, isSplitView)}
-                </div>
-              </div>
-
-              {isSplitView && splitRightTabIndex !== null && (
-                <div className={`flex-1 min-w-0 border-l border-[var(--border-color)] h-full w-full relative ${openTabs[splitRightTabIndex]?.documentType === 'pdf' ? 'bg-[var(--bg-secondary)]' : 'reader-bg'}`}>
-                  <div className="absolute inset-0 overflow-y-auto">
-                    {renderReaderContent(openTabs[splitRightTabIndex] || null, true)}
-                  </div>
-                </div>
-              )}
-            </>
+            <ReaderPanes
+              activeDocument={activeDocument}
+              splitDocument={splitRightTabIndex !== null ? openTabs[splitRightTabIndex] ?? null : null}
+              isSplitView={isSplitView}
+            />
           )}
         </div>
       </main>

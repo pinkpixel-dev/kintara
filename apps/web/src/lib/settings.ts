@@ -6,9 +6,26 @@
  * means the theme is applied before first paint instead of flashing.
  */
 
+/**
+ * How large the interface is drawn.
+ *
+ * This replaced a "base font size" setting that only ever changed text. The
+ * cards, icons, and chrome around the text stayed put, so small and medium
+ * looked identical and the whole control read as broken. One step here scales
+ * all of it together.
+ */
+export type UiSize = "sm" | "md" | "lg" | "xl";
+
+export const uiSizes: { value: UiSize; label: string }[] = [
+  { value: "sm", label: "Small" },
+  { value: "md", label: "Medium" },
+  { value: "lg", label: "Large" },
+  { value: "xl", label: "Extra Large" },
+];
+
 export interface Settings {
   fontFamily: string;
-  fontSize: string;
+  uiSize: UiSize;
   theme: "dark" | "light" | "system";
   readerTheme: "dark" | "light" | "system";
   highlightColor: string;
@@ -18,11 +35,25 @@ export interface Settings {
 /** Values carried over unchanged from the desktop build. */
 export const defaultSettings: Settings = {
   fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
-  fontSize: "14px",
+  uiSize: "sm",
   theme: "dark",
   readerTheme: "light",
   highlightColor: "rgba(139, 92, 246, 0.35)",
   hasSeenOnboarding: false,
+};
+
+/**
+ * Maps the old `fontSize` setting onto the new scale.
+ *
+ * Small is deliberately today's appearance, so anyone on the old 12px or 14px
+ * default sees nothing change. 16px and 18px map to the steps that are actually
+ * bigger than what they had.
+ */
+const legacyFontSizes: Record<string, UiSize> = {
+  "12px": "sm",
+  "14px": "sm",
+  "16px": "lg",
+  "18px": "xl",
 };
 
 const STORAGE_KEY = "kintara.settings";
@@ -33,7 +64,16 @@ export function loadSettings(): Settings {
     if (!raw) return { ...defaultSettings };
     // Spread over the defaults so a settings blob written by an older version
     // gains new keys rather than leaving them undefined.
-    return { ...defaultSettings, ...JSON.parse(raw) };
+    const stored = { ...defaultSettings, ...JSON.parse(raw) } as Settings & { fontSize?: string };
+
+    // Anyone who set a font size before this became a UI size keeps a sensible
+    // equivalent rather than being silently reset to the default.
+    if (stored.fontSize && !JSON.parse(raw).uiSize) {
+      stored.uiSize = legacyFontSizes[stored.fontSize] ?? defaultSettings.uiSize;
+    }
+    delete stored.fontSize;
+
+    return stored;
   } catch {
     // Corrupt JSON, or localStorage blocked in a private window.
     return { ...defaultSettings };
@@ -54,8 +94,12 @@ export function applySettings(settings: Settings): void {
   const root = document.documentElement;
 
   root.style.setProperty("--font-family", settings.fontFamily);
-  root.style.fontSize = settings.fontSize;
   root.style.setProperty("--highlight-color", settings.highlightColor);
+
+  // The stylesheet owns what each step means; this only says which one is in
+  // force. Set as an attribute rather than an inline scale so the steps stay
+  // tunable in one place.
+  root.setAttribute("data-ui-size", settings.uiSize);
 
   if (settings.theme === "system") {
     root.removeAttribute("data-theme");

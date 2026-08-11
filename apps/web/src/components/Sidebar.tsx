@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { ApiError, collectionService, libraryService, type Collection, type Library } from "../api";
 import { authService } from "../api/auth";
+import { SidebarPrompt, type PromptConfig } from "./SidebarPrompt";
+import { SidebarRowMenu, type RowMenuState } from "./SidebarRowMenu";
 
 // Map icon name strings → components for rendering
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -30,7 +32,14 @@ interface SidebarProps {
   setActiveView: (view: { type: 'all' | 'recent' | 'favorites' | 'library' | 'collection', id?: number }) => void;
   /** Drops the scope but keeps the query, so the same search runs everywhere. */
   onSearchEverywhere: () => void;
-  onImport: () => void;
+  /** A target files the uploaded document straight into that library or collection. */
+  onImport: (target?: ImportTarget) => void;
+}
+
+/** Where an import should land, when it is started from a specific row. */
+export interface ImportTarget {
+  libraryId?: number;
+  collectionId?: number;
 }
 
 /**
@@ -64,18 +73,24 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
   const [collectionsByLibrary, setCollectionsByLibrary] = useState<Record<number, Collection[]>>({});
   const [expandedLibraries, setExpandedLibraries] = useState<Record<number, boolean>>({});
 
-  const [promptConfig, setPromptConfig] = useState<{
-    isOpen: boolean;
-    title: string;
-    placeholder: string;
-    initialValue: string;
-    onSave: (val: string) => Promise<void>;
-  }>({
-    isOpen: false, title: '', placeholder: '', initialValue: '', onSave: async () => {}
-  });
-  const [promptValue, setPromptValue] = useState("");
-  const [promptError, setPromptError] = useState<string | null>(null);
-  const [promptSaving, setPromptSaving] = useState(false);
+  const [prompt, setPrompt] = useState<PromptConfig | null>(null);
+
+  const [rowMenu, setRowMenu] = useState<RowMenuState | null>(null);
+
+  const openRowMenu = (
+    event: React.MouseEvent<HTMLButtonElement>,
+    libraryId: number,
+    name: string,
+  ) => {
+    event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
+    setRowMenu({
+      libraryId,
+      name,
+      right: Math.max(8, window.innerWidth - rect.right),
+      y: rect.bottom + 4,
+    });
+  };
 
   const loadData = async () => {
     try {
@@ -147,34 +162,12 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
     setExpandedLibraries(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const openPrompt = (title: string, placeholder: string, initialValue: string, onSave: (val: string) => Promise<void>) => {
-    setPromptValue(initialValue);
-    setPromptError(null);
-    setPromptConfig({ isOpen: true, title, placeholder, initialValue, onSave });
-  };
-
-  const closePrompt = () => {
-    setPromptConfig(prev => ({ ...prev, isOpen: false }));
-  };
-
-  const handlePromptSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!promptValue.trim()) return;
-
-    setPromptError(null);
-    setPromptSaving(true);
-    try {
-      await promptConfig.onSave(promptValue.trim());
-      closePrompt();
-    } catch (err) {
-      // Without this a failed save left the dialog open and silent, which reads
-      // as "the Save button does nothing".
-      console.error("Failed to save", err);
-      setPromptError(err instanceof Error ? err.message : "Could not save. Please try again.");
-    } finally {
-      setPromptSaving(false);
-    }
-  };
+  const openPrompt = (
+    title: string,
+    placeholder: string,
+    initialValue: string,
+    onSave: (value: string) => Promise<void>,
+  ) => setPrompt({ title, placeholder, initialValue, onSave });
 
   /**
    * What the search box is currently searching inside, or null for everything.
@@ -205,7 +198,13 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
       <aside className="sidebar transition-all duration-300 flex-shrink-0 flex flex-col h-full bg-[var(--bg-secondary)] border-r border-[var(--border-color)]">
         <div className="sidebar-header flex justify-between items-center px-4 py-3 border-b border-[var(--border-color)]">
           <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="Kintara Logo" style={{ width: "58px", height: "58px", objectFit: "contain", padding: "2px" }} />
+            {/* Sized in em so it grows with the interface size setting; a fixed
+                pixel logo next to scaling wordmark drifts out of proportion. */}
+            <img
+              src="/logo.png"
+              alt="Kintara Logo"
+              style={{ width: "4.15em", height: "4.15em", objectFit: "contain", padding: "2px" }}
+            />
             <span
               className="text-primary tracking-wide"
               style={{ fontFamily: "'Bellota', sans-serif", fontWeight: 700, fontSize: "1.5rem" }}
@@ -215,7 +214,7 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
           </div>
           <button
             className="btn btn-ghost p-1.5 hover:bg-[var(--bg-tertiary)] rounded text-muted hover:text-primary transition-colors border-none bg-transparent cursor-pointer"
-            onClick={onImport}
+            onClick={() => onImport()}
             title="Import Document"
           >
             <Plus size={18} />
@@ -317,7 +316,7 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
                         }
                       }}
                     >
-                      <div className="flex items-center gap-1.5 min-w-0">
+                      <div className="sidebar-row-label">
                         <button
                           className="p-0.5 flex items-center justify-center bg-transparent border-none cursor-pointer hover:bg-black/10 rounded text-current opacity-70 transition-colors"
                           onClick={(e) => toggleLibrary(lib.id, e)}
@@ -332,25 +331,20 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
                         <span className="truncate">{lib.name}</span>
                       </div>
 
-                      {/* Only the + (new collection) button on hover */}
                       <div className="row-actions flex items-center gap-0.5 flex-shrink-0">
                         <button
                           className="p-1 text-muted hover:text-primary bg-transparent border-none cursor-pointer rounded hover:bg-black/10"
-                          title="New Collection"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setExpandedLibraries(prev => ({ ...prev, [lib.id]: true }));
-                            openPrompt("New Collection", "Collection name...", "", async (val) => {
-                              await collectionService.create(lib.id, val);
-                              await loadData();
-                            });
-                          }}
+                          title={`Add to ${lib.name}`}
+                          aria-label={`Add to ${lib.name}`}
+                          aria-haspopup="menu"
+                          aria-expanded={rowMenu?.libraryId === lib.id}
+                          onClick={(e) => openRowMenu(e, lib.id, lib.name)}
                         >
-                          <Plus size={12} />
+                          <Plus size={14} />
                         </button>
                         <button
                           className="p-1 text-muted hover:text-primary bg-transparent border-none cursor-pointer rounded hover:bg-black/10"
-                          title="Library settings"
+                          title={`${lib.name} settings`}
                           aria-label={`Settings for ${lib.name}`}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -361,7 +355,7 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
                             );
                           }}
                         >
-                          <Settings size={12} />
+                          <Settings size={14} />
                         </button>
                       </div>
                     </div>
@@ -385,21 +379,37 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
                         >
                           <span className="w-1.5 h-1.5 rounded-full bg-current opacity-50 flex-shrink-0"></span>
                           <span className="truncate flex-1 min-w-0">{col.name}</span>
-                          <button
-                            className="row-action p-1 text-muted hover:text-primary bg-transparent border-none cursor-pointer rounded hover:bg-black/10 flex-shrink-0"
-                            title="Collection settings"
-                            aria-label={`Settings for ${col.name}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              window.dispatchEvent(
-                                new CustomEvent("open-entity-settings", {
-                                  detail: { type: "collection", id: col.id },
-                                }),
-                              );
-                            }}
-                          >
-                            <Settings size={12} />
-                          </button>
+                          <div className="row-actions flex items-center gap-0.5 flex-shrink-0">
+                            {/* One action rather than a menu: a collection holds
+                                documents and nothing else, so there is nothing
+                                to choose between. */}
+                            <button
+                              className="p-1 text-muted hover:text-primary bg-transparent border-none cursor-pointer rounded hover:bg-black/10"
+                              title={`Import a document into ${col.name}`}
+                              aria-label={`Import a document into ${col.name}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onImport({ libraryId: lib.id, collectionId: col.id });
+                              }}
+                            >
+                              <Plus size={14} />
+                            </button>
+                            <button
+                              className="p-1 text-muted hover:text-primary bg-transparent border-none cursor-pointer rounded hover:bg-black/10"
+                              title={`${col.name} settings`}
+                              aria-label={`Settings for ${col.name}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.dispatchEvent(
+                                  new CustomEvent("open-entity-settings", {
+                                    detail: { type: "collection", id: col.id },
+                                  }),
+                                );
+                              }}
+                            >
+                              <Settings size={14} />
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
@@ -441,38 +451,26 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
         </div>
       </aside>
 
-      {/* Reusable Prompt Modal */}
-      {promptConfig.isOpen && (
-        <div className="fixed-overlay z-100 animate-in fade-in duration-200">
-          <div className="modal-content" style={{ maxWidth: '350px' }}>
-            <div className="modal-header">
-              <h2 className="font-semibold text-md m-0">{promptConfig.title}</h2>
-              <button className="p-1.5 rounded hover:bg-[var(--bg-tertiary)] text-muted transition-colors border-none bg-transparent cursor-pointer" onClick={closePrompt}>
-                <X size={16} />
-              </button>
-            </div>
-            <form onSubmit={handlePromptSubmit} className="modal-body">
-              <input
-                type="text"
-                autoFocus
-                className="input py-2 px-3 text-sm"
-                placeholder={promptConfig.placeholder}
-                value={promptValue}
-                onChange={(e) => setPromptValue(e.target.value)}
-              />
-              {promptError && (
-                <p className="auth-error" role="alert">{promptError}</p>
-              )}
-              <div className="flex justify-end gap-2 mt-2">
-                <button type="button" className="btn btn-ghost" onClick={closePrompt}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={!promptValue.trim() || promptSaving}>
-                  {promptSaving ? "Saving..." : "Save"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {rowMenu && (
+        <SidebarRowMenu
+          menu={rowMenu}
+          onClose={() => setRowMenu(null)}
+          onImportHere={() => {
+            setRowMenu(null);
+            onImport({ libraryId: rowMenu.libraryId });
+          }}
+          onNewCollection={() => {
+            setRowMenu(null);
+            setExpandedLibraries(prev => ({ ...prev, [rowMenu.libraryId]: true }));
+            openPrompt("New Collection", "Collection name...", "", async (val) => {
+              await collectionService.create(rowMenu.libraryId, val);
+              await loadData();
+            });
+          }}
+        />
       )}
+
+      {prompt && <SidebarPrompt config={prompt} onClose={() => setPrompt(null)} />}
     </>
   );
 }

@@ -1,5 +1,12 @@
 import { useState, useEffect } from "react";
-import { applySettings, defaultSettings, loadSettings, saveSettings, type Settings } from "../lib/settings";
+import {
+  applySettings,
+  defaultSettings,
+  loadSettings,
+  saveSettings,
+  uiSizes,
+  type Settings,
+} from "../lib/settings";
 import { X, Settings as SettingsIcon, Type, Palette } from "lucide-react";
 
 // Preset highlight colors: [label, rgba value]
@@ -76,7 +83,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               </div>
               <div className="flex items-center justify-between mt-2">
                 <label className="text-sm">Reader Theme</label>
-                <select 
+                <select
                   className="input py-1 px-2 text-sm w-32"
                   value={settings.readerTheme || 'light'}
                   onChange={(e) => updateSetting('readerTheme', e.target.value)}
@@ -84,6 +91,24 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   <option value="dark">Dark</option>
                   <option value="light">Light</option>
                   <option value="system">System</option>
+                </select>
+              </div>
+              {/* Sits with the theme rather than under Typography: it moves the
+                  cards and icons as much as it moves the text. */}
+              <div className="flex items-center justify-between mt-2">
+                <div className="flex flex-col">
+                  <label className="text-sm" htmlFor="ui-size">Interface Size</label>
+                  <span className="text-xs text-muted">Text, icons, and cards</span>
+                </div>
+                <select
+                  id="ui-size"
+                  className="input py-1 px-2 text-sm w-32"
+                  value={settings.uiSize}
+                  onChange={(e) => updateSetting('uiSize', e.target.value)}
+                >
+                  {uiSizes.map((size) => (
+                    <option key={size.value} value={size.value}>{size.label}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -110,19 +135,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   <option value="'M PLUS U', sans-serif">M PLUS U</option>
                   <option value="Bellota, sans-serif">Bellota</option>
                   <option value="Elsie, serif">Elsie</option>
-                </select>
-              </div>
-              <div className="flex items-center justify-between">
-                <label className="text-sm">Base Font Size</label>
-                <select 
-                  className="input py-1 px-2 text-sm w-32"
-                  value={settings.fontSize}
-                  onChange={(e) => updateSetting('fontSize', e.target.value)}
-                >
-                  <option value="12px">Small (12px)</option>
-                  <option value="14px">Medium (14px)</option>
-                  <option value="16px">Large (16px)</option>
-                  <option value="18px">Extra Large (18px)</option>
                 </select>
               </div>
             </div>
