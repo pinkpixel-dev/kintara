@@ -1,7 +1,7 @@
 {
   "name": "kintara",
   "private": true,
-  "version": "1.4.0",
+  "version": "1.4.1",
   "type": "module",
   "workspaces": [
     "apps/web"
@@ -17,5 +17,8 @@
   "devDependencies": {
     "@types/node": "^26.2.0",
     "concurrently": "^10.0.4"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
   }
 }

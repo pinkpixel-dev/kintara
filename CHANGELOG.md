@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-08-21
+### Security
+- **pdf.js upgraded from 5.7.284 to 6.2.108** (CVE-2026-16633, GHSA-hq66-cqwq-w95j —
+  arbitrary JavaScript execution from a malicious PDF). 5.7.284 was the last 5.x release,
+  so there was no backport and the fix required the major bump.
+
+  **Kintara was not exposed.** The advisory is about the `enableScripting` option in the
+  pdf.js *viewer*; this app uses only the raw API — `getDocument` and `page.render` onto a
+  canvas — with no `PDFViewer`, no scripting manager, and no annotation layer. `pdf.sandbox`
+  ships inside the package but was never bundled, and PDF JavaScript cannot execute without
+  it. The upgrade was done to clear the advisory rather than to close a reachable hole.
+
+  Verified rather than assumed: page 1 of a 67-page magazine whose images are *entirely*
+  JPEG 2000 renders **pixel-identically** before and after — zero differing pixels across
+  the frame. That fixture was chosen deliberately, because a broken wasm path makes pdf.js
+  drop photographs while still drawing the text, which looks like nothing went wrong. Also
+  checked: pages 2–4, an ordinary DCTDecode document, and drawing, page-scoping, persisting
+  and deleting a highlight.
+
+
 ## [1.4.0] - 2026-08-21
 ### Added
 - **Pick an accent colour.** Eight of them, in Settings under Appearance: red, orange,
