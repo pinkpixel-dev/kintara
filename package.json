@@ -15,6 +15,7 @@
     "test": "cd apps/server && cargo test"
   },
   "devDependencies": {
+    "@types/node": "^26.2.0",
     "concurrently": "^10.0.4"
   }
 }

@@ -4,8 +4,12 @@ import path from "node:path";
 import { defineConfig, type Plugin, type ResolvedConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// @ts-expect-error process is a nodejs global
-const host = process.env.TAURI_DEV_HOST;
+// / @ts-expect-error process is a nodejs global
+// Set this to your machine's LAN address to reach the dev server from a phone.
+// It was TAURI_DEV_HOST, which only `tauri dev` ever set — with the desktop
+// shell gone that was dead config, and this app is tested on a phone often
+// enough to be worth keeping as a real option. Named to match KINTARA_DEV_API.
+const host = process.env.KINTARA_DEV_HOST;
 
 const require = createRequire(import.meta.url);
 const pdfjsRoot = path.dirname(require.resolve("pdfjs-dist/package.json"));
@@ -77,12 +81,12 @@ function pdfjsAssets(): Plugin {
 export default defineConfig(async () => ({
   plugins: [react(), pdfjsAssets()],
 
-  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
-  //
-  // 1. prevent Vite from obscuring rust errors
+  // `npm run dev` runs the Rust server alongside Vite, so the screen must not be
+  // cleared out from under cargo's errors.
   clearScreen: false,
-  // 2. tauri expects a fixed port, fail if that port is not available
   server: {
+    // Fixed and strict: the port is baked into the API proxy below and into the
+    // dev URL, so silently moving to 1421 would be worse than failing.
     port: 1420,
     strictPort: true,
     host: host || false,
@@ -102,9 +106,5 @@ export default defineConfig(async () => ({
           port: 1421,
         }
       : undefined,
-    watch: {
-      // 3. tell Vite to ignore watching the frozen desktop shell
-      ignored: ["**/apps/desktop/**"],
-    },
   },
 }));

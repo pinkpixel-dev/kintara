@@ -89,7 +89,7 @@ cd apps/server && cargo run    # everything on :8080, no proxy involved
 apps/
   server/   Rust + Axum. Serves the API and the built frontend.
   web/      React + Vite. Talks to the API over HTTP, nothing else.
-  desktop/  The original Tauri shell. Frozen, kept for reference.
+assets/     Source icon, logo, and the packaging icon set.
 docker/     Dockerfile, entrypoint, compose file.
 ```
 

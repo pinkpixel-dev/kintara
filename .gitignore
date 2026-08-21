@@ -27,7 +27,8 @@ docker/kintara-data/
 *.db-shm
 *.db-wal
 
-# Left over from the desktop build, which now lives in apps/desktop.
+# Tauri build residue. The desktop shell was removed in 1.4.0, but this stays:
+# `tauri` regenerates src-tauri/ on sight if anyone runs it from the repo root.
 src-tauri/
 
 # Editor directories and files

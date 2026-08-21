@@ -40,6 +40,17 @@ All notable changes to this project will be documented in this file.
   nothing most of the time; it also meant the panel's open state and its contents could
   disagree. The header slot it occupied is deliberately left free.
 
+### Removed
+- **The frozen Tauri desktop shell at `apps/desktop`.** It had not been built since 1.1.0
+  and was kept "for reference", but the reference had gone stale in the worst way: it
+  carried its own SQLite schema frozen at the pre-server single-user model — favourites and
+  reading progress as columns on `documents`, no full-text index, no users or sessions — so
+  reading it to understand how Kintara stores anything gave you the model this project
+  deliberately left behind. Reviving it was never the route to a desktop build either; that
+  route is a thin shell around the existing server binary, and it does not need the old
+  crate. Its icon set moved to `assets/icons/`, and the code remains in git history. See
+  `DOCS/MEMORY.md`.
+
 ### Fixed
 - **The onboarding dialog's glow was pinned to the brand purple** rather than following the
   accent, so it stayed purple whatever else the app was set to.
