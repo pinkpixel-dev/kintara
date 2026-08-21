@@ -15,6 +15,7 @@ import type { ImportTarget } from "../components/Sidebar";
 export function useDocumentImport() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importingDoc, setImportingDoc] = useState<Document | null>(null);
+  const [bulkFiles, setBulkFiles] = useState<File[] | null>(null);
   const [target, setTarget] = useState<ImportTarget | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,15 +27,26 @@ export function useDocumentImport() {
   };
 
   const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+    const files = Array.from(event.target.files ?? []);
     // Reset so choosing the same file again still fires a change event.
     event.target.value = "";
-    if (!file) return;
+    if (files.length === 0) return;
 
     setError(null);
+
+    // Two genuinely different flows rather than one that handles both. A single
+    // import uploads first and then offers a form, because there is a document
+    // worth naming at the end of it. A batch asks where everything should go
+    // *before* uploading, because forty title fields is not a form anybody
+    // fills in — so it cannot reuse the upload-then-edit order.
+    if (files.length > 1) {
+      setBulkFiles(files);
+      return;
+    }
+
     setIsUploading(true);
     try {
-      setImportingDoc(await documentService.upload(file));
+      setImportingDoc(await documentService.upload(files[0]));
     } catch (err) {
       console.error("Failed to import document", err);
       setError(err instanceof Error ? err.message : "Import failed.");
@@ -45,12 +57,14 @@ export function useDocumentImport() {
 
   const finish = () => {
     setImportingDoc(null);
+    setBulkFiles(null);
     setTarget(null);
   };
 
   return {
     fileInputRef,
     importingDoc,
+    bulkFiles,
     target,
     isUploading,
     error,

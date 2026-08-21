@@ -23,9 +23,39 @@ export const uiSizes: { value: UiSize; label: string }[] = [
   { value: "xl", label: "Extra Large" },
 ];
 
+/**
+ * Which accent the interface is drawn in.
+ *
+ * Only the name lives here. The colours themselves are in `App.css`, one block
+ * per accent holding both a light-theme and a dark-theme value, because the
+ * theme has to be able to pick between them without JavaScript deciding what
+ * "system" currently means.
+ */
+export type Accent =
+  | "red"
+  | "orange"
+  | "yellow"
+  | "green"
+  | "blue"
+  | "cyan"
+  | "purple"
+  | "pink";
+
+export const accents: { value: Accent; label: string }[] = [
+  { value: "red", label: "Red" },
+  { value: "orange", label: "Orange" },
+  { value: "yellow", label: "Yellow" },
+  { value: "green", label: "Green" },
+  { value: "blue", label: "Blue" },
+  { value: "cyan", label: "Cyan" },
+  { value: "purple", label: "Purple" },
+  { value: "pink", label: "Pink" },
+];
+
 export interface Settings {
   fontFamily: string;
   uiSize: UiSize;
+  accent: Accent;
   theme: "dark" | "light" | "system";
   readerTheme: "dark" | "light" | "system";
   highlightColor: string;
@@ -36,6 +66,9 @@ export interface Settings {
 export const defaultSettings: Settings = {
   fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
   uiSize: "sm",
+  // The Pink Pixel brand purple, which is what the app was before this setting
+  // existed. Anyone who never opens Settings sees no change at all.
+  accent: "purple",
   theme: "dark",
   readerTheme: "light",
   highlightColor: "rgba(139, 92, 246, 0.35)",
@@ -100,6 +133,12 @@ export function applySettings(settings: Settings): void {
   // force. Set as an attribute rather than an inline scale so the steps stay
   // tunable in one place.
   root.setAttribute("data-ui-size", settings.uiSize);
+
+  // Same reasoning as the size step: the stylesheet owns what each accent
+  // means, and this only says which one is live. Setting the attribute rather
+  // than writing the colours inline is also what lets the dark theme pick a
+  // different value for the same accent.
+  root.setAttribute("data-accent", settings.accent);
 
   if (settings.theme === "system") {
     root.removeAttribute("data-theme");

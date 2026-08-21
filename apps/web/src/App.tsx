@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { PanelRightOpen } from "lucide-react";
 import "./App.css";
 import { ApiError, documentService, type Document } from "./api";
 import { Sidebar } from "./components/Sidebar";
@@ -8,6 +7,7 @@ import { DetailsSidebar } from "./components/DetailsSidebar";
 import { SettingsModal } from "./components/SettingsModal";
 import { HelpModal } from "./components/HelpModal";
 import { ImportModal } from "./components/ImportModal";
+import { BulkImportModal } from "./components/BulkImportModal";
 import { OnboardingOverlay } from "./components/OnboardingOverlay";
 import { LibrarySettingsModal } from "./components/LibrarySettingsModal";
 import { AppHeader } from "./components/AppHeader";
@@ -49,7 +49,9 @@ function App() {
   // library on a phone.
   const isNarrow = () => typeof window !== "undefined" && window.innerWidth <= 900;
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(() => !isNarrow());
-  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
+  // The details panel is open exactly when there is a document to show in it.
+  // It used to be a separate toggle, which meant the two could disagree — the
+  // panel could be "open" over nothing, or hold a document while closed.
   const [detailsDocument, setDetailsDocument] = useState<Document | null>(null);
 
   // Modals state
@@ -220,19 +222,15 @@ function App() {
     setViewMode('grid');
   };
 
-  const openDetails = (doc: Document) => {
-    setDetailsDocument(doc);
-    setIsRightSidebarOpen(true);
-  };
+  const openDetails = (doc: Document) => setDetailsDocument(doc);
 
   const handleDocumentUpdate = () => {
     loadDocuments();
 
-    // The details panel shows detailsDocument when one was picked from a card,
-    // and otherwise falls back to the document open in the reader. Refreshing
-    // only the former left the reader's copy stale, so edited metadata saved
-    // correctly to the server and then appeared to vanish on reopening.
-    const shown = detailsDocument ?? activeDocument;
+    // The reader's copy of the document has to be refreshed too, not just the
+    // panel's. Refreshing only the panel left the tab stale, so edited metadata
+    // saved correctly to the server and then appeared to vanish on reopening.
+    const shown = detailsDocument;
     if (!shown) return;
 
     // One document by id, rather than listing the whole library to find it.
@@ -269,10 +267,7 @@ function App() {
     try {
       await documentService.remove(doc.id);
       if (closeTabForDocument(doc.id)) setViewMode('grid');
-      if (detailsDocument?.id === doc.id) {
-        setDetailsDocument(null);
-        setIsRightSidebarOpen(false);
-      }
+      if (detailsDocument?.id === doc.id) setDetailsDocument(null);
       loadDocuments();
     } catch (err) {
       console.error("Failed to delete document", err);
@@ -280,7 +275,6 @@ function App() {
   };
 
   const handleDocumentDelete = () => {
-    setIsRightSidebarOpen(false);
     setDetailsDocument(null);
     loadDocuments();
     // Close tab if open
@@ -364,6 +358,21 @@ function App() {
         onCancel={() => setPendingDelete(null)}
       />
 
+      {importFlow.bulkFiles && (
+        <BulkImportModal
+          files={importFlow.bulkFiles}
+          defaultLibraryId={importFlow.target?.libraryId}
+          defaultCollectionId={importFlow.target?.collectionId}
+          onClose={importFlow.finish}
+          onComplete={() => {
+            importFlow.finish();
+            loadDocuments();
+            // A new library may have been created from inside the modal.
+            window.dispatchEvent(new CustomEvent('reload-sidebar'));
+          }}
+        />
+      )}
+
       {importFlow.importingDoc && (
         <ImportModal
           document={importFlow.importingDoc}
@@ -381,13 +390,13 @@ function App() {
 
       {/* Tapping outside a drawer closes it, which is the gesture people expect
           and the only way to dismiss it one-handed. */}
-      {(isLeftSidebarOpen || isRightSidebarOpen) && (
+      {(isLeftSidebarOpen || detailsDocument) && (
         <div
           className="drawer-backdrop"
           onClick={() => {
             if (isNarrow()) {
               setIsLeftSidebarOpen(false);
-              setIsRightSidebarOpen(false);
+              setDetailsDocument(null);
             }
           }}
           aria-hidden="true"
@@ -413,13 +422,11 @@ function App() {
           isSplitView={isSplitView}
           splitRightTabIndex={splitRightTabIndex}
           isLeftSidebarOpen={isLeftSidebarOpen}
-          isRightSidebarOpen={isRightSidebarOpen}
           onSelectTab={(idx) => { setActiveTabIndex(idx); setViewMode('reading'); }}
           onCloseTab={(idx) => { if (closeTab(idx)) setViewMode('grid'); }}
           onSetSplitRightTab={setSplitRightTabIndex}
           onToggleSplitView={toggleSplitView}
           onToggleLeftSidebar={() => setIsLeftSidebarOpen(!isLeftSidebarOpen)}
-          onToggleRightSidebar={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
           onOpenDetails={openDetails}
           onToggleFavorite={toggleFavorite}
           onMove={setMovingDocument}
@@ -437,6 +444,7 @@ function App() {
                   setViewMode('reading');
                 }}
                 onOpenDetails={openDetails}
+                onMove={setMovingDocument}
                 onRefresh={loadDocuments}
               />
             </div>
@@ -450,19 +458,17 @@ function App() {
         </div>
       </main>
 
-      {/* Right Sidebar (Details) */}
-      {isRightSidebarOpen && (detailsDocument || activeDocument) ? (
-        <DetailsSidebar 
-          document={(detailsDocument || activeDocument)!} 
+      {/* Details, for the one document that was asked about. There is no
+          empty state any more: without a toggle there is no way to open this
+          without choosing a document first. */}
+      {detailsDocument && (
+        <DetailsSidebar
+          document={detailsDocument}
           onUpdate={handleDocumentUpdate}
           onDelete={handleDocumentDelete}
+          onClose={() => setDetailsDocument(null)}
         />
-      ) : isRightSidebarOpen && !(detailsDocument || activeDocument) ? (
-         <aside className="inspector-pane flex-shrink-0 w-80 bg-[var(--bg-secondary)] border-l border-[var(--border-color)] flex flex-col h-full items-center justify-center text-center p-6">
-            <PanelRightOpen size={32} className="text-muted mb-4 opacity-50" />
-            <p className="text-sm text-muted">Select a document's details button to view and edit its metadata.</p>
-         </aside>
-      ) : null}
+      )}
     </div>
   );
 }

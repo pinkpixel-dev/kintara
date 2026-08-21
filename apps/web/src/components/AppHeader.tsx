@@ -1,10 +1,4 @@
-import {
-  Columns,
-  PanelLeftClose,
-  PanelLeftOpen,
-  PanelRightClose,
-  PanelRightOpen,
-} from "lucide-react";
+import { Columns, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { TabBar } from "./TabBar";
 import { DocumentActions } from "./DocumentActions";
 import type { Document } from "../api";
@@ -17,13 +11,11 @@ interface AppHeaderProps {
   isSplitView: boolean;
   splitRightTabIndex: number | null;
   isLeftSidebarOpen: boolean;
-  isRightSidebarOpen: boolean;
   onSelectTab: (index: number) => void;
   onCloseTab: (index: number) => void;
   onSetSplitRightTab: (index: number) => void;
   onToggleSplitView: () => void;
   onToggleLeftSidebar: () => void;
-  onToggleRightSidebar: () => void;
   onOpenDetails: (doc: Document) => void;
   onToggleFavorite: (doc: Document) => void;
   onMove: (doc: Document) => void;
@@ -31,8 +23,14 @@ interface AppHeaderProps {
 }
 
 /**
- * The bar above the library and the reader: panel toggles, the tab strip, and
- * the actions for whatever is currently open.
+ * The bar above the library and the reader: the sidebar toggle, the tab strip,
+ * and the actions for whatever is currently open.
+ *
+ * There is no Details toggle here any more. Details is a thing you ask for
+ * about a specific document, so it opens from that document's own actions and
+ * closes from its own header — a toggle that opened an empty panel with
+ * "select a document" in it was a control that could do nothing most of the
+ * time. The slot it used to occupy is deliberately left free.
  */
 export function AppHeader({
   tabs,
@@ -42,13 +40,11 @@ export function AppHeader({
   isSplitView,
   splitRightTabIndex,
   isLeftSidebarOpen,
-  isRightSidebarOpen,
   onSelectTab,
   onCloseTab,
   onSetSplitRightTab,
   onToggleSplitView,
   onToggleLeftSidebar,
-  onToggleRightSidebar,
   onOpenDetails,
   onToggleFavorite,
   onMove,
@@ -106,14 +102,6 @@ export function AppHeader({
             <Columns size={18} />
           </button>
         )}
-
-        <button
-          className={`btn btn-ghost p-1.5 ml-1 rounded ${isRightSidebarOpen ? 'text-[var(--accent)] bg-[var(--accent)]/10' : 'text-muted hover:text-primary hover:bg-[var(--bg-tertiary)]'}`}
-          onClick={onToggleRightSidebar}
-          title={isRightSidebarOpen ? "Close Details" : "Open Details"}
-        >
-          {isRightSidebarOpen ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
-        </button>
       </div>
     </div>
   );

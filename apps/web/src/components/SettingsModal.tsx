@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import {
+  accents,
   applySettings,
   defaultSettings,
   loadSettings,
@@ -80,6 +81,37 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   <option value="light">Light</option>
                   <option value="system">System</option>
                 </select>
+              </div>
+              {/* Swatches rather than a select: the whole point of the
+                  setting is the colour, and a dropdown of colour names makes
+                  you pick one to find out what it looks like. Each swatch
+                  carries its own data-accent so it paints itself from the same
+                  table the app uses. */}
+              <div className="flex flex-col gap-2 mt-2">
+                <div className="flex flex-col">
+                  <span className="text-sm">Accent Colour</span>
+                  <span className="text-xs text-muted">Highlights, buttons, and focus rings</span>
+                </div>
+                <div className="accent-grid" role="group" aria-label="Accent colour">
+                  {accents.map((option) => {
+                    const isActive = settings.accent === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className="accent-option"
+                        data-accent={option.value}
+                        aria-pressed={isActive}
+                        aria-label={option.label}
+                        title={option.label}
+                        onClick={() => updateSetting('accent', option.value)}
+                      >
+                        <span className="accent-swatch" />
+                        <span className="accent-option-label">{option.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
               <div className="flex items-center justify-between mt-2">
                 <label className="text-sm">Reader Theme</label>

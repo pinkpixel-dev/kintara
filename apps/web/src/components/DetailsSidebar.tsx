@@ -7,9 +7,17 @@ interface DetailsSidebarProps {
   document: Document;
   onUpdate: () => void;
   onDelete: () => void;
+  onClose: () => void;
 }
 
-export function DetailsSidebar({ document, onUpdate }: DetailsSidebarProps) {
+/**
+ * Metadata for one document, opened from that document's Show details action.
+ *
+ * It carries its own close button because nothing toggles it any more: the
+ * header control that used to open and close it is gone, so without one there
+ * would be no way out of the panel.
+ */
+export function DetailsSidebar({ document, onUpdate, onClose }: DetailsSidebarProps) {
   const [docState, setDocState] = useState<Document>(document);
   const [isSaving, setIsSaving] = useState(false);
   const [tags, setTags] = useState<Tag[]>([]);
@@ -109,6 +117,14 @@ export function DetailsSidebar({ document, onUpdate }: DetailsSidebarProps) {
     <aside className="inspector-pane transition-all duration-300 flex-shrink-0 w-80 bg-[var(--bg-secondary)] border-l border-[var(--border-color)] flex flex-col h-full">
       <div className="inspector-header font-semibold py-3 px-4 border-b border-[var(--border-color)] flex justify-between items-center">
         <span>Details</span>
+        <button
+          className="p-1.5 rounded hover:bg-[var(--bg-tertiary)] text-muted transition-colors border-none bg-transparent cursor-pointer"
+          onClick={onClose}
+          title="Close details"
+          aria-label="Close details"
+        >
+          <X size={18} />
+        </button>
       </div>
       
       <div className="inspector-content p-4 overflow-y-auto flex-1 flex flex-col gap-4 text-sm">

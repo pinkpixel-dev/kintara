@@ -4,6 +4,46 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-08-21
+### Added
+- **Pick an accent colour.** Eight of them, in Settings under Appearance: red, orange,
+  yellow, green, blue, cyan, purple, pink. Purple is the Pink Pixel brand purple and stays
+  the default, so anyone who never opens the setting sees exactly the app they had. Each
+  accent carries a separate light-theme and dark-theme value, because a colour that reads
+  well on white is usually too weak on near-black. Yellow and cyan also carry their own
+  text colour: every other accent is dark enough to put white on, and a yellow sidebar row
+  with white text on it cannot be read. Every pairing clears 4.5:1.
+- **Move a document straight from its card.** The action existed in the reader and in the
+  file dialog but not on the cards, which is where you are actually looking when you decide
+  something is in the wrong place. Same two-way Move and Add as everywhere else, and Move
+  still only appears when there is a library or collection to take it out of.
+- **Import several documents at once.** Selecting more than one file in the import picker
+  opens a batch flow instead of the single-document one. It asks where the whole batch
+  should go before uploading anything — forty title fields is not a form anyone fills in —
+  then uploads them one at a time with a progress count and a running list. A file the
+  server rejects does not stop the batch; it is listed at the end with the reason. There is
+  no second Import button to learn: picking one file behaves exactly as it did.
+- **A reader overflow menu below 640px.** The reader's five actions were hidden entirely at
+  phone widths, on the assumption that the details panel carried them, which it did not.
+  They now collapse into one labelled menu rather than disappearing.
+
+### Changed
+- **The card's actions slide up from the bottom of the cover instead of sitting in its four
+  corners.** Four corners left nowhere to put a fifth action, and covered the parts of the
+  art that identify the document — on a book cover, usually the title. Now the cover stays
+  clear until you reach for it: hover on a pointer, a kebab on touch, keyboard focus on
+  either. Whether something is favourited still shows at rest, as a marker in the corner,
+  since that is state you want to see without opening anything.
+- **The Details panel is no longer a toggle in the header.** It opens from a document's own
+  Show details action, on a card or in the reader, and closes from its own X. The toggle
+  could open an empty panel that said "select a document", which is a control that does
+  nothing most of the time; it also meant the panel's open state and its contents could
+  disagree. The header slot it occupied is deliberately left free.
+
+### Fixed
+- **The onboarding dialog's glow was pinned to the brand purple** rather than following the
+  accent, so it stayed purple whatever else the app was set to.
+
 ## [1.3.0] - 2026-08-10
 ### Added
 - **Document actions in the reader.** Details, favourite, move, download and delete now sit

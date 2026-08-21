@@ -21,11 +21,15 @@ export function ImportOverlays({
 }: ImportOverlaysProps) {
   return (
     <>
-      {/* The browser's file picker replaces the desktop build's native dialog. */}
+      {/* The browser's file picker replaces the desktop build's native dialog.
+          `multiple` is the whole of the bulk import's entry point: picking one
+          file behaves exactly as it did, picking several opens the batch flow
+          instead, so there is no second Import control to explain. */}
       <input
         ref={fileInputRef}
         type="file"
         accept=".pdf,.md,.txt"
+        multiple
         className="hidden"
         onChange={onFileSelected}
       />
