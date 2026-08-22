@@ -60,9 +60,10 @@ collections. The person who owns a document remains the only person who can perm
 delete its file.
 
 Files found by the NAS scanner belong to the installation owner. Files uploaded through
-the browser belong to the person who uploaded them. The sidebar keeps owned and shared
-libraries in separate collapsible sections, so another person's filing system can stay
-out of the way until you need it.
+the browser belong to the person who uploaded them. Browser uploads finish text extraction
+before they appear, so search and AI can use them immediately. The sidebar keeps owned and
+shared libraries in separate collapsible sections, so another person's filing system can
+stay out of the way until you need it.
 
 A ready-to-edit compose file is in [`docker/docker-compose.yml`](docker/docker-compose.yml).
 
@@ -109,7 +110,7 @@ You need Rust, Node, and `poppler-utils` (for `pdfinfo`, `pdftoppm`, and `pdftot
 ```bash
 npm install
 npm run dev      # starts the API on :8080 and the frontend on :1420
-npm test         # 157 tests, no mocks
+npm test         # 160 tests, no mocks
 ```
 
 `npm run dev` runs both halves — the frontend proxies `/api` to the server, so starting

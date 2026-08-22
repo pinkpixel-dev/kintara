@@ -367,7 +367,7 @@ pub fn sample_pdf() -> Vec<u8> {
     objects.push((2, b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_vec()));
     objects.push((
         3,
-        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents 4 0 R >>".to_vec(),
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>".to_vec(),
     ));
     let stream = b"BT /F1 12 Tf 20 100 Td (kintara) Tj ET";
     objects.push((
@@ -378,6 +378,10 @@ pub fn sample_pdf() -> Vec<u8> {
             b"\nendstream",
         ]
         .concat(),
+    ));
+    objects.push((
+        5,
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_vec(),
     ));
 
     let mut out: Vec<u8> = b"%PDF-1.4\n".to_vec();

@@ -11,6 +11,7 @@ use crate::error::{AppError, AppResult};
 use crate::media;
 use crate::models::Document;
 use crate::state::AppState;
+use crate::text_extraction;
 
 /// Extensions the reader can actually display. Anything else is rejected at the
 /// door rather than being indexed into a library entry that cannot be opened.
@@ -238,6 +239,8 @@ async fn finish(
                 .await?;
         }
     }
+
+    text_extraction::extract_and_store(state, id, &destination, &upload.extension).await?;
 
     if let Some(library_id) = library_id {
         sqlx::query(

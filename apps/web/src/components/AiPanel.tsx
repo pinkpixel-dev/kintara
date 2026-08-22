@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -15,6 +16,7 @@ import {
   clampAiPanelWidth,
   loadAiPanelWidth,
 } from "../lib/ai-panel-size";
+import { withPendingUserMessage } from "../lib/ai-conversation";
 
 interface Props {
   document: Document;
@@ -47,23 +49,29 @@ export function AiPanel({ document, onClose, onUpdated }: Props) {
       .catch((err) => setError(messageFor(err, "Could not load this conversation.")));
   }, [document.id]);
 
-  useEffect(() => {
-    transcriptRef.current?.scrollTo({
-      top: transcriptRef.current.scrollHeight,
-      behavior: "smooth",
+  useLayoutEffect(() => {
+    const transcript = transcriptRef.current;
+    if (!transcript) return;
+    transcript.scrollTo({
+      top: transcript.scrollHeight,
+      behavior: busy ? "auto" : "smooth",
     });
-  }, [conversation?.messages.length]);
+  }, [conversation?.messages.length, busy]);
 
   const ask = async () => {
     const message = draft.trim();
     if (!message || busy) return;
+    const previousConversation = conversation;
+    setConversation(withPendingUserMessage(conversation, document.id, message));
+    setDraft("");
     setBusy(true);
     setError(null);
     try {
       const response = await aiService.ask(document.id, message);
       setConversation(response.conversation);
-      setDraft("");
     } catch (err) {
+      setConversation(previousConversation);
+      setDraft(message);
       setError(messageFor(err, "The question could not be sent."));
     } finally {
       setBusy(false);

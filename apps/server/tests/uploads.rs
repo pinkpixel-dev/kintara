@@ -4,7 +4,6 @@ use axum::http::StatusCode;
 use common::{body_json, sample_pdf, TestApp};
 use serde_json::json;
 
-
 // ---------------------------------------------------- uploads
 #[tokio::test]
 async fn uploading_a_pdf_indexes_it_and_writes_it_into_the_library() {
@@ -23,6 +22,32 @@ async fn uploading_a_pdf_indexes_it_and_writes_it_into_the_library() {
 
     let listed = body_json(app.get("/api/documents").await).await;
     assert_eq!(listed["total"], 1);
+}
+
+#[tokio::test]
+async fn a_browser_upload_extracts_pdf_text_before_it_returns() {
+    let app = TestApp::new().await;
+
+    let response = app.upload("readable.pdf", &sample_pdf(), &[]).await;
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let document = body_json(response).await;
+    let document_id = document["id"].as_i64().unwrap();
+
+    let (status, text, pages): (Option<String>, Option<String>, i64) = sqlx::query_as(
+        "SELECT d.text_status, d.extracted_text, COUNT(p.page_number)
+         FROM documents d
+         LEFT JOIN document_pages p ON p.document_id = d.id
+         WHERE d.id = ?
+         GROUP BY d.id",
+    )
+    .bind(document_id)
+    .fetch_one(&app.db)
+    .await
+    .unwrap();
+
+    assert_eq!(status.as_deref(), Some("ok"));
+    assert!(text.is_some_and(|value| value.contains("kintara")));
+    assert_eq!(pages, 1);
 }
 
 #[tokio::test]

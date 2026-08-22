@@ -4,6 +4,44 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.8.2] - 2026-08-22
+
+### 🐛 Browser uploads
+
+- Ran text extraction before a browser upload returns, so new PDFs are ready for search
+  and AI without waiting for a filesystem scan or server restart.
+- Kept the startup scan as the repair path for documents uploaded before this fix.
+
+### 🧪 Tests
+
+- Added a real multipart PDF upload test that checks extracted text, extraction status,
+  and page rows. The full server and web suites pass with 160 tests.
+- Corrected the shared PDF fixture with a standard font resource so Poppler reads its
+  text layer instead of treating it as empty.
+
+### 🏷️ Versioning
+
+- Bumped Kintara from 1.8.1 to 1.8.2 for browser-upload text extraction.
+
+## [1.8.1] - 2026-08-22
+
+### 🐛 AI chat
+
+- Moved a sent question into the transcript immediately and cleared the composer while
+  Kintara waits for the provider response.
+- Kept the new question and Thinking indicator in view by moving the transcript to the
+  bottom after they render.
+- Restored the question to the composer if the request fails so the text is not lost.
+
+### 🧪 Tests
+
+- Added frontend coverage for appending a pending question to existing and empty
+  conversations. The full server and web suites pass with 159 tests.
+
+### 🏷️ Versioning
+
+- Bumped Kintara from 1.8.0 to 1.8.1 for the AI chat send behavior fix.
+
 ## [1.8.0] - 2026-08-22
 
 ### 🤖 Document chat
