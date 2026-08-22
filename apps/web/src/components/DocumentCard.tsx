@@ -61,7 +61,7 @@ export function DocumentCard({
 
   return (
     <div
-      className="document-card group"
+      className="document-card"
       onClick={onOpen}
       role="button"
       tabIndex={0}

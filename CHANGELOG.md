@@ -4,6 +4,77 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-08-21
+### Added
+- **The empty grid now says what emptied it.** It used to read "No documents found in this
+  view" whether you were looking at a library with nothing in it, a search that matched
+  nothing, an unopened Recent list, or an empty Favorites. Those want different words and,
+  more importantly, different next steps. A scoped search that found nothing now names the
+  scope — "No matches in Infrastructure" — and offers **Search everywhere**, which keeps
+  the query and drops the scope. An empty library or collection offers **Import a
+  document**. This mattered most on a phone, where the scope chip lives inside the drawer:
+  a search with no results looked exactly like a library that had lost its contents, with
+  the only explanation off-screen.
+- **`npm test` runs the frontend tests too.** There were none before. The new
+  `apps/web/test` suite covers the empty-grid logic and needs no test framework — Node 22
+  strips the types itself — so this adds no dependency. `npm run test:web` and
+  `npm run test:server` run each half on its own.
+- **`npm run check:css` fails on a class name no stylesheet defines.** This project does
+  not run Tailwind, and a utility-looking class that was never defined here fails silently:
+  it reads as correct in review and does nothing in the browser. Five real layout bugs have
+  started that way. The checker understands both `className="…"` and the template-literal
+  form with conditionals in it, which the ad-hoc script in `ERRORS.md` did not.
+
+### Fixed
+- **The welcome screen had no padding and never showed its three columns.** It was built
+  from `p-10`, `p-5` and `grid grid-cols-1 md:grid-cols-3 gap-6`, none of which this
+  project defines, so the text ran to the edges of the panel and the feature cards stacked
+  in a single column at every width including desktop.
+- **The keyboard shortcuts in Help were the same bug.** `grid grid-cols-1 md:grid-cols-2`
+  is undefined here, so six shortcuts listed in one long column instead of two, and `p-2`
+  left each row's label and key flush against the fill behind them.
+- **A favourited document's star was never drawn filled.** `fill-current` is used in three
+  places and defined in none, so the favourited and unfavourited stars rendered
+  identically. On a card the state was still legible from the separate corner marker; in
+  the reader's action bar it was not visible at all.
+- **Destructive buttons were drawn like ordinary ones.** Delete in the confirm dialog and
+  Remove in the import dialog both asked for `text-red-400 hover:text-red-500
+  hover:bg-red-500/10`, and none of those three exist here.
+- **Settings controls no longer sit in a ragged column.** The four selects asked for `w-32`
+  and got nothing, so each one sized itself to its longest option.
+- **Three icon-only close buttons had no accessible name.** Settings, Library Settings and
+  Help each closed with a bare ✕ that a screen reader announced as "button". The tag
+  remove button in the details panel had the same gap.
+- **Touch targets no longer shrink below 44px at the Small interface size.** The new
+  tap-target floors were written in `rem`, and the root font size is scaled by
+  `--ui-scale`, so they measured 39px at the default size — smallest exactly where someone
+  has asked for a more compact interface. They are absolute pixels now.
+- **The "new library" + is reachable on touch.** It was written as `opacity-0
+  group-hover:opacity-100` — a Tailwind mechanism this project does not have — so it has in
+  fact always been visible. It now follows the same contract as the row actions: hover on a
+  pointer device, permanent on touch, revealed by keyboard focus.
+
+### Changed
+- **The fonts are self-hosted.** They were the last thing loaded from a CDN at runtime,
+  which on an offline or firewalled NAS meant the app silently fell back to system fonts.
+  The six families the app actually offers now ship as woff2 in `apps/web/public/fonts`.
+  Trimming this down mattered: `index.html` was pulling **seven** families, one of them
+  (Life Savers) referenced nowhere in the app, at full 100–900 variable ranges plus
+  italics. Vendoring only the latin and latin-ext subsets at the weights actually rendered
+  brings it to **509 KB across 22 faces**, against 1,218 KB for the naive copy of what was
+  being requested. `scripts/vendor-fonts.py` regenerates it.
+- **Roughly 80 undefined utility classes are gone.** Every one has either become a named
+  rule — `.modal-close`, `.dialog-title`, `.empty-state`, `.reader-tab`, `.cover-picker`,
+  the `.sidebar-*` and `.onboarding-*` families — or been deleted as dead. `npm run
+  check:css` now reports zero. Notably, one close-button class string had been copy-pasted
+  verbatim into eight components, and three of its classes did not exist.
+
+### Removed
+- **The two decorative blurred orbs behind the welcome screen.** `blur-[100px]`, `w-64` and
+  `-top-32` are all undefined, so they have only ever rendered as zero-size invisible divs.
+  Implementing them rather than deleting them would have meant adding a glow effect the
+  project's design rules rule out.
+
 ## [1.4.1] - 2026-08-21
 ### Security
 - **pdf.js upgraded from 5.7.284 to 6.2.108** (CVE-2026-16633, GHSA-hq66-cqwq-w95j —

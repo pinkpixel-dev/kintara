@@ -58,7 +58,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <SettingsIcon size={18} className="text-[var(--accent)]" />
             <h2 className="font-semibold text-lg m-0">Settings</h2>
           </div>
-          <button className="p-1.5 rounded hover:bg-[var(--bg-tertiary)] text-muted transition-colors border-none bg-transparent cursor-pointer" onClick={onClose}>
+          <button className="modal-close" onClick={onClose} aria-label="Close settings">
             <X size={18} />
           </button>
         </div>
@@ -66,14 +66,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         <div className="modal-body">
           {/* Appearance */}
           <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted mb-3 flex items-center gap-2">
+            <h3 className="settings-section-title">
               <Palette size={14} /> Appearance
             </h3>
-            <div className="flex flex-col gap-4 pl-1">
+            <div className="settings-section-body">
               <div className="flex items-center justify-between">
                 <label className="text-sm">Theme</label>
                 <select 
-                  className="input py-1 px-2 text-sm w-32"
+                  className="input settings-control"
                   value={settings.theme}
                   onChange={(e) => updateSetting('theme', e.target.value)}
                 >
@@ -116,7 +116,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               <div className="flex items-center justify-between mt-2">
                 <label className="text-sm">Reader Theme</label>
                 <select
-                  className="input py-1 px-2 text-sm w-32"
+                  className="input settings-control"
                   value={settings.readerTheme || 'light'}
                   onChange={(e) => updateSetting('readerTheme', e.target.value)}
                 >
@@ -134,7 +134,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </div>
                 <select
                   id="ui-size"
-                  className="input py-1 px-2 text-sm w-32"
+                  className="input settings-control"
                   value={settings.uiSize}
                   onChange={(e) => updateSetting('uiSize', e.target.value)}
                 >
@@ -148,14 +148,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
           {/* Typography */}
           <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted mb-3 flex items-center gap-2">
+            <h3 className="settings-section-title">
               <Type size={14} /> Typography
             </h3>
-            <div className="flex flex-col gap-4 pl-1">
+            <div className="settings-section-body">
               <div className="flex items-center justify-between">
                 <label className="text-sm">Font Family</label>
                 <select 
-                  className="input py-1 px-2 text-sm w-32"
+                  className="input settings-control"
                   value={settings.fontFamily}
                   onChange={(e) => updateSetting('fontFamily', e.target.value)}
                 >
@@ -174,10 +174,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
           {/* Highlights */}
           <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted mb-3 flex items-center gap-2">
+            <h3 className="settings-section-title">
               <span style={{ fontSize: "14px" }}>🖊</span> Highlights
             </h3>
-            <div className="pl-1">
+            <div className="settings-section-body">
               <label className="text-sm" style={{ display: "block", marginBottom: "0.625rem" }}>Highlight Color</label>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
                 {HIGHLIGHT_PRESETS.map((preset) => {

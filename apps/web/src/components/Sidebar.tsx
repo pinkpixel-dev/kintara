@@ -32,6 +32,12 @@ interface SidebarProps {
   setActiveView: (view: { type: 'all' | 'recent' | 'favorites' | 'library' | 'collection', id?: number }) => void;
   /** Drops the scope but keeps the query, so the same search runs everywhere. */
   onSearchEverywhere: () => void;
+  /**
+   * Reports the name of the scope currently being searched, or null when there
+   * is none. The names live here because this is what loads the libraries and
+   * collections; the empty grid needs them to say what emptied it.
+   */
+  onScopeNameChange: (name: string | null) => void;
   /** A target files the uploaded document straight into that library or collection. */
   onImport: (target?: ImportTarget) => void;
 }
@@ -68,7 +74,7 @@ async function ensureDefaultLibrary(): Promise<void> {
   return defaultLibraryInFlight;
 }
 
-export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setActiveView, onSearchEverywhere, onImport }: SidebarProps) {
+export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setActiveView, onSearchEverywhere, onScopeNameChange, onImport }: SidebarProps) {
   const [libraries, setLibraries] = useState<Library[]>([]);
   const [collectionsByLibrary, setCollectionsByLibrary] = useState<Record<number, Collection[]>>({});
   const [expandedLibraries, setExpandedLibraries] = useState<Record<number, boolean>>({});
@@ -191,6 +197,12 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
     return null;
   })();
 
+  // Pushed up rather than derived again in App, which does not hold the
+  // libraries or collections and would need a second request to name one.
+  useEffect(() => {
+    onScopeNameChange(scopeName);
+  }, [scopeName, onScopeNameChange]);
+
   if (!isOpen) return null;
 
   return (
@@ -213,7 +225,7 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
             </span>
           </div>
           <button
-            className="btn btn-ghost p-1.5 hover:bg-[var(--bg-tertiary)] rounded text-muted hover:text-primary transition-colors border-none bg-transparent cursor-pointer"
+            className="sidebar-icon-btn"
             onClick={() => onImport()}
             title="Import Document"
           >
@@ -221,15 +233,15 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
           </button>
         </div>
 
-        <div className="sidebar-content flex-1 overflow-y-auto px-2 py-4 flex flex-col gap-4">
+        <div className="sidebar-content px-2 flex flex-col gap-4">
           <div className="px-2">
-            <div className="search-field">
+            <div className="search-field sidebar-search">
               <Search className="search-field-icon" size={14} aria-hidden="true" />
               <input
                 type="text"
                 placeholder={scopeName ? `Search in ${scopeName}...` : "Search documents..."}
                 aria-label={scopeName ? `Search in ${scopeName}` : "Search all documents"}
-                className="input pl-8 py-2 text-sm w-full bg-[var(--bg-tertiary)] border-transparent focus:border-[var(--accent)]"
+                className="input"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -254,21 +266,21 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
           </div>
 
           <div>
-            <div className="uppercase text-muted mb-1 px-3 font-semibold tracking-wider" style={{ fontSize: "0.75rem" }}>Quick Views</div>
+            <div className="sidebar-section-label">Quick Views</div>
             <div
-              className={`sidebar-item flex items-center gap-2 px-3 py-1.5 rounded-md cursor-pointer text-sm mb-0.5 ${activeView.type === 'recent' ? 'active' : ''}`}
+              className={`sidebar-item flex items-center gap-2 px-3 py-1.5 rounded-md cursor-pointer text-sm ${activeView.type === 'recent' ? 'active' : ''}`}
               onClick={() => setActiveView({ type: 'recent' })}
             >
               <Clock size={16} /> Recent Documents
             </div>
             <div
-              className={`sidebar-item flex items-center gap-2 px-3 py-1.5 rounded-md cursor-pointer text-sm mb-0.5 ${activeView.type === 'all' ? 'active' : ''}`}
+              className={`sidebar-item flex items-center gap-2 px-3 py-1.5 rounded-md cursor-pointer text-sm ${activeView.type === 'all' ? 'active' : ''}`}
               onClick={() => setActiveView({ type: 'all' })}
             >
               <LibraryIcon size={16} /> All Documents
             </div>
             <div
-              className={`sidebar-item flex items-center gap-2 px-3 py-1.5 rounded-md cursor-pointer text-sm mb-0.5 ${activeView.type === 'favorites' ? 'active' : ''}`}
+              className={`sidebar-item flex items-center gap-2 px-3 py-1.5 rounded-md cursor-pointer text-sm ${activeView.type === 'favorites' ? 'active' : ''}`}
               onClick={() => setActiveView({ type: 'favorites' })}
             >
               <Star size={16} /> Favorites
@@ -276,11 +288,12 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
           </div>
 
           <div>
-            <div className="uppercase text-muted mb-1 px-3 font-semibold tracking-wider flex justify-between items-center group" style={{ fontSize: "0.75rem" }}>
+            <div className="sidebar-section-label">
               Libraries
               <button
-                className="p-0.5 text-muted hover:text-primary bg-transparent border-none cursor-pointer rounded hover:bg-[var(--bg-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity"
+                className="sidebar-section-add"
                 title="New Library"
+                aria-label="New Library"
                 onClick={() => {
                   openPrompt("Create Library", "Library name...", "", async (val) => {
                     await libraryService.create({ name: val });
@@ -291,7 +304,7 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
                 <Plus size={12} />
               </button>
             </div>
-            <div className="flex flex-col gap-0.5">
+            <div className="sidebar-tree">
               {libraries.map(lib => {
                 const isExpanded = expandedLibraries[lib.id];
                 const collections = collectionsByLibrary[lib.id] || [];
@@ -304,7 +317,7 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
                 return (
                   <div key={`lib-${lib.id}`}>
                     <div
-                      className={`sidebar-item flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer text-sm group ${isActiveLib ? 'active' : ''}`}
+                      className={`sidebar-item flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer text-sm ${isActiveLib ? 'active' : ''}`}
                       onClick={() => setActiveView({ type: 'library', id: lib.id })}
                       onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
                       onDrop={async (e) => {
@@ -318,22 +331,22 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
                     >
                       <div className="sidebar-row-label">
                         <button
-                          className="p-0.5 flex items-center justify-center bg-transparent border-none cursor-pointer hover:bg-black/10 rounded text-current opacity-70 transition-colors"
+                          className="sidebar-row-icon-btn"
                           onClick={(e) => toggleLibrary(lib.id, e)}
                         >
                           {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                         </button>
                         <LibIcon
                           size={14}
-                          className="flex-shrink-0 opacity-90"
+                          className="flex-shrink-0"
                           style={isActiveLib ? {} : (iconColor ? { color: iconColor } : {})}
                         />
                         <span className="truncate">{lib.name}</span>
                       </div>
 
-                      <div className="row-actions flex items-center gap-0.5 flex-shrink-0">
+                      <div className="row-actions flex items-center flex-shrink-0">
                         <button
-                          className="p-1 text-muted hover:text-primary bg-transparent border-none cursor-pointer rounded hover:bg-black/10"
+                          className="sidebar-row-action"
                           title={`Add to ${lib.name}`}
                           aria-label={`Add to ${lib.name}`}
                           aria-haspopup="menu"
@@ -343,7 +356,7 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
                           <Plus size={14} />
                         </button>
                         <button
-                          className="p-1 text-muted hover:text-primary bg-transparent border-none cursor-pointer rounded hover:bg-black/10"
+                          className="sidebar-row-action"
                           title={`${lib.name} settings`}
                           aria-label={`Settings for ${lib.name}`}
                           onClick={(e) => {
@@ -365,7 +378,7 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
                       return (
                         <div
                           key={`col-${col.id}`}
-                          className={`sidebar-item group flex items-center gap-2 pl-9 pr-2 py-1.5 rounded-md cursor-pointer text-sm ${isActiveCol ? 'active' : ''}`}
+                          className={`sidebar-item flex items-center gap-2 pl-9 pr-2 py-1.5 rounded-md cursor-pointer text-sm ${isActiveCol ? 'active' : ''}`}
                           onClick={() => setActiveView({ type: 'collection', id: col.id })}
                           onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
                           onDrop={async (e) => {
@@ -377,14 +390,14 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
                             }
                           }}
                         >
-                          <span className="w-1.5 h-1.5 rounded-full bg-current opacity-50 flex-shrink-0"></span>
+                          <span className="sidebar-collection-dot"></span>
                           <span className="truncate flex-1 min-w-0">{col.name}</span>
-                          <div className="row-actions flex items-center gap-0.5 flex-shrink-0">
+                          <div className="row-actions flex items-center flex-shrink-0">
                             {/* One action rather than a menu: a collection holds
                                 documents and nothing else, so there is nothing
                                 to choose between. */}
                             <button
-                              className="p-1 text-muted hover:text-primary bg-transparent border-none cursor-pointer rounded hover:bg-black/10"
+                              className="sidebar-row-action"
                               title={`Import a document into ${col.name}`}
                               aria-label={`Import a document into ${col.name}`}
                               onClick={(e) => {
@@ -395,7 +408,7 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
                               <Plus size={14} />
                             </button>
                             <button
-                              className="p-1 text-muted hover:text-primary bg-transparent border-none cursor-pointer rounded hover:bg-black/10"
+                              className="sidebar-row-action"
                               title={`${col.name} settings`}
                               aria-label={`Settings for ${col.name}`}
                               onClick={(e) => {
@@ -421,23 +434,23 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
         </div>
 
         {/* Sidebar Footer */}
-        <div className="mt-auto px-4 py-3 border-t border-[var(--border-color)] flex justify-between items-center bg-[var(--bg-primary)]">
+        <div className="sidebar-footer">
           <button
-            className="btn btn-ghost p-2 rounded-md hover:bg-[var(--bg-tertiary)] text-muted hover:text-primary transition-colors flex items-center justify-center border-none cursor-pointer bg-transparent"
+            className="sidebar-icon-btn"
             onClick={() => window.dispatchEvent(new CustomEvent('open-settings'))}
             title="Settings (Ctrl+,)"
           >
             <Settings size={18} />
           </button>
           <button
-            className="btn btn-ghost p-2 rounded-md hover:bg-[var(--bg-tertiary)] text-muted hover:text-primary transition-colors flex items-center justify-center border-none cursor-pointer bg-transparent"
+            className="sidebar-icon-btn"
             onClick={() => window.dispatchEvent(new CustomEvent('open-help'))}
             title="Help & Shortcuts (F1)"
           >
             <HelpCircle size={18} />
           </button>
           <button
-            className="p-2 rounded text-muted hover:text-primary hover:bg-[var(--bg-tertiary)] transition-colors flex items-center justify-center border-none cursor-pointer bg-transparent"
+            className="sidebar-icon-btn"
             onClick={async () => {
               await authService.logout().catch(() => {});
               // The gate listens for this and drops back to the sign-in form.

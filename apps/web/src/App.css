@@ -1,5 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Bellota:wght@400;700&display=swap');
+@import url("./fonts.css");
 
 :root, [data-theme="light"] {
   color-scheme: light;
@@ -380,6 +379,205 @@ select, option {
   min-width: 0;
 }
 
+/*
+  The icon buttons in the sidebar's header and footer -- import, settings, help,
+  sign out.
+
+  One rule for four call sites that carried the same nine-class string, of which
+  `p-1.5`, `p-2` and `transition-colors` were never defined here.
+*/
+.sidebar-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  border: none;
+  border-radius: var(--radius-md);
+  background-color: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.sidebar-icon-btn:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.sidebar-icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/*
+  The footer's tap targets need the same floor the row actions get.
+
+  In px rather than rem on purpose: `html` font-size is `--font-base` times
+  `--ui-scale`, so 2.75rem is only 38.5px at the default Small size. A finger is
+  the same width whatever the interface size is set to, so the floor has to be
+  an absolute 44.
+*/
+@media (hover: none) {
+  .sidebar-icon-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/*
+  The search box sits on the tertiary fill, so its resting border is drawn in
+  the same colour rather than the usual one. `.input:focus` still supplies the
+  accent border, which is what `focus:border-[var(--accent)]` was reaching for.
+*/
+.sidebar-search .input {
+  background-color: var(--bg-tertiary);
+  border-color: transparent;
+}
+
+/* "Quick Views", "Libraries". */
+.sidebar-section-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.75rem;
+  margin-bottom: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/*
+  The + beside a section label.
+
+  Same visibility contract as `.row-actions`: hover on a pointer device,
+  permanent on touch, and revealed by keyboard focus. It was written as
+  `opacity-0 group-hover:opacity-100`, neither of which exists here, so it has
+  in fact been permanently visible -- this keeps it reachable everywhere rather
+  than making it hover-only for the first time.
+*/
+.sidebar-section-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.125rem;
+  border: none;
+  border-radius: 0.25rem;
+  background-color: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease, background-color 150ms ease, color 150ms ease;
+}
+
+.sidebar-section-label:hover .sidebar-section-add,
+.sidebar-section-label:focus-within .sidebar-section-add,
+.sidebar-section-add:focus-visible {
+  opacity: 1;
+}
+
+.sidebar-section-add:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.sidebar-section-add:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+@media (hover: none) {
+  .sidebar-section-add {
+    opacity: 1;
+    padding: 0.5rem;
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* The library and collection rows, tight against each other. */
+.sidebar-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.row-actions {
+  gap: 0.125rem;
+}
+
+/*
+  The library's own icon on its row, which doubles as the expand toggle.
+
+  Inherits the row's colour so it flips to `--accent-ink` along with everything
+  else when the row is active; `text-current` was carrying that intent and is
+  not defined here.
+*/
+.sidebar-row-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.125rem;
+  border: none;
+  border-radius: 0.25rem;
+  background-color: transparent;
+  color: inherit;
+  opacity: 0.7;
+  cursor: pointer;
+  transition: opacity 150ms ease, background-color 150ms ease;
+}
+
+.sidebar-row-icon-btn:hover {
+  opacity: 1;
+  background-color: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.sidebar-row-icon-btn:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Gear and menu on a library or collection row. */
+.sidebar-row-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  border: none;
+  border-radius: 0.25rem;
+  background-color: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.sidebar-row-action:hover {
+  background-color: color-mix(in srgb, currentColor 10%, transparent);
+  color: var(--text-primary);
+}
+
+/* The bullet standing in for an icon on a collection row. */
+.sidebar-collection-dot {
+  width: 0.375rem;
+  height: 0.375rem;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background-color: currentColor;
+  opacity: 0.5;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border-color);
+  background-color: var(--bg-primary);
+}
+
 /* Main Reader */
 /* PDF Theme Support */
 [data-reader-theme="dark"] .pdf-canvas-wrapper::after {
@@ -513,6 +711,104 @@ select, option {
 
 .metadata-field {
   margin-bottom: 20px;
+}
+
+/*
+  The cover well in the details panel, which doubles as the file picker.
+
+  `group` and its `group-hover:` partners are Tailwind's parent-hover mechanism
+  and do not exist in this stylesheet, so the icon and label never responded to
+  hovering the well at all. A descendant selector does the same job in CSS.
+*/
+.cover-picker {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  padding: 0;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-tertiary);
+  cursor: pointer;
+  transition: border-color 150ms ease;
+}
+
+.cover-picker:hover,
+.cover-picker:focus-visible {
+  border-color: var(--accent);
+}
+
+.cover-picker:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.cover-picker-icon {
+  color: var(--text-muted);
+  opacity: 0.5;
+  margin-bottom: 0.5rem;
+  transition: color 150ms ease;
+}
+
+.cover-picker-label {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--text-muted);
+  transition: color 150ms ease;
+}
+
+.cover-picker:hover .cover-picker-icon,
+.cover-picker:focus-visible .cover-picker-icon {
+  color: var(--accent);
+}
+
+.cover-picker:hover .cover-picker-label,
+.cover-picker:focus-visible .cover-picker-label {
+  color: var(--text-primary);
+}
+
+/* A tag on a document, with its own dismiss. */
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.tag-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: none;
+  background-color: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 150ms ease;
+}
+
+/* Matching the literal the other danger rules in this file already use;
+   there is no `--danger` token yet, and introducing one here would leave it
+   adopted in a single place. */
+.tag-chip-remove:hover {
+  color: #ef4444;
+}
+
+.tag-chip-remove:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Only the summary box is worth dragging taller; the rest are single-line. */
+.input.resize-y {
+  resize: vertical;
 }
 
 .metadata-label {
@@ -753,6 +1049,375 @@ select, option {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+}
+
+/*
+  The dismiss button in a modal header, and the one on the details panel.
+
+  This was the same eight-class string copy-pasted into eight components, three
+  of whose classes -- `p-1.5`, `transition-colors`, and the hover background --
+  this stylesheet never defined. Being one rule also means the touch target is
+  specified in one place; at 1.5rem of padding around an 18px icon it clears
+  44px, which the copy-pasted version only managed by accident.
+*/
+.modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.375rem;
+  min-width: 44px;
+  min-height: 44px;
+  border: none;
+  border-radius: 0.375rem;
+  background-color: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.modal-close:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.modal-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/*
+  A dialog's heading, and the row its buttons sit in.
+
+  Five components wrote the heading as `font-semibold text-base m-0` or
+  `font-semibold text-md m-0` -- and `text-base` and `text-md` are both
+  undefined here, so the two spellings that looked different rendered
+  identically at the inherited size. One rule, one size.
+*/
+.dialog-title {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 600;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+/*
+  A destructive button that is otherwise a ghost -- Delete in the confirm
+  dialog, Remove in the import dialog. Both were spelled
+  `text-red-400 hover:text-red-500 hover:bg-red-500/10`, and none of those three
+  exist here, so the destructive action was drawn exactly like a neutral one.
+*/
+.btn-danger-ghost {
+  color: #f87171;
+}
+
+.btn-danger-ghost:hover {
+  color: #ef4444;
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+.dialog-danger-icon {
+  color: #f87171;
+  flex-shrink: 0;
+}
+
+/* Whatever stopped a document from opening, said in the reading pane. */
+.reader-error {
+  padding: 1rem;
+  color: #ef4444;
+}
+
+/* Settings sections: a small caps heading and the controls under it. */
+.settings-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.settings-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-left: 0.25rem;
+}
+
+/*
+  The select or input on the right of a settings row. A fixed width so the four
+  of them line up in a column; `w-32` was meant to do this and is not defined,
+  so each one sized to its longest option and the column was ragged.
+*/
+.settings-control {
+  width: 8rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+/* Icon buttons in the reader header -- sidebar toggle, split view. */
+.header-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.375rem;
+  border: none;
+  border-radius: var(--radius-md);
+  background-color: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.header-icon-btn:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.header-icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.header-icon-btn.is-active {
+  color: var(--accent);
+  background-color: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+@media (hover: none) {
+  .header-icon-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* Which document the right half of a split view shows. */
+.header-select {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.25rem;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  cursor: pointer;
+  transition: border-color 150ms ease;
+}
+
+.header-select:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+/* The source line above a rendered markdown document. */
+.markdown-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--text-muted);
+}
+
+.markdown-backlinks {
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.markdown-backlinks-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/*
+  A filled star, for a document that is favourited.
+
+  This has been spelled `fill-current` in three places and defined in none, so
+  the favourited and unfavourited stars have rendered identically -- the state
+  was only ever legible from the separate corner marker on a card.
+*/
+.fill-current {
+  fill: currentColor;
+}
+
+/*
+  A tab in the reader's tab strip.
+
+  The active and inactive spellings differed by seven utility classes each,
+  including `transition-colors`, which does not exist here.
+*/
+.reader-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 100%;
+  max-width: 200px;
+  padding: 0 1rem;
+  border-right: 1px solid var(--border-color);
+  border-top: 3px solid transparent;
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.reader-tab:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.reader-tab.is-active {
+  background-color: var(--bg-primary);
+  border-top-color: var(--accent);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.reader-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Whatever emptied the grid, said in the middle of it. */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.5rem;
+  padding: 3rem 1.5rem;
+  margin: 0 auto;
+  max-width: 30rem;
+}
+
+.empty-state-icon {
+  color: var(--text-muted);
+  opacity: 0.6;
+  margin-bottom: 0.25rem;
+}
+
+.empty-state-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.empty-state-body {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  /* Wraps rather than truncating: the search term is in here, and a cut-off
+     term is exactly the thing the reader is trying to check. */
+  overflow-wrap: anywhere;
+}
+
+.empty-state-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  /* A comfortable target on touch, where this is often the only thing to tap. */
+  min-height: 44px;
+}
+
+/*
+  Help modal.
+
+  The shortcut list asked for `grid grid-cols-1 md:grid-cols-2`, none of which
+  this stylesheet defines, so it has always rendered as a plain block -- six
+  rows stacked in one column at every width, each with no padding because `p-2`
+  is missing too.
+*/
+.help-section-title {
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+
+.shortcut-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+}
+
+@media (min-width: 768px) {
+  .shortcut-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  border-radius: var(--radius-sm, 0.25rem);
+  background-color: var(--bg-tertiary);
+}
+
+.shortcut-key {
+  flex-shrink: 0;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.25rem;
+  background-color: var(--bg-primary);
+  font-family: monospace;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
+}
+
+.tip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.tip-item {
+  display: flex;
+  gap: 0.75rem;
+}
+
+/* Nudged down so it lines up with the first line of text, not its ascenders. */
+.tip-icon {
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+  color: var(--accent);
+}
+
+.tip-title {
+  color: var(--text-primary);
+  margin-right: 0.25rem;
 }
 
 /*
@@ -1115,6 +1780,99 @@ select, option {
   box-shadow: 0 0 50px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
+.onboarding-body {
+  padding: 2.5rem;
+  text-align: center;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.onboarding-logo {
+  width: 5rem;
+  height: 5rem;
+  margin-bottom: 1.5rem;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.onboarding-logo-img {
+  width: 3rem;
+  height: 3rem;
+  object-fit: contain;
+}
+
+.onboarding-title {
+  font-size: 1.875rem;
+  line-height: 2.25rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  margin-bottom: 0.75rem;
+  color: var(--text-primary);
+}
+
+.onboarding-subtitle {
+  color: var(--text-secondary);
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+  max-width: 32rem;
+  margin-bottom: 2.5rem;
+}
+
+/* Three across where there is room, one per row on a phone. Both cases were
+   previously `grid grid-cols-1 md:grid-cols-3`, which is defined nowhere, so
+   the cards stacked at every width including desktop. */
+.onboarding-features {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
+  width: 100%;
+  text-align: left;
+}
+
+@media (min-width: 768px) {
+  .onboarding-features {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.onboarding-feature {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+}
+
+/* All three use the accent. Two of them asked for `text-cyan-400` and
+   `text-pink-400`, which are not defined here, so they inherited body colour
+   and the row looked half-finished. */
+.onboarding-feature-icon {
+  color: var(--accent);
+  margin-bottom: 0.75rem;
+}
+
+.onboarding-feature-title {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.onboarding-cta {
+  padding: 0.75rem 2rem;
+  font-size: 1.125rem;
+  font-weight: 500;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 /* Utility Fixes */
 .w-8 { width: 2rem; }
 .h-8 { height: 2rem; }
@@ -1154,6 +1912,7 @@ select, option {
 .animate-in { animation-fill-mode: both; }
 .fade-in { animation-name: fadeIn; }
 .zoom-in { animation-name: zoomIn; }
+.duration-150 { animation-duration: 150ms; }
 .duration-200 { animation-duration: 200ms; }
 .duration-500 { animation-duration: 500ms; }
 

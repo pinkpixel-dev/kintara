@@ -45,9 +45,9 @@ export function SidebarPrompt({ config, onClose }: SidebarPromptProps) {
     <div className="fixed-overlay z-100 animate-in fade-in duration-200">
       <div className="modal-content" style={{ maxWidth: '350px' }}>
         <div className="modal-header">
-          <h2 className="font-semibold text-md m-0">{config.title}</h2>
+          <h2 className="dialog-title">{config.title}</h2>
           <button
-            className="p-1.5 rounded hover:bg-[var(--bg-tertiary)] text-muted transition-colors border-none bg-transparent cursor-pointer"
+            className="modal-close"
             onClick={onClose}
             aria-label="Close"
           >
@@ -64,7 +64,7 @@ export function SidebarPrompt({ config, onClose }: SidebarPromptProps) {
             onChange={(e) => setValue(e.target.value)}
           />
           {error && <p className="auth-error" role="alert">{error}</p>}
-          <div className="flex justify-end gap-2 mt-2">
+          <div className="dialog-actions">
             <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={!value.trim() || saving}>
               {saving ? "Saving..." : "Save"}

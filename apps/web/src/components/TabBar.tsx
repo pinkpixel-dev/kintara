@@ -20,12 +20,7 @@ export function TabBar({ tabs, activeIndex, isReading, onSelect, onClose }: TabB
             role="tab"
             aria-selected={isActive}
             tabIndex={0}
-            className={`flex items-center gap-2 px-4 h-full cursor-pointer border-r border-[var(--border-color)] text-sm max-w-[200px] transition-colors
-              ${
-                isActive
-                  ? "bg-[var(--bg-primary)] border-t-3 border-t-[var(--accent)] text-primary font-medium"
-                  : "bg-[var(--bg-secondary)] text-secondary border-t-3 border-t-transparent hover:bg-[var(--bg-tertiary)]"
-              }`}
+            className={`reader-tab ${isActive ? "is-active" : ""}`}
             onClick={() => onSelect(idx)}
             onAuxClick={(e) => {
               // Middle-click closes, matching every browser and editor.

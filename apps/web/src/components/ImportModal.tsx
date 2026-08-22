@@ -139,7 +139,7 @@ export function ImportModal({
         <div className="modal-header">
           <h2 className="font-semibold text-lg m-0">Import Document</h2>
           <button
-            className="p-1.5 rounded hover:bg-[var(--bg-tertiary)] text-muted transition-colors border-none bg-transparent cursor-pointer"
+            className="modal-close"
             onClick={() => setConfirmCancel(true)}
             aria-label="Cancel import"
           >
@@ -252,7 +252,7 @@ export function ImportModal({
 
             <div className="import-actions">
               <button
-                className="btn btn-ghost text-red-400 hover:text-red-500 hover:bg-red-500/10"
+                className="btn btn-ghost btn-danger-ghost"
                 onClick={() => setConfirmCancel(true)}
               >
                 Cancel Import

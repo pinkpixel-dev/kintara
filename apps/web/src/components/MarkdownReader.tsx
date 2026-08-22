@@ -121,12 +121,12 @@ export const MarkdownReader: React.FC<MarkdownReaderProps> = ({ documentId }) =>
   };
 
   if (error) {
-    return <div className="text-red-500 p-4">{error}</div>;
+    return <div className="reader-error">{error}</div>;
   }
 
   return (
     <div className="markdown-reader-container relative" ref={containerRef} onMouseUp={handleTextSelection}>
-      <div className="mb-4 text-xs text-muted flex items-center gap-1 border-b border-[var(--border-color)] pb-2">
+      <div className="markdown-meta">
         <Link size={12} />
         <span>Select text to highlight · Click a highlight to remove it</span>
       </div>
@@ -169,8 +169,8 @@ export const MarkdownReader: React.FC<MarkdownReaderProps> = ({ documentId }) =>
       </ReactMarkdown>
 
       {/* Render Backlinks panel below content */}
-      <div className="mt-12 pt-8 border-t border-[var(--border-color)]">
-        <h3 className="text-lg font-semibold text-primary mb-4 flex items-center gap-2">
+      <div className="markdown-backlinks">
+        <h3 className="markdown-backlinks-title">
           <Link size={18} className="text-[var(--accent)]" />
           Linked Mentions
         </h3>

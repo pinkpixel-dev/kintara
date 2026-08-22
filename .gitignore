@@ -42,7 +42,12 @@ src-tauri/
 *.sln
 *.sw?
 
-# Other
-to-do.md
+# Agents
+.agents/
+.claude/
+.codex/
 AGENTS.md
+CLAUDE.md
+
+# Other
 DOCS/

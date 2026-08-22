@@ -118,7 +118,7 @@ export function DetailsSidebar({ document, onUpdate, onClose }: DetailsSidebarPr
       <div className="inspector-header font-semibold py-3 px-4 border-b border-[var(--border-color)] flex justify-between items-center">
         <span>Details</span>
         <button
-          className="p-1.5 rounded hover:bg-[var(--bg-tertiary)] text-muted transition-colors border-none bg-transparent cursor-pointer"
+          className="modal-close"
           onClick={onClose}
           title="Close details"
           aria-label="Close details"
@@ -127,7 +127,7 @@ export function DetailsSidebar({ document, onUpdate, onClose }: DetailsSidebarPr
         </button>
       </div>
       
-      <div className="inspector-content p-4 overflow-y-auto flex-1 flex flex-col gap-4 text-sm">
+      <div className="inspector-content flex flex-col gap-4 text-sm">
         
         {/* Thumbnail Preview Area */}
         <input
@@ -139,7 +139,7 @@ export function DetailsSidebar({ document, onUpdate, onClose }: DetailsSidebarPr
         />
         <button
           type="button"
-          className="w-full aspect-3-4 bg-[var(--bg-tertiary)] rounded flex flex-col items-center justify-center border border-dashed border-[var(--border-color)] relative overflow-hidden cursor-pointer hover:border-[var(--accent)] transition-colors group p-0"
+          className="cover-picker"
           onClick={() => coverInputRef.current?.click()}
           title="Change cover image"
           aria-label="Change cover image"
@@ -152,8 +152,8 @@ export function DetailsSidebar({ document, onUpdate, onClose }: DetailsSidebarPr
             />
           ) : (
             <>
-              <ImageIcon size={32} className="text-muted mb-2 opacity-50 group-hover:text-[var(--accent)] transition-colors" />
-              <span className="text-xs text-muted group-hover:text-primary transition-colors">Click to upload cover</span>
+              <ImageIcon size={32} className="cover-picker-icon" />
+              <span className="cover-picker-label">Click to upload cover</span>
             </>
           )}
         </button>
@@ -196,7 +196,7 @@ export function DetailsSidebar({ document, onUpdate, onClose }: DetailsSidebarPr
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid-cols-2 gap-3">
           <div className="flex flex-col gap-1">
             <label className="text-xs text-muted font-medium uppercase tracking-wider">DOI</label>
             <input 
@@ -220,11 +220,12 @@ export function DetailsSidebar({ document, onUpdate, onClose }: DetailsSidebarPr
           <div className="flex gap-1 flex-wrap mt-1">
             {tags.length === 0 ? <span className="text-xs text-muted italic">No tags assigned</span> : null}
             {tags.map(t => (
-              <span key={t.id} className="px-2 py-0.5 rounded-full text-xs flex items-center gap-1 border" style={{ backgroundColor: t.color || 'var(--bg-tertiary)', borderColor: t.color ? t.color.replace('0.2)', '0.5)') : 'var(--border-color)' }}>
+              <span key={t.id} className="tag-chip" style={{ backgroundColor: t.color || 'var(--bg-tertiary)', borderColor: t.color ? t.color.replace('0.2)', '0.5)') : 'var(--border-color)' }}>
                 {t.name}
                 <button 
-                  className="bg-transparent border-none text-muted hover:text-red-500 cursor-pointer p-0 flex items-center"
+                  className="tag-chip-remove"
                   onClick={() => handleRemoveTag(t.id)}
+                  aria-label={`Remove tag ${t.name}`}
                 >
                   <X size={10} />
                 </button>

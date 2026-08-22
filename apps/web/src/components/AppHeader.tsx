@@ -53,7 +53,7 @@ export function AppHeader({
   return (
     <div className="h-12 border-b border-[var(--border-color)] bg-[var(--bg-primary)] flex items-center px-2 z-10 flex-shrink-0">
       <button
-        className="btn btn-ghost p-1.5 text-muted hover:text-primary mr-2 flex-shrink-0 rounded"
+        className="header-icon-btn mr-2 flex-shrink-0"
         onClick={onToggleLeftSidebar}
         title={isLeftSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
       >
@@ -81,7 +81,7 @@ export function AppHeader({
 
         {isReading && isSplitView && splitRightTabIndex !== null && (
           <select
-            className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-primary rounded px-2 py-1 text-xs mr-2 cursor-pointer focus:outline-none focus:border-[var(--accent)] transition-all"
+            className="header-select mr-2"
             value={splitRightTabIndex}
             onChange={(e) => onSetSplitRightTab(Number(e.target.value))}
             title="Split View Document"
@@ -94,7 +94,7 @@ export function AppHeader({
 
         {isReading && (
           <button
-            className={`btn btn-ghost p-1.5 rounded ${isSplitView ? 'text-[var(--accent)] bg-[var(--accent)]/10' : 'text-muted hover:text-primary hover:bg-[var(--bg-tertiary)]'}`}
+            className={`header-icon-btn ${isSplitView ? 'is-active' : ''}`}
             onClick={onToggleSplitView}
             title="Toggle Split View"
             disabled={tabs.length === 0}

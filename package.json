@@ -1,7 +1,7 @@
 {
   "name": "kintara",
   "private": true,
-  "version": "1.4.1",
+  "version": "1.5.0",
   "type": "module",
   "workspaces": [
     "apps/web"
@@ -12,7 +12,10 @@
     "dev:web": "npm run dev --workspace apps/web",
     "build": "npm run build --workspace apps/web",
     "preview": "npm run preview --workspace apps/web",
-    "test": "cd apps/server && cargo test"
+    "test": "npm run test:web && npm run test:server",
+    "test:web": "npm run test --workspace apps/web",
+    "test:server": "cd apps/server && cargo test",
+    "check:css": "python3 scripts/check-css-classes.py"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

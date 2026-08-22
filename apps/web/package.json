@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test --experimental-strip-types test/*.test.ts"
   },
   "dependencies": {
     "lucide-react": "^1.16.0",

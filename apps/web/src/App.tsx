@@ -3,6 +3,7 @@ import "./App.css";
 import { ApiError, documentService, type Document } from "./api";
 import { Sidebar } from "./components/Sidebar";
 import { DocumentGrid } from "./components/DocumentGrid";
+import { emptyReasonFor, type ActiveView } from "./lib/empty-reason";
 import { DetailsSidebar } from "./components/DetailsSidebar";
 import { SettingsModal } from "./components/SettingsModal";
 import { HelpModal } from "./components/HelpModal";
@@ -20,14 +21,15 @@ import { useDocumentImport } from "./hooks/useDocumentImport";
 import { useEntitySettings } from "./hooks/useEntitySettings";
 import { loadSettings, saveSettings } from "./lib/settings";
 
-type ViewType = 'all' | 'recent' | 'favorites' | 'library' | 'collection';
-type ActiveView = { type: ViewType, id?: number };
 
 function App() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   
   const [activeView, setActiveView] = useState<ActiveView>({ type: 'recent' });
+  // Reported by the sidebar, which owns the libraries and collections and so is
+  // the only place that can name the scope a search is running inside.
+  const [scopeName, setScopeName] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'reading'>('grid');
 
   const {
@@ -304,7 +306,7 @@ function App() {
   };
 
   return (
-    <div className="app-container font-sans text-primary bg-[var(--bg-primary)]">
+    <div className="app-container text-primary bg-[var(--bg-primary)]">
       {showOnboarding && <OnboardingOverlay onComplete={handleOnboardingComplete} />}
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
       <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
@@ -410,6 +412,7 @@ function App() {
         activeView={activeView}
         setActiveView={handleSidebarSelect}
         onSearchEverywhere={handleSearchEverywhere}
+        onScopeNameChange={setScopeName}
         onImport={importFlow.start}
       />
 
@@ -439,6 +442,7 @@ function App() {
             <div className="w-full h-full animate-in fade-in duration-200">
               <DocumentGrid
                 documents={documents}
+                emptyReason={emptyReasonFor(searchQuery, activeView, scopeName)}
                 onOpenDocument={(doc) => {
                   openDocument(doc);
                   setViewMode('reading');
@@ -446,6 +450,8 @@ function App() {
                 onOpenDetails={openDetails}
                 onMove={setMovingDocument}
                 onRefresh={loadDocuments}
+                onSearchEverywhere={handleSearchEverywhere}
+                onImport={() => importFlow.start()}
               />
             </div>
           ) : (

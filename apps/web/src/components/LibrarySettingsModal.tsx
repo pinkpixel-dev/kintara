@@ -171,13 +171,14 @@ export function LibrarySettingsModal({
         <div className="modal-header">
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <PreviewIcon size={18} style={{ color: selectedColor }} />
-            <h2 className="font-semibold text-md m-0">
+            <h2 className="dialog-title">
               {mode === "library" ? "Library Settings" : "Collection Settings"}
             </h2>
           </div>
           <button
-            className="p-1.5 rounded hover:bg-[var(--bg-tertiary)] text-muted transition-colors border-none bg-transparent cursor-pointer"
+            className="modal-close"
             onClick={onClose}
+            aria-label="Close settings"
           >
             <X size={16} />
           </button>

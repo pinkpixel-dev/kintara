@@ -127,9 +127,9 @@ export function MoveDocumentModal({ document, scope, onClose, onMoved }: MoveDoc
     <div className="fixed-overlay z-100 animate-in fade-in duration-200" role="dialog" aria-modal="true">
       <div className="modal-content" style={{ maxWidth: "440px" }}>
         <div className="modal-header">
-          <h2 className="font-semibold text-base m-0">File "{document.title}"</h2>
+          <h2 className="dialog-title">File "{document.title}"</h2>
           <button
-            className="p-1.5 rounded hover:bg-[var(--bg-tertiary)] text-muted transition-colors border-none bg-transparent cursor-pointer"
+            className="modal-close"
             onClick={onClose}
             aria-label="Close"
           >

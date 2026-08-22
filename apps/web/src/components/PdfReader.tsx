@@ -194,7 +194,7 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ documentId }) => {
     }
   };
 
-  if (error) return <div className="text-red-500 p-4">{error}</div>;
+  if (error) return <div className="reader-error">{error}</div>;
 
   return (
     <div className="pdf-reader-container">

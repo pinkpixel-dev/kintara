@@ -2,21 +2,29 @@ import { useState } from "react";
 import { documentService, type Document } from "../api";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { DocumentCard } from "./DocumentCard";
+import { EmptyState, type EmptyReason } from "./EmptyState";
 
 interface DocumentGridProps {
   documents: Document[];
+  /** Why the grid is empty, when it is. Never read while there are documents. */
+  emptyReason: EmptyReason;
   onOpenDocument: (doc: Document) => void;
   onOpenDetails: (doc: Document) => void;
   onMove: (doc: Document) => void;
   onRefresh: () => void;
+  onSearchEverywhere: () => void;
+  onImport: () => void;
 }
 
 export function DocumentGrid({
   documents,
+  emptyReason,
   onOpenDocument,
   onOpenDetails,
   onMove,
   onRefresh,
+  onSearchEverywhere,
+  onImport,
 }: DocumentGridProps) {
   const [pendingDelete, setPendingDelete] = useState<Document | null>(null);
 
@@ -58,9 +66,11 @@ export function DocumentGrid({
       />
 
       {documents.length === 0 ? (
-        <div className="text-center text-muted mt-10">
-          <p>No documents found in this view.</p>
-        </div>
+        <EmptyState
+          reason={emptyReason}
+          onSearchEverywhere={onSearchEverywhere}
+          onImport={onImport}
+        />
       ) : (
         <div className="document-grid">
           {documents.map((doc) => (

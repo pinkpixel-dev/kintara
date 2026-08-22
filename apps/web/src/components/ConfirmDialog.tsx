@@ -89,8 +89,8 @@ export function ConfirmDialog({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="modal-header">
-          <h2 id="confirm-dialog-title" className="font-semibold text-base m-0 flex items-center gap-2">
-            {danger && <AlertTriangle size={18} className="text-red-400" aria-hidden="true" />}
+          <h2 id="confirm-dialog-title" className="dialog-title flex items-center gap-2">
+            {danger && <AlertTriangle size={18} className="dialog-danger-icon" aria-hidden="true" />}
             {title}
           </h2>
         </div>
@@ -100,14 +100,14 @@ export function ConfirmDialog({
             {message}
           </p>
 
-          <div className="flex justify-end gap-3 mt-6">
+          <div className="dialog-actions">
             <button ref={cancelRef} className="btn btn-ghost" onClick={onCancel}>
               {cancelLabel}
             </button>
             <button
               className={
                 danger
-                  ? "btn btn-ghost text-red-400 hover:text-red-500 hover:bg-red-500/10"
+                  ? "btn btn-ghost btn-danger-ghost"
                   : "btn btn-primary"
               }
               onClick={onConfirm}

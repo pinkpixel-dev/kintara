@@ -163,7 +163,7 @@ export function BulkImportModal({
           </h2>
           {phase === "configure" && (
             <button
-              className="p-1.5 rounded hover:bg-[var(--bg-tertiary)] text-muted transition-colors border-none bg-transparent cursor-pointer"
+              className="modal-close"
               onClick={onClose}
               aria-label="Cancel import"
             >

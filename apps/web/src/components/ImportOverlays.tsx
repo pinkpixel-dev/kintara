@@ -48,11 +48,11 @@ export function ImportOverlays({
         <div className="fixed-overlay z-100" role="alertdialog" aria-modal="true">
           <div className="modal-content" style={{ maxWidth: "420px" }}>
             <div className="modal-header">
-              <h2 className="font-semibold text-base m-0">Import failed</h2>
+              <h2 className="dialog-title">Import failed</h2>
             </div>
             <div className="modal-body">
               <p className="text-sm text-secondary m-0">{error}</p>
-              <div className="flex justify-end mt-6">
+              <div className="dialog-actions">
                 <button className="btn btn-primary" onClick={onDismissError} autoFocus>
                   Close
                 </button>
