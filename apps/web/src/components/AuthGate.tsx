@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { LogIn } from "lucide-react";
 import { authService, type AuthStatus } from "../api/auth";
+import { BRAND_ASSET_PATHS } from "../lib/brand-assets";
 
 interface AuthGateProps { children: ReactNode }
 
@@ -45,7 +46,7 @@ export function AuthGate({ children }: AuthGateProps) {
   return (
     <div className="auth-screen">
       <div className="auth-card">
-        <img src="/logo.png" alt="" width={56} height={56} />
+        <img src={BRAND_ASSET_PATHS.logo} alt="" width={56} height={56} />
         <h1 className="auth-title">{status.needsOwner ? "Claim this Kintara" : "Sign in to Kintara"}</h1>
         {status.needsOwner && <p className="auth-subtitle">The first GitHub account to sign in becomes the owner.</p>}
         {status.oauthConfigured ? (

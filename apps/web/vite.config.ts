@@ -24,6 +24,7 @@ const pdfjsRoot = path.dirname(require.resolve("pdfjs-dist/package.json"));
  * profiles, `cmaps` CJK text, and `standard_fonts` the base-14 fonts.
  */
 const PDFJS_ASSET_DIRS = ["cmaps", "standard_fonts", "wasm", "iccs"];
+const BRAND_ASSET_NAMES = ["logo.png", "favicon.png"] as const;
 
 const CONTENT_TYPES: Record<string, string> = {
   ".wasm": "application/wasm",
@@ -32,6 +33,53 @@ const CONTENT_TYPES: Record<string, string> = {
   ".icc": "application/vnd.iccprofile",
   ".js": "text/javascript",
 };
+
+/**
+ * Emits the small brand images inside Vite's assets directory.
+ *
+ * Some NAS static-web layers retain the generated assets directory but omit
+ * files copied to the build root from `public/`. Keeping these aliases in the
+ * generated directory gives the UI and favicon the same delivery path as the
+ * JavaScript and CSS bundles. The public copies stay in place for the PWA
+ * manifest and existing installs.
+ */
+function brandAssets(): Plugin {
+  let config: ResolvedConfig;
+
+  const sourcePath = (name: (typeof BRAND_ASSET_NAMES)[number]) =>
+    path.resolve(config.root, "public", name);
+
+  return {
+    name: "kintara-brand-assets",
+
+    configResolved(resolved) {
+      config = resolved;
+    },
+
+    configureServer(server) {
+      server.middlewares.use("/assets/brand", (req, res, next) => {
+        const name = decodeURIComponent((req.url ?? "/").split("?")[0]).replace(/^\/+/, "");
+        if (!BRAND_ASSET_NAMES.includes(name as (typeof BRAND_ASSET_NAMES)[number])) {
+          next();
+          return;
+        }
+
+        res.setHeader("Content-Type", "image/png");
+        fs.createReadStream(sourcePath(name as (typeof BRAND_ASSET_NAMES)[number])).pipe(res);
+      });
+    },
+
+    generateBundle() {
+      for (const name of BRAND_ASSET_NAMES) {
+        this.emitFile({
+          type: "asset",
+          fileName: `assets/brand/${name}`,
+          source: fs.readFileSync(sourcePath(name)),
+        });
+      }
+    },
+  };
+}
 
 /**
  * Serves pdf.js runtime assets from node_modules in development, and copies
@@ -79,7 +127,7 @@ function pdfjsAssets(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
-  plugins: [react(), pdfjsAssets()],
+  plugins: [react(), brandAssets(), pdfjsAssets()],
 
   // `npm run dev` runs the Rust server alongside Vite, so the screen must not be
   // cleared out from under cargo's errors.

@@ -3,6 +3,7 @@ use std::path::{Path as StdPath, PathBuf};
 use axum::extract::{Multipart, State};
 use axum::http::StatusCode;
 use axum::Json;
+use sqlx::{Sqlite, Transaction};
 use tokio::io::AsyncWriteExt;
 
 use crate::access;
@@ -122,11 +123,10 @@ pub async fn upload(
 
     let upload = upload.ok_or_else(|| AppError::BadRequest("no file provided".into()))?;
 
-    // From here on any early return has to remove the temp file.
+    // A new upload moves the temp file into place. A recovered duplicate does
+    // not need the streamed copy, so remove anything that remains either way.
     let result = finish(&state, user_id, &upload, library_id, collection_id).await;
-    if result.is_err() {
-        let _ = tokio::fs::remove_file(&upload.temp_path).await;
-    }
+    let _ = tokio::fs::remove_file(&upload.temp_path).await;
     result
 }
 
@@ -149,21 +149,6 @@ async fn finish(
         return Err(AppError::BadRequest("the uploaded file is empty".into()));
     }
 
-    // The same file uploaded twice should not become two library entries.
-    let existing: Option<i64> = sqlx::query_scalar(
-        "SELECT id FROM documents WHERE file_hash = ? AND owner_id = ?",
-    )
-        .bind(&upload.hash)
-        .bind(user_id)
-        .fetch_optional(&state.db)
-        .await?;
-
-    if let Some(id) = existing {
-        return Err(AppError::Conflict(format!(
-            "this file is already in the library as document {id}"
-        )));
-    }
-
     if let Some(collection_id) = collection_id {
         let parent_id: i64 =
             sqlx::query_scalar("SELECT library_id FROM collections WHERE id = ?")
@@ -180,6 +165,26 @@ async fn finish(
         library_id = Some(parent_id);
     } else if let Some(library_id) = library_id {
         access::require_library_editor(state, library_id, user_id).await?;
+    }
+
+    // Retrying the same owned file repairs any placement that an interrupted
+    // first request did not finish. This also covers a successful upload whose
+    // response never reached the browser.
+    let existing: Option<i64> = sqlx::query_scalar(
+        "SELECT id FROM documents WHERE file_hash = ? AND owner_id = ?",
+    )
+        .bind(&upload.hash)
+        .bind(user_id)
+        .fetch_optional(&state.db)
+        .await?;
+
+    if let Some(id) = existing {
+        let mut tx = state.db.begin().await?;
+        add_placement(&mut tx, id, library_id, collection_id).await?;
+        tx.commit().await?;
+
+        let document = super::fetch_one(state, id, user_id).await?;
+        return Ok((StatusCode::OK, Json(document)));
     }
 
     let relative_path = unique_relative_path(state, &upload.filename).await?;
@@ -208,6 +213,10 @@ async fn finish(
         .filter(|t| !t.trim().is_empty())
         .unwrap_or_else(|| media::title_from_filename(&upload.filename));
 
+    // The row and its requested placement are one database change. Thumbnail
+    // and text indexing happen afterwards because the received file remains a
+    // useful document even when either derived operation fails.
+    let mut tx = state.db.begin().await?;
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO documents
             (owner_id, title, author, relative_path, document_type, file_hash, file_size,
@@ -225,8 +234,11 @@ async fn finish(
     .bind(&metadata.keywords)
     .bind(metadata.page_count)
     .bind(metadata.year)
-    .fetch_one(&state.db)
+    .fetch_one(&mut *tx)
     .await?;
+
+    add_placement(&mut tx, id, library_id, collection_id).await?;
+    tx.commit().await?;
 
     if upload.extension == "pdf" {
         if let Some(name) =
@@ -242,13 +254,23 @@ async fn finish(
 
     text_extraction::extract_and_store(state, id, &destination, &upload.extension).await?;
 
+    let document = super::fetch_one(state, id, user_id).await?;
+    Ok((StatusCode::CREATED, Json(document)))
+}
+
+async fn add_placement(
+    tx: &mut Transaction<'_, Sqlite>,
+    document_id: i64,
+    library_id: Option<i64>,
+    collection_id: Option<i64>,
+) -> AppResult<()> {
     if let Some(library_id) = library_id {
         sqlx::query(
             "INSERT OR IGNORE INTO library_documents (library_id, document_id) VALUES (?, ?)",
         )
         .bind(library_id)
-        .bind(id)
-        .execute(&state.db)
+        .bind(document_id)
+        .execute(&mut **tx)
         .await?;
     }
 
@@ -257,13 +279,12 @@ async fn finish(
             "INSERT OR IGNORE INTO document_collections (collection_id, document_id) VALUES (?, ?)",
         )
         .bind(collection_id)
-        .bind(id)
-        .execute(&state.db)
+        .bind(document_id)
+        .execute(&mut **tx)
         .await?;
     }
 
-    let document = super::fetch_one(state, id, user_id).await?;
-    Ok((StatusCode::CREATED, Json(document)))
+    Ok(())
 }
 
 /// Replaces a document's cover with an uploaded image.

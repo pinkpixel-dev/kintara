@@ -1,4 +1,5 @@
 import { ArrowRight, BookOpen, Layers, LayoutPanelLeft } from "lucide-react";
+import { BRAND_ASSET_PATHS } from "../lib/brand-assets";
 
 interface OnboardingOverlayProps {
   onComplete: () => void;
@@ -18,7 +19,7 @@ export function OnboardingOverlay({ onComplete }: OnboardingOverlayProps) {
       <div className="onboarding-container">
         <div className="onboarding-body">
           <div className="onboarding-logo">
-            <img src="/logo.png" alt="" className="onboarding-logo-img" />
+            <img src={BRAND_ASSET_PATHS.logo} alt="" className="onboarding-logo-img" />
           </div>
 
           <h1 className="onboarding-title">Welcome to Kintara</h1>

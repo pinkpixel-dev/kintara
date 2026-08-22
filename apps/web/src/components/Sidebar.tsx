@@ -8,6 +8,7 @@ import { authService } from "../api/auth";
 import { SidebarPrompt, type PromptConfig } from "./SidebarPrompt";
 import { SidebarRowMenu, type RowMenuState } from "./SidebarRowMenu";
 import { SidebarLibraryGroup } from "./SidebarLibraryGroups";
+import { BRAND_ASSET_PATHS } from "../lib/brand-assets";
 import type { AiSearchState } from "../hooks/useAiSearch";
 
 interface SidebarProps {
@@ -179,7 +180,7 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
             {/* Sized in em so it grows with the interface size setting; a fixed
                 pixel logo next to scaling wordmark drifts out of proportion. */}
             <img
-              src="/logo.png"
+              src={BRAND_ASSET_PATHS.logo}
               alt="Kintara Logo"
               style={{ width: "4.15em", height: "4.15em", objectFit: "contain", padding: "2px" }}
             />

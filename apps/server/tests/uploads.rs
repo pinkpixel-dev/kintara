@@ -51,21 +51,69 @@ async fn a_browser_upload_extracts_pdf_text_before_it_returns() {
 }
 
 #[tokio::test]
-async fn uploading_the_same_file_twice_is_a_conflict_not_a_duplicate() {
+async fn retrying_the_same_file_returns_the_existing_document_without_a_duplicate() {
     let app = TestApp::new().await;
     let pdf = sample_pdf();
 
-    assert_eq!(
-        app.upload("paper.pdf", &pdf, &[]).await.status(),
-        StatusCode::CREATED
-    );
+    let first = body_json(app.upload("paper.pdf", &pdf, &[]).await).await;
 
-    // Same bytes, different name — content hashing should still catch it.
+    // Same bytes, different name. A retry is idempotent even when the browser
+    // missed the first success response.
     let response = app.upload("paper-copy.pdf", &pdf, &[]).await;
-    assert_eq!(response.status(), StatusCode::CONFLICT);
+    assert_eq!(response.status(), StatusCode::OK);
+    let retried = body_json(response).await;
+    assert_eq!(retried["id"], first["id"]);
 
     let listed = body_json(app.get("/api/documents").await).await;
     assert_eq!(listed["total"], 1, "the library must not gain a duplicate");
+}
+
+#[tokio::test]
+async fn retrying_an_unfiled_document_restores_its_library_and_collection() {
+    let app = TestApp::new().await;
+    let pdf = sample_pdf();
+
+    let library = body_json(
+        app.send_json("POST", "/api/libraries", json!({ "name": "Recovered" }))
+            .await,
+    )
+    .await;
+    let library_id = library["id"].as_i64().unwrap();
+    let collection = body_json(
+        app.send_json(
+            "POST",
+            "/api/collections",
+            json!({ "libraryId": library_id, "name": "Imports" }),
+        )
+        .await,
+    )
+    .await;
+    let collection_id = collection["id"].as_i64().unwrap();
+
+    let first = body_json(app.upload("orphan.pdf", &pdf, &[]).await).await;
+    let response = app
+        .upload(
+            "orphan-retry.pdf",
+            &pdf,
+            &[("collectionId", &collection_id.to_string())],
+        )
+        .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(body_json(response).await["id"], first["id"]);
+
+    let library_docs = body_json(
+        app.get(&format!("/api/documents?libraryId={library_id}"))
+            .await,
+    )
+    .await;
+    assert_eq!(library_docs["total"], 1);
+
+    let collection_docs = body_json(
+        app.get(&format!("/api/documents?collectionId={collection_id}"))
+            .await,
+    )
+    .await;
+    assert_eq!(collection_docs["total"], 1);
 }
 
 #[tokio::test]
@@ -173,15 +221,15 @@ async fn a_failed_upload_does_not_leave_a_temp_file_behind() {
     let pdf = sample_pdf();
 
     assert_eq!(app.upload("a.pdf", &pdf, &[]).await.status(), StatusCode::CREATED);
-    // Same content, so this is rejected after the bytes have been streamed to
-    // the incoming directory.
-    assert_eq!(app.upload("b.pdf", &pdf, &[]).await.status(), StatusCode::CONFLICT);
+    // Same content, so this recovers the existing document after the bytes have
+    // been streamed to the incoming directory.
+    assert_eq!(app.upload("b.pdf", &pdf, &[]).await.status(), StatusCode::OK);
 
     let incoming = app.config.library_dir.join(".kintara-incoming");
     let leftovers = std::fs::read_dir(&incoming)
         .map(|entries| entries.count())
         .unwrap_or(0);
-    assert_eq!(leftovers, 0, "a rejected upload must not leave a partial file");
+    assert_eq!(leftovers, 0, "a recovered upload must not leave a partial file");
 }
 
 #[tokio::test]

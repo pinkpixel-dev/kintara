@@ -7,10 +7,10 @@
  * listing, and caching whole PDFs would fill a phone's storage budget quickly.
  */
 
-const VERSION = "kintara-shell-v2";
+const VERSION = "kintara-shell-v3";
 
 // Precaching only the entry points; the hashed bundles are picked up at runtime.
-const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/logo.png"];
+const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/assets/brand/logo.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

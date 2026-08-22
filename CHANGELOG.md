@@ -4,6 +4,43 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.13.7] - 2026-08-22
+
+### 🐛 Imports
+
+- Made document retries recover the existing owned document instead of reporting a
+  duplicate. A retry now restores its requested library and collection placement.
+- Committed each new document row and its initial placement in one database transaction.
+  Thumbnail and text indexing can no longer leave the document outside its selected
+  library.
+- Removed the streamed retry copy after both successful recovery and failed imports.
+
+### 🧪 Tests
+
+- Added real router, SQLite, and filesystem coverage for duplicate retries, recovered
+  library and collection placement, and retry-file cleanup.
+
+### 🏷️ Versioning
+
+- Bumped Kintara from 1.13.6 to 1.13.7 for recoverable document imports.
+
+## [1.13.6] - 2026-08-22
+
+### 🐛 Branding
+
+- Moved the sidebar, sign-in, onboarding, and favicon requests onto generated Vite asset
+  paths. This keeps the images available when a NAS web layer omits files from the build
+  root but serves the generated `assets` directory.
+
+### 🧪 Tests
+
+- Added frontend wiring checks for the shared logo path, favicon path, and service-worker
+  shell entry.
+
+### 🏷️ Versioning
+
+- Bumped Kintara from 1.13.5 to 1.13.6 for the missing logo and favicon fix.
+
 ## [1.13.5] - 2026-08-22
 
 ### 📚 Documentation
