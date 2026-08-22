@@ -249,3 +249,83 @@ async fn ai_keys_and_preferences_are_isolated_per_user() {
     assert_eq!(reader["enabled"], false);
     assert_eq!(reader["openaiKey"]["set"], false);
 }
+
+#[tokio::test]
+async fn document_conversations_are_private_even_when_the_document_is_shared() {
+    let app = TestApp::new().await;
+    let (owner_id, _owner_cookie) = signed_in_owner(&app).await;
+    sqlx::query("INSERT INTO github_invitations (github_login, invited_by) VALUES ('reader', ?)")
+        .bind(owner_id)
+        .execute(&app.db)
+        .await
+        .unwrap();
+    let reader_id = auth::resolve_github_user(
+        &state_of(&app),
+        &GitHubIdentity {
+            id: 303,
+            login: "reader".into(),
+            avatar_url: None,
+        },
+    )
+    .await
+    .unwrap();
+    let document_id = app.insert_row("Shared", "shared.md", "md", 10).await;
+    let library_id: i64 = sqlx::query_scalar(
+        "INSERT INTO libraries (owner_id, name) VALUES (?, 'Shared library') RETURNING id",
+    )
+    .bind(owner_id)
+    .fetch_one(&app.db)
+    .await
+    .unwrap();
+    sqlx::query("INSERT INTO library_documents (library_id, document_id) VALUES (?, ?)")
+        .bind(library_id)
+        .bind(document_id)
+        .execute(&app.db)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO library_members (library_id, user_id, role) VALUES (?, ?, 'viewer')")
+        .bind(library_id)
+        .bind(reader_id)
+        .execute(&app.db)
+        .await
+        .unwrap();
+
+    for (user_id, content) in [(owner_id, "Owner question"), (reader_id, "Reader question")] {
+        let conversation_id: i64 = sqlx::query_scalar(
+            "INSERT INTO ai_conversations (user_id, document_id) VALUES (?, ?) RETURNING id",
+        )
+        .bind(user_id)
+        .bind(document_id)
+        .fetch_one(&app.db)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO ai_messages (conversation_id, role, kind, content)
+             VALUES (?, 'user', 'question', ?)",
+        )
+        .bind(conversation_id)
+        .bind(content)
+        .execute(&app.db)
+        .await
+        .unwrap();
+    }
+
+    let owner = body_json(
+        app.get_as(
+            &format!("/api/ai/documents/{document_id}/conversation"),
+            owner_id,
+        )
+        .await,
+    )
+    .await;
+    let reader = body_json(
+        app.get_as(
+            &format!("/api/ai/documents/{document_id}/conversation"),
+            reader_id,
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(owner["messages"][0]["content"], "Owner question");
+    assert_eq!(reader["messages"][0]["content"], "Reader question");
+}

@@ -52,6 +52,9 @@ async fn migrations_apply_to_an_empty_database() {
 
     for expected in [
         "annotations",
+        "ai_conversations",
+        "ai_message_citations",
+        "ai_messages",
         "ai_usage",
         "collections",
         "documents",
@@ -68,6 +71,66 @@ async fn migrations_apply_to_an_empty_database() {
             "expected table {expected} to exist, got {tables:?}"
         );
     }
+}
+
+#[tokio::test]
+async fn ai_conversations_are_per_user_and_cascade_with_the_document() {
+    let (_dir, pool) = fresh_db().await;
+    let (user_id, doc_id) = seed(&pool).await;
+    let conversation_id: i64 = sqlx::query_scalar(
+        "INSERT INTO ai_conversations (user_id, document_id) VALUES (?, ?) RETURNING id",
+    )
+    .bind(user_id)
+    .bind(doc_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let message_id: i64 = sqlx::query_scalar(
+        "INSERT INTO ai_messages (conversation_id, role, kind, content)
+         VALUES (?, 'assistant', 'question', 'Answer') RETURNING id",
+    )
+    .bind(conversation_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO ai_message_citations (message_id, page_number, excerpt)
+         VALUES (?, 1, 'Source')",
+    )
+    .bind(message_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let duplicate =
+        sqlx::query("INSERT INTO ai_conversations (user_id, document_id) VALUES (?, ?)")
+            .bind(user_id)
+            .bind(doc_id)
+            .execute(&pool)
+            .await;
+    assert!(
+        duplicate.is_err(),
+        "a user has one conversation per document"
+    );
+
+    sqlx::query("DELETE FROM documents WHERE id = ?")
+        .bind(doc_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let conversations: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM ai_conversations")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let messages: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM ai_messages")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let citations: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM ai_message_citations")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!((conversations, messages, citations), (0, 0, 0));
 }
 
 #[tokio::test]

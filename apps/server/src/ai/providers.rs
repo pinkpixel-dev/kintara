@@ -15,6 +15,7 @@ pub struct GenerateRequest<'a> {
     pub input: &'a str,
     pub reasoning: Option<&'a str>,
     pub temperature: Option<f64>,
+    pub structured_citations: bool,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -38,22 +39,7 @@ async fn openai(
     client: &reqwest::Client,
     request: GenerateRequest<'_>,
 ) -> AppResult<GenerateResult> {
-    let mut body = json!({
-        "model": request.model,
-        "instructions": request.instructions,
-        "input": request.input,
-        "store": false,
-        "max_output_tokens": 1200
-    });
-    if let Some(reasoning) = request.reasoning {
-        body["reasoning"] = json!({ "effort": reasoning });
-    }
-    if request.reasoning == Some("none")
-        && let Some(temperature) = request.temperature
-    {
-        body["temperature"] = json!(temperature);
-    }
-
+    let body = openai_body(&request);
     let value = send_json(
         client
             .post("https://api.openai.com/v1/responses")
@@ -64,21 +50,41 @@ async fn openai(
     parse_openai(&value)
 }
 
+fn openai_body(request: &GenerateRequest<'_>) -> Value {
+    let mut body = json!({
+        "model": request.model,
+        "instructions": request.instructions,
+        "input": request.input,
+        "store": false,
+        "max_output_tokens": 1200
+    });
+    if request.structured_citations {
+        body["text"] = json!({
+            "format": {
+                "type": "json_schema",
+                "name": "document_answer",
+                "strict": true,
+                "schema": citation_schema()
+            }
+        });
+    }
+    if let Some(reasoning) = request.reasoning {
+        body["reasoning"] = json!({ "effort": reasoning });
+    }
+    if request.reasoning == Some("none")
+        && let Some(temperature) = request.temperature
+    {
+        body["temperature"] = json!(temperature);
+    }
+
+    body
+}
+
 async fn google(
     client: &reqwest::Client,
     request: GenerateRequest<'_>,
 ) -> AppResult<GenerateResult> {
-    let mut generation_config = json!({ "max_output_tokens": 1200 });
-    if let Some(thinking) = request.reasoning {
-        generation_config["thinking_level"] = json!(thinking);
-    }
-    let body = json!({
-        "model": request.model,
-        "input": request.input,
-        "system_instruction": request.instructions,
-        "store": false,
-        "generation_config": generation_config
-    });
+    let body = google_body(&request);
     let value = send_json(
         client
             .post("https://generativelanguage.googleapis.com/v1beta/interactions")
@@ -87,6 +93,51 @@ async fn google(
     )
     .await?;
     parse_google(&value)
+}
+
+fn google_body(request: &GenerateRequest<'_>) -> Value {
+    let mut generation_config = json!({ "max_output_tokens": 1200 });
+    if let Some(thinking) = request.reasoning {
+        generation_config["thinking_level"] = json!(thinking);
+    }
+    let mut body = json!({
+        "model": request.model,
+        "input": request.input,
+        "system_instruction": request.instructions,
+        "store": false,
+        "generation_config": generation_config
+    });
+    if request.structured_citations {
+        body["response_format"] = json!({
+            "type": "text",
+            "mime_type": "application/json",
+            "schema": citation_schema()
+        });
+    }
+    body
+}
+
+fn citation_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "answer": { "type": "string" },
+            "citations": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "page": { "type": "integer", "minimum": 1 },
+                        "excerpt": { "type": "string" }
+                    },
+                    "required": ["page", "excerpt"],
+                    "additionalProperties": false
+                }
+            }
+        },
+        "required": ["answer", "citations"],
+        "additionalProperties": false
+    })
 }
 
 async fn send_json(builder: reqwest::RequestBuilder) -> AppResult<Value> {
@@ -210,5 +261,28 @@ mod tests {
             "usage": {"total_input_tokens": 42, "total_output_tokens": 7}
         });
         assert_eq!(parse_google(&value).unwrap().text, "A summary.");
+    }
+
+    #[test]
+    fn structured_requests_disable_provider_storage_and_use_each_api_schema() {
+        let request = GenerateRequest {
+            provider: Provider::OpenAi,
+            api_key: "secret",
+            model: "model",
+            instructions: "instructions",
+            input: "input",
+            reasoning: Some("medium"),
+            temperature: None,
+            structured_citations: true,
+        };
+        let openai = openai_body(&request);
+        assert_eq!(openai["store"], false);
+        assert_eq!(openai["text"]["format"]["type"], "json_schema");
+
+        let google = google_body(&request);
+        assert_eq!(google["store"], false);
+        assert_eq!(google["response_format"]["type"], "text");
+        assert_eq!(google["response_format"]["mime_type"], "application/json");
+        assert!(google.get("temperature").is_none());
     }
 }

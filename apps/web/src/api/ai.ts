@@ -48,6 +48,26 @@ export interface SummaryPreflight {
   approximateInputTokens: number;
   textStatus: string;
   hasSummary: boolean;
+  canSummarize: boolean;
+}
+
+export interface AiCitation { page: number; excerpt: string }
+export interface AiMessage {
+  id: number;
+  role: "user" | "assistant";
+  kind: "question" | "summary";
+  content: string;
+  citations: AiCitation[];
+  createdAt: string;
+}
+export interface AiConversation {
+  conversationId: number | null;
+  documentId: number;
+  messages: AiMessage[];
+}
+export interface AiChatResponse {
+  conversation: AiConversation;
+  updatedDocument: Document | null;
 }
 
 export const aiService = {
@@ -57,6 +77,18 @@ export const aiService = {
   test: () => api.post<{ ok: boolean }>("/api/ai/test"),
   preflight: (documentId: number) =>
     api.get<SummaryPreflight>(`/api/ai/documents/${documentId}/preflight`),
+  conversation: (documentId: number) =>
+    api.get<AiConversation>(`/api/ai/documents/${documentId}/conversation`),
+  ask: (documentId: number, message: string) =>
+    api.post<AiChatResponse>(`/api/ai/documents/${documentId}/conversation`, {
+      action: "ask",
+      message,
+    }),
+  summarizeInChat: (documentId: number, overwrite = false) =>
+    api.post<AiChatResponse>(`/api/ai/documents/${documentId}/conversation`, {
+      action: "summarize",
+      overwrite,
+    }),
   summarize: (documentId: number, overwrite = false) =>
     api.post<Document>(`/api/documents/${documentId}/summarize`, { overwrite }),
 };

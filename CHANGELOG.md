@@ -4,6 +4,41 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-08-22
+
+### 🤖 Document chat
+
+- Replaced the single-result AI panel with a stored, per-user conversation for each
+  accessible document. Questions and follow-ups use page-addressable document text and
+  show the supporting page citations with each answer.
+- Kept provider storage disabled. Kintara replays only the latest conversation messages
+  needed for the next request and rejects oversized document-plus-history input.
+- Moved Summarize below the composer as the first quick action. Summary replacement still
+  shows the provider, model, input estimate, and overwrite warning before anything is sent.
+- Stored shared summaries only for owners and editors. A viewer can ask questions without
+  gaining permission to replace the document summary.
+
+### 🎨 AI panel
+
+- Widened the desktop panel to 440px by default and added pointer, touch, and keyboard
+  resizing. The saved width stays on the current device.
+- Kept the panel as a dismissible mobile drawer. The AI header control is absent when AI
+  is disabled or no document is open.
+- Added transcript bubbles, Markdown answers, source chips, loading state, keyboard send,
+  and a compact composer without redundant helper text.
+
+### 🧪 Tests
+
+- Added real SQLite migration tests for conversation constraints and cascade deletion.
+- Added API coverage that proves two people who share a document cannot read each other's
+  AI transcript.
+- Added provider request checks for structured output and `store: false`, plus frontend
+  width-preference tests. The full server and web suites pass with 157 tests.
+
+### 🏷️ Versioning
+
+- Bumped Kintara from 1.7.1 to 1.8.0 for document chat.
+
 ## [1.7.1] - 2026-08-22
 
 ### 🎨 Interface

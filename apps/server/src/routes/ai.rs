@@ -1,20 +1,21 @@
-use axum::extract::{Path, State};
-use axum::routing::{get, post};
-use axum::{Json, Router};
-use serde::{Deserialize, Serialize};
-
 use crate::access;
 use crate::ai::Provider;
+use crate::ai::credentials::{clean_key, key_context, last_four};
 use crate::ai::models;
 use crate::ai::providers::{self, GenerateRequest};
 use crate::current_user::AuthenticatedUser;
 use crate::error::{AppError, AppResult};
 use crate::secrets;
 use crate::state::AppState;
+use axum::extract::{Path, State};
+use axum::routing::{get, post};
+use axum::{Json, Router};
+use serde::{Deserialize, Serialize};
 
 const DEFAULT_OPENAI_MODEL: &str = "gpt-5.6-terra";
 const DEFAULT_GOOGLE_MODEL: &str = "gemini-3.7-flash";
 const MAX_SUMMARY_INPUT_TOKENS: usize = 250_000;
+
 #[derive(Debug, sqlx::FromRow)]
 struct SettingsRow {
     enabled: bool,
@@ -29,14 +30,12 @@ struct SettingsRow {
     google_thinking: Option<String>,
     temperature: Option<f64>,
 }
-
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyStatus {
     set: bool,
     hint: Option<String>,
 }
-
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AiSettings {
@@ -51,14 +50,12 @@ pub struct AiSettings {
     temperature: Option<f64>,
     usage: UsageTotals,
 }
-
 #[derive(Debug, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct UsageTotals {
     input_tokens: i64,
     output_tokens: i64,
 }
-
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateSettings {
@@ -76,7 +73,6 @@ pub struct UpdateSettings {
     #[serde(default)]
     remove_google_key: bool,
 }
-
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Preflight {
@@ -85,14 +81,13 @@ pub struct Preflight {
     approximate_input_tokens: usize,
     text_status: String,
     has_summary: bool,
+    can_summarize: bool,
 }
-
 #[derive(Debug, Deserialize, Default)]
 pub struct SummarizeRequest {
     #[serde(default)]
     overwrite: bool,
 }
-
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/models", get(model_catalog))
@@ -106,7 +101,6 @@ pub async fn model_catalog(
 ) -> Json<models::ModelCatalog> {
     Json(models::catalog())
 }
-
 async fn load_row(state: &AppState, user_id: i64) -> AppResult<Option<SettingsRow>> {
     Ok(sqlx::query_as(
         "SELECT enabled, provider, openai_api_key, google_api_key,
@@ -118,7 +112,6 @@ async fn load_row(state: &AppState, user_id: i64) -> AppResult<Option<SettingsRo
     .fetch_optional(&state.db)
     .await?)
 }
-
 async fn usage_totals(state: &AppState, user_id: i64) -> AppResult<UsageTotals> {
     let (input_tokens, output_tokens): (i64, i64) = sqlx::query_as(
         "SELECT COALESCE(SUM(input_tokens), 0), COALESCE(SUM(output_tokens), 0)
@@ -132,7 +125,6 @@ async fn usage_totals(state: &AppState, user_id: i64) -> AppResult<UsageTotals> 
         output_tokens,
     })
 }
-
 fn public_settings(row: Option<SettingsRow>, usage: UsageTotals) -> AiSettings {
     let row = row.unwrap_or(SettingsRow {
         enabled: false,
@@ -304,6 +296,7 @@ pub async fn test_connection(
             input: "Test this Kintara AI connection.",
             reasoning: Some(&configured.reasoning),
             temperature: configured.temperature,
+            structured_citations: false,
         },
     )
     .await?;
@@ -329,6 +322,7 @@ pub async fn preflight(
         approximate_input_tokens: approximate_tokens(text),
         text_status: status.unwrap_or_else(|| "failed".into()),
         has_summary: summary.is_some_and(|value| !value.trim().is_empty()),
+        can_summarize: access::can_edit_document(&state, document_id, user_id).await?,
     }))
 }
 
@@ -367,6 +361,7 @@ pub async fn summarize(
             input: text,
             reasoning: Some(&configured.reasoning),
             temperature: configured.temperature,
+            structured_citations: false,
         },
     )
     .await?;
@@ -397,15 +392,18 @@ pub async fn summarize(
     ))
 }
 
-struct ConfiguredProvider {
-    provider: Provider,
-    api_key: String,
-    model: String,
-    reasoning: String,
-    temperature: Option<f64>,
+pub(crate) struct ConfiguredProvider {
+    pub(crate) provider: Provider,
+    pub(crate) api_key: String,
+    pub(crate) model: String,
+    pub(crate) reasoning: String,
+    pub(crate) temperature: Option<f64>,
 }
 
-async fn configured_provider(state: &AppState, user_id: i64) -> AppResult<ConfiguredProvider> {
+pub(crate) async fn configured_provider(
+    state: &AppState,
+    user_id: i64,
+) -> AppResult<ConfiguredProvider> {
     let row = load_row(state, user_id)
         .await?
         .ok_or_else(|| AppError::BadRequest("configure AI in Settings first".into()))?;
@@ -472,32 +470,12 @@ fn approximate_tokens(text: &str) -> usize {
     text.chars().count().div_ceil(4)
 }
 
-fn clean_key(value: Option<&str>) -> Option<&str> {
-    value.map(str::trim).filter(|value| !value.is_empty())
-}
-
-fn last_four(value: &str) -> String {
-    value
-        .chars()
-        .rev()
-        .take(4)
-        .collect::<Vec<_>>()
-        .into_iter()
-        .rev()
-        .collect()
-}
-
-fn key_context(user_id: i64, provider: Provider) -> String {
-    format!("user:{user_id}:{}", provider.as_str())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn token_estimate_rounds_up_and_key_hints_do_not_expose_the_key() {
+    fn token_estimate_rounds_up() {
         assert_eq!(approximate_tokens("12345"), 2);
-        assert_eq!(last_four("sk-abcdefgh"), "efgh");
     }
 }

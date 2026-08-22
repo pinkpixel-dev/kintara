@@ -75,10 +75,12 @@ export function AppHeader({
       />
 
       <div className="flex items-center gap-2 flex-shrink-0 ml-auto pr-2">
-        <button className={`header-icon-btn ${isAiOpen ? "is-active" : ""}`} onClick={onToggleAi}
-          disabled={!aiEnabled} title={aiEnabled ? "Toggle AI tools" : "Enable AI in Settings"} aria-label="Toggle AI tools">
-          <Bot size={18} />
-        </button>
+        {aiEnabled && isReading && activeDocument && (
+          <button className={`header-icon-btn ${isAiOpen ? "is-active" : ""}`} onClick={onToggleAi}
+            title="Toggle AI chat" aria-label="Toggle AI chat">
+            <Bot size={18} />
+          </button>
+        )}
         {isReading && activeDocument && (
           <DocumentActions
             document={activeDocument}

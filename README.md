@@ -23,7 +23,7 @@ live, run it on your NAS, and read them from any device on your network.
 - **Keeps access tied to GitHub.** The first GitHub account becomes the owner, and admins
   invite everyone else by GitHub username. Kintara keeps its own sessions, not passwords.
 - **Adds AI only when you ask for it.** Each person can save their own encrypted OpenAI
-  or Google key, then summarize a document after reviewing exactly what will leave the NAS.
+  or Google key, then chat with a document, ask follow-up questions, and see page citations.
 
 ## Running it
 
@@ -95,9 +95,12 @@ are encrypted before they enter SQLite and are never returned to the browser. Ba
 keys. Supplying `KINTARA_SECRET` instead is useful when your NAS already has a proper
 secret manager.
 
-Before summarizing, Kintara shows the provider, model, approximate input tokens, and a
-warning that the document text will leave the NAS. OpenAI and Google requests always set
-`store: false`. There is no automatic or background AI processing.
+The AI button appears only after you enable AI and open a document. Ask a question in the
+right panel or use the Summarize action below the composer. Before a summary request,
+Kintara shows the provider, model, approximate input tokens, and replacement warning.
+OpenAI and Google requests always set `store: false`. Kintara stores each person's chat
+history itself and sends only recent messages needed for a follow-up. There is no
+automatic or background AI processing.
 
 ## Developing
 
@@ -106,7 +109,7 @@ You need Rust, Node, and `poppler-utils` (for `pdfinfo`, `pdftoppm`, and `pdftot
 ```bash
 npm install
 npm run dev      # starts the API on :8080 and the frontend on :1420
-npm test         # 146 tests, no mocks
+npm test         # 157 tests, no mocks
 ```
 
 `npm run dev` runs both halves — the frontend proxies `/api` to the server, so starting

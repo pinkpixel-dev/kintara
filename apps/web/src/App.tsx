@@ -479,7 +479,7 @@ function App() {
           onClose={() => setDetailsDocument(null)}
         />
       )}
-      {isAiOpen && <AiPanel document={viewMode === "reading" ? activeDocument : null} onClose={() => setIsAiOpen(false)} onUpdated={(updated) => { replaceDocument(updated); setDocuments((items) => items.map((item) => item.id === updated.id ? updated : item)); }} />}
+      {isAiOpen && viewMode === "reading" && activeDocument && <AiPanel document={activeDocument} onClose={() => setIsAiOpen(false)} onUpdated={(updated) => { replaceDocument(updated); setDocuments((items) => items.map((item) => item.id === updated.id ? updated : item)); }} />}
     </div>
   );
 }
