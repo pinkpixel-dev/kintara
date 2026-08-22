@@ -25,7 +25,6 @@ pub const GOOGLE_MODELS: &[&str] = &[
     "gemini-3.1-flash-lite",
     "gemini-3.1-pro-preview",
     "gemini-3-flash-preview",
-    "gemini-2.5-pro",
 ];
 
 /// Image models, from the lists approved in `ROADMAP.md`.
@@ -121,9 +120,7 @@ pub fn openai_reasoning(model: &str) -> &'static [&'static str] {
 
 pub fn google_thinking(model: &str) -> &'static [&'static str] {
     match model {
-        "gemini-3.7-flash" | "gemini-3.1-pro-preview" | "gemini-2.5-pro" => {
-            GOOGLE_NO_MINIMAL_THINKING
-        }
+        "gemini-3.7-flash" | "gemini-3.1-pro-preview" => GOOGLE_NO_MINIMAL_THINKING,
         _ => GOOGLE_ALL_THINKING,
     }
 }
@@ -169,12 +166,13 @@ mod tests {
     #[test]
     fn google_thinking_levels_follow_each_models_documented_capabilities() {
         assert!(!google_thinking("gemini-3.7-flash").contains(&"minimal"));
-        assert!(!google_thinking("gemini-2.5-pro").contains(&"minimal"));
+        assert!(!google_thinking("gemini-3.1-pro-preview").contains(&"minimal"));
         assert!(google_thinking("gemini-3.1-flash-lite").contains(&"minimal"));
     }
 
     #[test]
-    fn unavailable_gemini_25_flash_models_are_not_selectable() {
+    fn unavailable_gemini_25_text_models_are_not_selectable() {
+        assert!(!validate_model(Provider::Google, "gemini-2.5-pro"));
         assert!(!validate_model(Provider::Google, "gemini-2.5-flash"));
         assert!(!validate_model(Provider::Google, "gemini-2.5-flash-lite"));
     }

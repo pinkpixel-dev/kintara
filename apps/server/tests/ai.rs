@@ -95,7 +95,7 @@ async fn invalid_parameter_combinations_are_rejected_before_any_provider_call() 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 
     let mut invalid_google = settings(Some("sk-test"), true);
-    invalid_google["googleModel"] = json!("gemini-2.5-flash-lite");
+    invalid_google["googleModel"] = json!("gemini-2.5-pro");
     let response = json_with_cookie(&app, "PUT", "/api/ai/settings", &cookie, invalid_google).await;
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
@@ -117,7 +117,7 @@ async fn removed_google_models_fall_back_to_the_current_default() {
         StatusCode::OK
     );
     sqlx::query(
-        "UPDATE user_ai_settings SET google_model = 'gemini-2.5-flash-lite',
+        "UPDATE user_ai_settings SET google_model = 'gemini-2.5-pro',
          google_thinking = 'low' WHERE user_id = ?",
     )
     .bind(user_id)

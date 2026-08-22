@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.13.3] - 2026-08-22
+
+### 🐛 AI models
+
+- Removed Gemini 2.5 Pro from the selectable catalog after the provider reported that it
+  is unavailable to new users. Kintara now offers Gemini 3.x text models only.
+- Existing Gemini 2.5 selections load with Gemini 3.7 Flash. Gemini 3.1 Pro Preview remains
+  available as Google's recommended replacement for 2.5 Pro.
+
+### 🧪 Tests
+
+- Added catalog and saved-settings coverage for the removal of all Gemini 2.5 text models.
+
+### 🏷️ Versioning
+
+- Bumped Kintara from 1.13.2 to 1.13.3.
+
 ## [1.13.2] - 2026-08-22
 
 ### 🤖 AI chat
