@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.13.1] - 2026-08-22
+
+### 🧹 Cleanup
+
+- Removed the unfinished Linked Mentions panel from the Markdown reader. The panel exposed
+  a backlinks heading for a feature that does not exist.
+- Removed the unused icon import and CSS rules that only supported that panel.
+
+### 📚 Documentation
+
+- Rebuilt the README around the current server-first application and added the 300×300
+  Kintara logo.
+- Added complete Docker Compose instructions for storage, permissions, GitHub OAuth,
+  reverse proxies, updates, backups, owner recovery, troubleshooting, and local builds.
+
+### 🧪 Tests
+
+- Added a frontend copy check that keeps unfinished Linked Mentions and backlinks text out
+  of the interface.
+
+### 🏷️ Versioning
+
+- Bumped Kintara from 1.13.0 to 1.13.1 for the cleanup and documentation closeout.
+
 ## [1.13.0] - 2026-08-22
 
 ### 🖼️ Cover editing

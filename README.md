@@ -1,32 +1,112 @@
+<p align="center">
+  <img src="assets/logo.png" alt="Kintara logo" width="300" height="300">
+</p>
+
 # Kintara
 
-A self-hosted document library and reader. Point it at the folder where your PDFs already
-live, run it on your NAS, and read them from any device on your network.
+Kintara is a self-hosted document library and reader. It watches an existing document
+folder, indexes its contents, and serves the library through a browser or installable PWA.
 
-## What it does
+## What Kintara does
 
-- **Watches a folder.** Copy a PDF onto your share over SMB and it appears in the library,
-  with its title, author, page count, and a cover pulled out automatically. Rename or
-  delete it on the share and Kintara keeps up.
-- **Reads in the browser.** PDFs stream with range requests, so page turns are quick even
-  on a phone and a large scan does not have to download in full first.
-- **Keeps each person's libraries separate.** Your libraries are private until you share
-  one with another Kintara user as a viewer or editor. Deleting a library never deletes
-  the document files inside it.
-- **Searches where you are looking.** Open a library or collection and the search box
-  searches inside it, with one click to widen the same query to everything. It matches
-  titles, authors, keywords, summaries, and tag names.
-- **Highlights and remembers where you were.** Per user, so two people reading the same
-  paper do not fight over the bookmark.
-- **Installs as an app.** It is a PWA, so you can add it to a home screen and it opens
-  like anything else.
-- **Keeps access tied to GitHub.** The first GitHub account becomes the owner, and admins
-  invite everyone else by GitHub username. Kintara keeps its own sessions, not passwords.
-- **Adds AI only when you ask for it.** Each person can save their own encrypted OpenAI
-  or Google key, then chat with a document, ask follow-up questions, see page citations,
-  and review metadata suggestions before saving them.
+- Watches one folder for PDF, Markdown, and text documents.
+- Extracts PDF metadata, searchable text, page counts, and cover thumbnails with Poppler.
+- Streams PDFs with HTTP Range support, so large files do not need one full download.
+- Keeps libraries, collections, highlights, favorites, and reading progress per user.
+- Supports private libraries with viewer and editor sharing.
+- Uses GitHub OAuth for sign-in and administrator invitations for new accounts.
+- Offers optional OpenAI and Google features with a separate provider key for each user.
 
-## Running it
+Kintara runs as one Rust server. The server hosts the API and the built React frontend on
+the same port.
+
+## Install with Docker Compose
+
+### Requirements
+
+Prepare these items before you start:
+
+- Docker Engine with the Docker Compose plugin
+- A folder that contains your documents
+- A local folder for Kintara data
+- A GitHub OAuth app
+- The user ID and group ID that can access the document folder
+
+The published image supports `linux/amd64` and `linux/arm64`.
+
+### 1. Prepare the folders
+
+Create one folder for the Compose file and Kintara data. Keep the data folder on a local
+disk.
+
+```bash
+mkdir -p ~/kintara/data
+cd ~/kintara
+```
+
+Your document folder can be an existing NAS share. The container mounts this folder at
+`/library`.
+
+Kintara stores its SQLite database, thumbnails, sessions, and encryption key under
+`/data`. Do not put `/data` on SMB or NFS. SQLite can corrupt on a network filesystem.
+
+### 2. Find the share owner
+
+Run these commands on the Docker host. Replace `yourname` with the account that owns the
+document folder.
+
+```bash
+id -u yourname
+id -g yourname
+```
+
+Use the two returned numbers for `PUID` and `PGID`. Kintara uses this identity for uploads,
+cover files, and deletions. The container does not change ownership of the document folder.
+
+### 3. Create the GitHub OAuth app
+
+Open your GitHub developer settings and create an OAuth app for Kintara. Use the address
+that readers will enter in their browsers.
+
+For this example, the Kintara address is:
+
+```text
+https://kintara.example.com
+```
+
+Set the authorization callback URL to:
+
+```text
+https://kintara.example.com/api/auth/github/callback
+```
+
+The scheme, host, and port must match the browser address. The callback path must be
+exactly `/api/auth/github/callback`. Copy the client ID and create a client secret.
+
+### 4. Create the environment file
+
+Save the deployment values in `~/kintara/.env`. Replace every example value.
+
+```dotenv
+PUID=1000
+PGID=1000
+KINTARA_PUBLIC_URL=https://kintara.example.com
+KINTARA_GITHUB_CLIENT_ID=your-oauth-client-id
+KINTARA_GITHUB_CLIENT_SECRET=your-oauth-client-secret
+```
+
+Limit access to this file because it contains the OAuth client secret.
+
+```bash
+chmod 600 .env
+```
+
+Do not commit `.env` to the repository.
+
+### 5. Create `compose.yaml`
+
+Save this file as `compose.yaml` inside `~/kintara`. Replace the example values before you
+start the container.
 
 ```yaml
 services:
@@ -34,124 +114,268 @@ services:
     image: ghcr.io/pinkpixel-dev/kintara:latest
     container_name: kintara
     restart: unless-stopped
+
     ports:
       - "8080:8080"
+
     environment:
-      # Match the owner of your library share, or uploads will fail.
-      # Find them with `id -u yourname` and `id -g yourname`.
-      PUID: 1000
-      PGID: 1000
-      KINTARA_PUBLIC_URL: https://kintara.example.com
-      KINTARA_GITHUB_CLIENT_ID: your-oauth-app-client-id
-      KINTARA_GITHUB_CLIENT_SECRET: set-this-in-your-nas-secret-manager
+      PUID: "${PUID}"
+      PGID: "${PGID}"
+      TZ: Etc/UTC
+      KINTARA_PUBLIC_URL: "${KINTARA_PUBLIC_URL}"
+      KINTARA_GITHUB_CLIENT_ID: "${KINTARA_GITHUB_CLIENT_ID}"
+      KINTARA_GITHUB_CLIENT_SECRET: "${KINTARA_GITHUB_CLIENT_SECRET}"
+
     volumes:
-      - /volume1/documents:/library   # your PDFs
-      - ./kintara-data:/data          # database and thumbnails
+      - /path/to/your/documents:/library
+      - ./data:/data
+
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 ```
 
-Create a GitHub OAuth app for the URL you use to reach Kintara. Set its callback URL to
-`https://kintara.example.com/api/auth/github/callback`, then set the three matching
-variables above. Open Kintara and continue with GitHub. The first GitHub account becomes
-the installation owner; after that, an admin must invite each GitHub username in
-Settings. Each invited person starts with an empty personal library area.
+The repository also contains a commented example at
+[`docker/docker-compose.yml`](docker/docker-compose.yml).
 
-Library owners can share a library from its settings after the other person has signed in
-once. A viewer can read its documents. An editor can also manage its documents and
-collections. The person who owns a document remains the only person who can permanently
-delete its file.
+### 6. Start Kintara
 
-Files found by the NAS scanner belong to the installation owner. Files uploaded through
-the browser belong to the person who uploaded them. Browser uploads finish text extraction
-before they appear, so search and AI can use them immediately. The sidebar keeps owned and
-shared libraries in separate collapsible sections, so another person's filing system can
-stay out of the way until you need it.
+Pull the image and start the service.
 
-A ready-to-edit compose file is in [`docker/docker-compose.yml`](docker/docker-compose.yml).
+```bash
+docker compose pull
+docker compose up -d
+```
 
-### Keep `/data` off the share
+Make sure that the container becomes healthy.
 
-`/library` is your documents and is usually a network share. `/data` holds the SQLite
-database and must be on local disk — SQLite over SMB or NFS corrupts, and it is not a
-subtle failure.
+```bash
+docker compose ps
+curl http://127.0.0.1:8080/api/health
+```
 
-### Configuration
+The health endpoint returns the server status, version, and indexed document count. It
+also runs a database query, so a broken data mount does not report as healthy.
 
-| Variable | Default | What it does |
+Open the configured Kintara address. The first GitHub account to sign in becomes the
+installation owner. An administrator must invite each later account by GitHub username.
+
+## Docker storage and permissions
+
+Kintara uses two separate mounts:
+
+| Container path | Contents | Storage rule |
 |---|---|---|
-| `PUID` / `PGID` | `1000` | User the server runs as. Match your share's owner. |
-| `KINTARA_BIND` | `0.0.0.0:8080` | Listen address. |
-| `KINTARA_SCAN_ON_START` | `true` | Sweep the library at startup. |
-| `KINTARA_WATCH` | `true` | Watch for changes while running. Turn off if your share does not report filesystem events. |
-| `KINTARA_MAX_UPLOAD_MB` | `1024` | Largest upload accepted. Magazine scans are big. |
-| `KINTARA_LOG` | `kintara_server=info` | Log filter. |
-| `KINTARA_PUBLIC_URL` | none | Public Kintara origin used to build the OAuth callback. Required with GitHub credentials. |
-| `KINTARA_GITHUB_CLIENT_ID` | none | GitHub OAuth app client id. |
-| `KINTARA_GITHUB_CLIENT_SECRET` | none | GitHub OAuth app client secret. Keep it out of the compose file when your NAS supports secrets. |
-| `KINTARA_SECRET` | generated file | Optional 32+ character source for provider-key encryption. Otherwise `/data/kintara-ai.key` is created. |
+| `/library` | PDF, Markdown, and text documents | Can be an existing NAS share |
+| `/data` | SQLite, thumbnails, sessions, and `kintara-ai.key` | Must be on local storage |
 
-### AI keys and privacy
+The startup script changes ownership of `/data` to `PUID` and `PGID`. It never changes
+ownership of `/library`. If `/library` is not writable, reading and scanning still work.
+Uploads, cover writes, and permanent deletion will fail.
 
-AI is disabled per account until that person saves a provider key and turns it on. Keys
-are encrypted before they enter SQLite and are never returned to the browser. Back up
-`/data/kintara-ai.key` with `kintara.db`; losing it means replacing the saved provider
-keys. Supplying `KINTARA_SECRET` instead is useful when your NAS already has a proper
-secret manager.
+Files discovered by the scanner belong to the installation owner. Browser uploads belong
+to the account that uploaded them.
 
-The AI button appears only after you enable AI and open a document. Ask a question in the
-right panel or use the Summarize action below the composer. Before a summary request,
-Kintara shows the provider, model, approximate input tokens, and replacement warning.
-Document owners and shared-library editors can also choose Suggest metadata with AI in Details.
-Kintara shows the provider, model, and input estimate before sending readable document
-text, then returns field-by-field candidates to review. It does not invent a missing
-author or publication year, and applying a candidate does not write anything until Save
-Details is pressed. Details also lets editors upload or replace a cover, including the
-first-page cover extracted from a PDF, or open the same generator found in the AI panel's
-Cover tab. The generator can use document metadata or a custom prompt, previews one
-candidate, and writes it only after Accept. A custom cover request sends only that prompt;
-the standard cover request sends title, author, keywords, and summary. Neither sends
-document text. OpenAI and Google text requests always set `store: false`. Kintara
-stores each person's chat history itself and sends only recent messages needed for a
-follow-up. There is no automatic or background AI processing.
+## Docker configuration
 
-## Developing
+| Variable | Default | Purpose |
+|---|---|---|
+| `PUID` | `1000` | User ID that runs Kintara |
+| `PGID` | `1000` | Group ID that runs Kintara |
+| `TZ` | Image default | Container timezone |
+| `KINTARA_BIND` | `0.0.0.0:8080` | Server listen address |
+| `KINTARA_SCAN_ON_START` | `true` | Scans the full document folder during startup |
+| `KINTARA_WATCH` | `true` | Watches the document folder for live changes |
+| `KINTARA_MAX_UPLOAD_MB` | `1024` | Maximum browser upload size in megabytes |
+| `KINTARA_LOG` | `kintara_server=info,tower_http=warn,warn` | Rust tracing filter |
+| `KINTARA_PUBLIC_URL` | none | Browser origin used for the OAuth callback |
+| `KINTARA_GITHUB_CLIENT_ID` | none | GitHub OAuth client ID |
+| `KINTARA_GITHUB_CLIENT_SECRET` | none | GitHub OAuth client secret |
+| `KINTARA_SECRET` | generated file | Optional provider-key encryption source of 32 or more characters |
 
-You need Rust, Node, and `poppler-utils` (for `pdfinfo`, `pdftoppm`, and `pdftotext`).
+GitHub login stays disabled unless all three OAuth variables are set. Kintara stops during
+startup if only part of the OAuth configuration is present.
+
+If `KINTARA_SECRET` is absent, Kintara creates `/data/kintara-ai.key`. Back up this key
+with the database. Saved OpenAI and Google keys cannot be decrypted without it.
+
+Some network shares do not report filesystem events. Set `KINTARA_WATCH: "false"` if the
+watcher cannot follow your share. Keep `KINTARA_SCAN_ON_START` enabled so each restart
+finds changes.
+
+## Reverse proxies
+
+Set `KINTARA_PUBLIC_URL` to the browser-facing origin, not the container address. For
+example, use `https://kintara.example.com` when a reverse proxy sends traffic to port
+`8080`.
+
+The GitHub callback must use the same origin:
+
+```text
+https://kintara.example.com/api/auth/github/callback
+```
+
+Kintara serves the API, frontend, document streams, and OAuth routes from one origin. The
+proxy must pass normal requests and HTTP Range headers to the container.
+
+## Update the container
+
+Pull the current image and recreate the service.
+
+```bash
+cd ~/kintara
+docker compose pull
+docker compose up -d
+```
+
+Then make sure that the new container is healthy.
+
+```bash
+docker compose ps
+docker compose logs --tail=100 kintara
+```
+
+Database migrations run when the new server starts. Back up `/data` before each update.
+
+## Back up and restore
+
+The document folder remains your source library. Back up the full `/data` mount to keep
+accounts, libraries, collections, reading state, thumbnails, and saved provider keys.
+
+Stop Kintara before you copy the data folder. This gives the backup a consistent SQLite
+state.
+
+```bash
+cd ~/kintara
+docker compose stop kintara
+tar -C . -czf "kintara-data-$(date +%Y-%m-%d).tar.gz" data
+docker compose start kintara
+```
+
+CAUTION: A restore replaces the current database, sessions, and provider-key encryption
+file. Keep the current data folder until the restored installation works.
+
+To restore, stop Kintara and place the backed-up `data` folder beside `compose.yaml`. Then
+start the service and make sure that it becomes healthy.
+
+## Logs and troubleshooting
+
+### The container does not become healthy
+
+Read the startup log.
+
+```bash
+docker compose logs --tail=200 kintara
+```
+
+Make sure that `/data` is writable and stored on local disk. Also make sure that port
+`8080` is available on the host.
+
+### GitHub login is not configured
+
+Set all three GitHub variables. Then restart the service.
+
+```bash
+docker compose up -d
+```
+
+Make sure that `KINTARA_PUBLIC_URL` and the callback in GitHub use the same origin.
+
+### Uploads or deletions fail
+
+Compare `PUID` and `PGID` with the owner of the mounted document folder. The startup log
+warns when the container cannot write to `/library`.
+
+### Files copied to the share do not appear
+
+Restart Kintara to run the startup scan.
+
+```bash
+docker compose restart kintara
+```
+
+If the restart finds the files, the share does not send usable watcher events. Disable
+`KINTARA_WATCH` and keep startup scanning enabled.
+
+### Recover the installation owner
+
+Use the local recovery command if the installation owner loses GitHub access. The command
+needs the numeric GitHub user ID and current login.
+
+```bash
+docker compose run --rm kintara \
+  /app/kintara-server recover-owner GITHUB_NUMERIC_ID GITHUB_LOGIN
+```
+
+This command changes the installation administrator and deletes existing sessions. Sign
+in again after it finishes.
+
+## Build the image locally
+
+Clone the repository and run the build from its root.
+
+```bash
+docker build -f docker/Dockerfile -t kintara:local .
+```
+
+Change the Compose image to `kintara:local` before you start the local build. The
+multi-stage Dockerfile builds the React frontend and Rust server, then adds Poppler to a
+slim Debian runtime.
+
+## AI keys and privacy
+
+AI is disabled for each account until that person saves a provider key and enables it.
+Kintara encrypts provider keys before they enter SQLite. The browser never receives a
+saved key.
+
+OpenAI Responses and Google Interactions requests use `store: false`. OpenAI image
+generation has no matching retention setting, so Kintara discloses that exception before
+the request. Kintara does not run automatic or background AI processing.
+
+## Development
+
+Install Rust, Node.js, and `poppler-utils`.
 
 ```bash
 npm install
-npm run dev      # starts the API on :8080 and the frontend on :1420
-npm test         # 230 tests, no mocks
+npm run dev
+npm test
 ```
 
-`npm run dev` runs both halves — the frontend proxies `/api` to the server, so starting
-only one gives you an app that cannot reach its backend. Point the proxy elsewhere with
-`KINTARA_DEV_API`.
+`npm run dev` starts the API on port `8080` and Vite on port `1420`. Vite proxies `/api`
+to the Rust server. Set `KINTARA_DEV_API` to use another API address.
 
-To run it the way the NAS does, build the frontend once and let the server host it:
+Build the frontend and let the Rust server host it:
 
 ```bash
 npm run build
-cd apps/server && cargo run    # everything on :8080, no proxy involved
+cd apps/server
+cargo run
 ```
 
-### Layout
+## Repository layout
 
-```
+```text
 apps/
-  server/   Rust + Axum. Serves the API and the built frontend.
-  web/      React + Vite. Talks to the API over HTTP, nothing else.
-assets/     Source icon, logo, and the packaging icon set.
-docker/     Dockerfile, entrypoint, compose file.
+  server/   Rust and Axum API, scanner, authentication, and static hosting
+  web/      React and Vite PWA
+assets/     Brand images and package icons
+docker/     Dockerfile, entrypoint, and Compose example
+scripts/    Project checks and asset utilities
 ```
 
 ## Known limits
 
-- The PDF reader has no pinch-zoom or swipe paging yet.
-- Single library root. Multiple shares are not supported.
+- The PDF reader has no pinch zoom or swipe paging.
+- Kintara supports one document root per installation.
+- Kintara does not provide an OPDS feed.
 
 ## License
 
-Apache 2.0. See [LICENSE](LICENSE).
+Kintara uses the Apache License 2.0. See [LICENSE](LICENSE).
 
 ---
 

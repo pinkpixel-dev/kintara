@@ -6,7 +6,6 @@ import { codeToHtml } from "shiki";
 import { annotationService, documentService, type Annotation } from "../api";
 import { onHighlightRequest, reportHighlight } from "../lib/reader-events";
 import "./MarkdownReader.css";
-import { Link } from "lucide-react";
 
 interface MarkdownReaderProps {
   documentId: number;
@@ -212,14 +211,6 @@ export const MarkdownReader: React.FC<MarkdownReaderProps> = ({ documentId }) =>
       >
         {processContent(content)}
       </ReactMarkdown>
-
-      {/* Render Backlinks panel below content */}
-      <div className="markdown-backlinks">
-        <h3 className="markdown-backlinks-title">
-          <Link size={18} className="text-[var(--accent)]" />
-          Linked Mentions
-        </h3>
-      </div>
     </div>
   );
 };

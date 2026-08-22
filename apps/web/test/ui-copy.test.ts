@@ -29,6 +29,13 @@ test("redundant helper copy stays out of the interface", async () => {
   }
 });
 
+test("unfinished feature copy stays out of the interface", async () => {
+  const source = await component("MarkdownReader.tsx");
+
+  assert.doesNotMatch(source, /Linked Mentions/);
+  assert.doesNotMatch(source, /backlinks engine/i);
+});
+
 test("authentication copy is deployment neutral", async () => {
   const source = await component("AuthGate.tsx");
 
