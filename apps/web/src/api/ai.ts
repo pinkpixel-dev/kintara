@@ -12,6 +12,8 @@ export interface ModelCapability {
 export interface ModelCatalog {
   openai: ModelCapability[];
   google: ModelCapability[];
+  openaiImage: string[];
+  googleImage: string[];
 }
 
 export interface KeyStatus { set: boolean; hint: string | null }
@@ -25,6 +27,8 @@ export interface AiSettings {
   openaiReasoning: string;
   googleThinking: string;
   temperature: number | null;
+  openaiImageModel: string;
+  googleImageModel: string;
   usage: { inputTokens: number; outputTokens: number };
 }
 
@@ -36,6 +40,8 @@ export interface UpdateAiSettings {
   openaiReasoning: string;
   googleThinking: string;
   temperature: number | null;
+  openaiImageModel: string;
+  googleImageModel: string;
   openaiApiKey?: string;
   googleApiKey?: string;
   removeOpenaiKey?: boolean;
@@ -49,6 +55,18 @@ export interface SummaryPreflight {
   textStatus: string;
   hasSummary: boolean;
   canSummarize: boolean;
+  imageModel: string;
+  hasCover: boolean;
+  /** True when this provider's image endpoint cannot disable retention. */
+  imageStoredByProvider: boolean;
+}
+
+export interface CoverCandidate {
+  imageBase64: string;
+  mimeType: string;
+  provider: AiProvider;
+  model: string;
+  storedByProvider: boolean;
 }
 
 /**
@@ -118,6 +136,8 @@ export const aiService = {
       action: "summarize",
       overwrite,
     }),
+  generateCover: (documentId: number) =>
+    api.post<CoverCandidate>(`/api/ai/documents/${documentId}/cover`, {}),
   find: (documentId: number, request: string) =>
     api.post<{ passages: AiPassage[] }>(`/api/ai/documents/${documentId}/find`, { request }),
   search: (request: string, scope: { libraryId?: number; collectionId?: number } = {}) =>

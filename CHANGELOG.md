@@ -4,6 +4,66 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-08-22
+
+### 🖼️ Cover generation
+
+- Added a Cover tab to the AI panel. It builds a prompt from the document's title, author,
+  keywords, and summary, generates one candidate, and shows it for a decision. Accept,
+  Regenerate, or Discard.
+- Never sends document text. A cover does not need it, and a PDF should not be able to
+  talk the model into drawing something else.
+- Asks for no lettering in the image. Both providers still render text imperfectly, and a
+  misspelt title on a cover is worse than no title when the real one sits under the tile.
+- Writes nothing until Accept. The candidate lives in the panel; closing it throws the
+  image away and leaves no server-side state behind.
+- Accepting goes through the existing cover upload route, so a generated image lands the
+  same way a hand-picked one does: editor permission, format allowlist, and a fresh
+  filename each time.
+- Added image model selection per provider in Settings, defaulting to `gpt-image-2` and
+  `gemini-3.1-flash-image`. Migration `0009_ai_image_models.sql`.
+
+### 🔒 Retention
+
+- Disclosed the one request Kintara cannot send with storage disabled. Google generates
+  images through the same Interactions endpoint as everything else, so `store: false`
+  still applies; OpenAI's Images endpoint has no such parameter. The confirmation dialog
+  and the AI settings panel both say so before anything is sent.
+
+### 🐛 Fixes
+
+- Fixed a replaced cover staying invisible. `/documents/{id}/thumbnail` is a stable URL
+  served with a week-long `max-age`, so the grid kept showing the old image; documents now
+  carry a `coverVersion` the tile appends to bust it. The details panel already worked
+  around this on its own.
+- Gave image requests their own 180-second timeout. The shared 90-second client limit is
+  below the two minutes OpenAI documents for a complex image prompt.
+- Named a content-filter refusal as one, since the fix is to change the document's
+  metadata rather than to retry.
+
+### 🧹 Maintenance
+
+- Split per-user AI configuration into `routes/ai_settings.rs`, which brought
+  `routes/ai.rs` back under the file size limit.
+- Split the AI route tests into `tests/ai.rs` for keys and settings and
+  `tests/ai_features.rs` for search, find, and cover, moving their shared sign-in helpers
+  into the common harness.
+
+### 🧪 Tests
+
+- Added coverage for both providers' image request and response shapes, including that
+  Google still disables storage, that OpenAI has no field to disable it with, and that an
+  interim Gemini "thought" image is not mistaken for the finished one.
+- Added coverage for the cover prompt: metadata only, blank fields omitted, a runaway
+  summary clamped, and the no-lettering instruction present.
+- Added route coverage proving cover generation is refused for disabled AI, for an
+  unsupported image model at save time, and for a viewer on someone else's document.
+- The full server and web suites pass with 208 tests.
+
+### 🏷️ Versioning
+
+- Bumped Kintara from 1.10.0 to 1.11.0 for cover generation.
+
 ## [1.10.0] - 2026-08-22
 
 ### 🔦 Find in a document

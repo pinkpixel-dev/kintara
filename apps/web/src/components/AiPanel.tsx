@@ -8,6 +8,7 @@ import {
 } from "react";
 import { Bot, Send, Sparkles, X } from "lucide-react";
 import { AiFindMode } from "./AiFindMode";
+import { AiCoverMode } from "./AiCoverMode";
 import ReactMarkdown from "react-markdown";
 import { ApiError, aiService, type AiConversation, type Document, type SummaryPreflight } from "../api";
 import {
@@ -32,7 +33,7 @@ export function AiPanel({ document, onClose, onUpdated }: Props) {
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<"chat" | "find">("chat");
+  const [mode, setMode] = useState<"chat" | "find" | "cover">("chat");
   const [width, setWidth] = useState(() =>
     loadAiPanelWidth(typeof localStorage === "undefined" ? null : localStorage));
   const transcriptRef = useRef<HTMLDivElement>(null);
@@ -157,9 +158,27 @@ export function AiPanel({ document, onClose, onUpdated }: Props) {
         >
           Find
         </button>
+        <button
+          type="button"
+          className={mode === "cover" ? "search-mode-option active" : "search-mode-option"}
+          aria-pressed={mode === "cover"}
+          onClick={() => setMode("cover")}
+        >
+          Cover
+        </button>
       </div>
 
       {mode === "find" && <AiFindMode document={document} preflight={preflight} />}
+      {mode === "cover" && (
+        <AiCoverMode
+          document={document}
+          preflight={preflight}
+          onUpdated={(updated) => {
+            onUpdated(updated);
+            setPreflight((current) => (current ? { ...current, hasCover: true } : current));
+          }}
+        />
+      )}
 
       {mode === "chat" && <>
       <div className="ai-transcript" ref={transcriptRef} aria-live="polite">

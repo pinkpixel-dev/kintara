@@ -13,6 +13,7 @@ use axum::body::Body;
 use axum::http::Request;
 use axum::response::Response;
 use http_body_util::BodyExt;
+use kintara_server::auth::GitHubIdentity;
 use kintara_server::config::Config;
 use kintara_server::state::AppState;
 use kintara_server::{auth, db, routes};
@@ -407,4 +408,90 @@ pub fn sample_pdf() -> Vec<u8> {
         .as_bytes(),
     );
     out
+}
+
+// ---------------------------------------------------------------------------
+// AI test helpers
+//
+// Shared by `ai.rs` and `ai_features.rs`, which split when one file outgrew the
+// size limit. Sign-in goes through the real GitHub identity path because that
+// is the only way to get a session.
+// ---------------------------------------------------------------------------
+
+pub fn state_of(app: &TestApp) -> AppState {
+    AppState::new(app.db.clone(), app.config.clone())
+}
+
+pub async fn signed_in_owner(app: &TestApp) -> (i64, String) {
+    let state = state_of(app);
+    let user_id = auth::resolve_github_user(
+        &state,
+        &GitHubIdentity {
+            id: 101,
+            login: "owner".into(),
+            avatar_url: None,
+        },
+    )
+    .await
+    .unwrap();
+    let session = auth::create_session(&state, user_id).await.unwrap();
+    (user_id, format!("kintara_session={session}"))
+}
+
+pub async fn invited_user(app: &TestApp, owner_id: i64, login: &str, github_id: i64) -> i64 {
+    sqlx::query("INSERT INTO github_invitations (github_login, invited_by) VALUES (?, ?)")
+        .bind(login)
+        .bind(owner_id)
+        .execute(&app.db)
+        .await
+        .unwrap();
+    auth::resolve_github_user(
+        &state_of(app),
+        &GitHubIdentity {
+            id: github_id,
+            login: login.into(),
+            avatar_url: None,
+        },
+    )
+    .await
+    .unwrap()
+}
+
+pub async fn json_with_cookie(
+    app: &TestApp,
+    method: &str,
+    uri: &str,
+    cookie: &str,
+    body: serde_json::Value,
+) -> Response {
+    app.request(
+        Request::builder()
+            .method(method)
+            .uri(uri)
+            .header("content-type", "application/json")
+            .header("cookie", cookie)
+            .body(Body::from(body.to_string()))
+            .unwrap(),
+    )
+    .await
+}
+
+/// A complete settings payload. Every field is required by the API, so tests
+/// start from a valid one and change only what they are exercising.
+pub fn ai_settings(openai_key: Option<&str>, enabled: bool) -> serde_json::Value {
+    serde_json::json!({
+        "enabled": enabled,
+        "provider": "openai",
+        "openaiModel": "gpt-5.6-terra",
+        "googleModel": "gemini-3.7-flash",
+        "openaiReasoning": "medium",
+        "googleThinking": "medium",
+        "temperature": null,
+        "openaiImageModel": "gpt-image-2",
+        "googleImageModel": "gemini-3.1-flash-image",
+        "openaiApiKey": openai_key,
+        "googleApiKey": null,
+        "removeOpenaiKey": false,
+        "removeGoogleKey": false
+    })
 }

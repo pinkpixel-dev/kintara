@@ -1,5 +1,6 @@
 pub mod credentials;
 pub mod document_context;
+pub mod images;
 pub mod models;
 pub mod providers;
 pub mod search_rewrite;

@@ -82,7 +82,11 @@ export function DocumentCard({
     >
       <div className="document-card-thumb">
         {document.hasThumbnail ? (
-          <img src={documentUrls.thumbnail(document.id)} alt="" loading="lazy" />
+          <img
+            src={`${documentUrls.thumbnail(document.id)}?v=${document.coverVersion ?? ""}`}
+            alt=""
+            loading="lazy"
+          />
         ) : (
           <FileText size={48} className="text-muted opacity-50" aria-hidden="true" />
         )}

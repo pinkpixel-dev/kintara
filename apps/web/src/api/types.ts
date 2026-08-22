@@ -24,6 +24,13 @@ export interface Document {
   readingProgress: number;
   isFavorite: boolean;
   hasThumbnail: boolean;
+  /**
+   * Cache key for the cover image, or null when there is none.
+   *
+   * The thumbnail URL is stable but served with a week-long max-age, so a
+   * replaced cover needs this appended to be seen at all.
+   */
+  coverVersion: string | null;
 }
 
 export interface Library {

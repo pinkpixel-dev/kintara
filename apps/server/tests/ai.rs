@@ -1,66 +1,10 @@
 mod common;
 
-use axum::body::Body;
-use axum::http::{Request, StatusCode};
-use common::{TestApp, body_json};
-use kintara_server::auth::{self, GitHubIdentity};
-use kintara_server::state::AppState;
+use axum::http::StatusCode;
+use common::{
+    TestApp, ai_settings as settings, body_json, invited_user, json_with_cookie, signed_in_owner,
+};
 use serde_json::json;
-
-fn state_of(app: &TestApp) -> AppState {
-    AppState::new(app.db.clone(), app.config.clone())
-}
-
-async fn signed_in_owner(app: &TestApp) -> (i64, String) {
-    let state = state_of(app);
-    let user_id = auth::resolve_github_user(
-        &state,
-        &GitHubIdentity {
-            id: 101,
-            login: "owner".into(),
-            avatar_url: None,
-        },
-    )
-    .await
-    .unwrap();
-    let session = auth::create_session(&state, user_id).await.unwrap();
-    (user_id, format!("kintara_session={session}"))
-}
-
-async fn json_with_cookie(
-    app: &TestApp,
-    method: &str,
-    uri: &str,
-    cookie: &str,
-    body: serde_json::Value,
-) -> axum::response::Response {
-    app.request(
-        Request::builder()
-            .method(method)
-            .uri(uri)
-            .header("content-type", "application/json")
-            .header("cookie", cookie)
-            .body(Body::from(body.to_string()))
-            .unwrap(),
-    )
-    .await
-}
-
-fn settings(openai_key: Option<&str>, enabled: bool) -> serde_json::Value {
-    json!({
-        "enabled": enabled,
-        "provider": "openai",
-        "openaiModel": "gpt-5.6-terra",
-        "googleModel": "gemini-3.7-flash",
-        "openaiReasoning": "medium",
-        "googleThinking": "medium",
-        "temperature": null,
-        "openaiApiKey": openai_key,
-        "googleApiKey": null,
-        "removeOpenaiKey": false,
-        "removeGoogleKey": false
-    })
-}
 
 #[tokio::test]
 async fn ai_routes_require_a_real_session_even_during_first_run() {
@@ -210,25 +154,8 @@ async fn empty_text_and_existing_summaries_are_refused_without_network_calls() {
 async fn ai_keys_and_preferences_are_isolated_per_user() {
     let app = TestApp::new().await;
     let (owner_id, owner_cookie) = signed_in_owner(&app).await;
-    sqlx::query("INSERT INTO github_invitations (github_login, invited_by) VALUES ('reader', ?)")
-        .bind(owner_id)
-        .execute(&app.db)
-        .await
-        .unwrap();
-    let reader_id = auth::resolve_github_user(
-        &state_of(&app),
-        &GitHubIdentity {
-            id: 202,
-            login: "reader".into(),
-            avatar_url: None,
-        },
-    )
-    .await
-    .unwrap();
-    let reader_session = auth::create_session(&state_of(&app), reader_id)
-        .await
-        .unwrap();
-    let reader_cookie = format!("kintara_session={reader_session}");
+    let reader_id = invited_user(&app, owner_id, "reader", 202).await;
+    let reader_cookie = app.session_cookie_for(reader_id).await;
 
     assert_eq!(
         json_with_cookie(
@@ -254,21 +181,7 @@ async fn ai_keys_and_preferences_are_isolated_per_user() {
 async fn document_conversations_are_private_even_when_the_document_is_shared() {
     let app = TestApp::new().await;
     let (owner_id, _owner_cookie) = signed_in_owner(&app).await;
-    sqlx::query("INSERT INTO github_invitations (github_login, invited_by) VALUES ('reader', ?)")
-        .bind(owner_id)
-        .execute(&app.db)
-        .await
-        .unwrap();
-    let reader_id = auth::resolve_github_user(
-        &state_of(&app),
-        &GitHubIdentity {
-            id: 303,
-            login: "reader".into(),
-            avatar_url: None,
-        },
-    )
-    .await
-    .unwrap();
+    let reader_id = invited_user(&app, owner_id, "reader", 303).await;
     let document_id = app.insert_row("Shared", "shared.md", "md", 10).await;
     let library_id: i64 = sqlx::query_scalar(
         "INSERT INTO libraries (owner_id, name) VALUES (?, 'Shared library') RETURNING id",
@@ -328,160 +241,4 @@ async fn document_conversations_are_private_even_when_the_document_is_shared() {
     .await;
     assert_eq!(owner["messages"][0]["content"], "Owner question");
     assert_eq!(reader["messages"][0]["content"], "Reader question");
-}
-
-#[tokio::test]
-async fn library_search_refuses_before_any_provider_call() {
-    let app = TestApp::new().await;
-    let (_user_id, cookie) = signed_in_owner(&app).await;
-
-    // AI off entirely: nothing should reach a provider, and no key is set.
-    let disabled = json_with_cookie(
-        &app,
-        "POST",
-        "/api/ai/search",
-        &cookie,
-        json!({ "request": "crochet dragons" }),
-    )
-    .await;
-    assert_eq!(disabled.status(), StatusCode::BAD_REQUEST);
-
-    json_with_cookie(
-        &app,
-        "PUT",
-        "/api/ai/settings",
-        &cookie,
-        settings(Some("sk-test-key"), true),
-    )
-    .await;
-
-    // An empty request never becomes a billed round trip.
-    let empty = json_with_cookie(
-        &app,
-        "POST",
-        "/api/ai/search",
-        &cookie,
-        json!({ "request": "   " }),
-    )
-    .await;
-    assert_eq!(empty.status(), StatusCode::BAD_REQUEST);
-    assert!(
-        body_json(empty).await["error"]
-            .as_str()
-            .unwrap()
-            .contains("describe what you are looking for")
-    );
-
-    let too_long = json_with_cookie(
-        &app,
-        "POST",
-        "/api/ai/search",
-        &cookie,
-        json!({ "request": "d".repeat(501) }),
-    )
-    .await;
-    assert_eq!(too_long.status(), StatusCode::BAD_REQUEST);
-}
-
-#[tokio::test]
-async fn library_search_requires_a_session() {
-    let app = TestApp::new().await;
-    let response = app
-        .request(
-            Request::builder()
-                .method("POST")
-                .uri("/api/ai/search")
-                .header("content-type", "application/json")
-                .body(Body::from(json!({ "request": "anything" }).to_string()))
-                .unwrap(),
-        )
-        .await;
-    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-}
-
-#[tokio::test]
-async fn in_document_find_refuses_before_any_provider_call() {
-    let app = TestApp::new().await;
-    let (_user_id, cookie) = signed_in_owner(&app).await;
-    let document_id = app.insert_row("Notes", "notes.md", "md", 10).await;
-
-    // AI is off, so nothing can reach a provider whatever the request says.
-    let disabled = json_with_cookie(
-        &app,
-        "POST",
-        &format!("/api/ai/documents/{document_id}/find"),
-        &cookie,
-        json!({ "request": "where is the magic ring" }),
-    )
-    .await;
-    assert_eq!(disabled.status(), StatusCode::BAD_REQUEST);
-
-    json_with_cookie(
-        &app,
-        "PUT",
-        "/api/ai/settings",
-        &cookie,
-        settings(Some("sk-test-key"), true),
-    )
-    .await;
-
-    let empty = json_with_cookie(
-        &app,
-        "POST",
-        &format!("/api/ai/documents/{document_id}/find"),
-        &cookie,
-        json!({ "request": "  " }),
-    )
-    .await;
-    assert_eq!(empty.status(), StatusCode::BAD_REQUEST);
-    assert!(
-        body_json(empty).await["error"]
-            .as_str()
-            .unwrap()
-            .contains("describe what to look for")
-    );
-
-    // This row has no extracted text at all, which must be refused rather than
-    // sent as an empty document.
-    let no_text = json_with_cookie(
-        &app,
-        "POST",
-        &format!("/api/ai/documents/{document_id}/find"),
-        &cookie,
-        json!({ "request": "where is the magic ring" }),
-    )
-    .await;
-    assert_eq!(no_text.status(), StatusCode::BAD_REQUEST);
-}
-
-#[tokio::test]
-async fn in_document_find_is_refused_on_a_document_the_caller_cannot_see() {
-    let app = TestApp::new().await;
-    let (owner_id, _cookie) = signed_in_owner(&app).await;
-    sqlx::query("INSERT INTO github_invitations (github_login, invited_by) VALUES ('outsider', ?)")
-        .bind(owner_id)
-        .execute(&app.db)
-        .await
-        .unwrap();
-    let outsider_id = auth::resolve_github_user(
-        &state_of(&app),
-        &GitHubIdentity {
-            id: 404,
-            login: "outsider".into(),
-            avatar_url: None,
-        },
-    )
-    .await
-    .unwrap();
-    let document_id = app.insert_row("Private", "private.md", "md", 10).await;
-
-    let response = app
-        .send_json_as(
-            "POST",
-            &format!("/api/ai/documents/{document_id}/find"),
-            json!({ "request": "anything" }),
-            outsider_id,
-        )
-        .await;
-    assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }

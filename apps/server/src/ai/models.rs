@@ -30,6 +30,21 @@ pub const GOOGLE_MODELS: &[&str] = &[
     "gemini-2.5-flash-lite",
 ];
 
+/// Image models, from the lists approved in `ROADMAP.md`.
+pub const OPENAI_IMAGE_MODELS: &[&str] = &[
+    "gpt-image-2",
+    "gpt-image-1.5",
+    "gpt-image-1-mini",
+    "gpt-image-1",
+];
+
+pub const GOOGLE_IMAGE_MODELS: &[&str] = &[
+    "gemini-3.1-flash-image",
+    "gemini-3.1-flash-lite-image",
+    "gemini-3-pro-image",
+    "gemini-2.5-flash-image",
+];
+
 const OPENAI_56_REASONING: &[&str] = &["none", "low", "medium", "high", "xhigh", "max"];
 const OPENAI_52_55_REASONING: &[&str] = &["none", "low", "medium", "high", "xhigh"];
 const OPENAI_51_REASONING: &[&str] = &["none", "low", "medium", "high"];
@@ -50,6 +65,8 @@ pub struct ModelCapability {
 pub struct ModelCatalog {
     pub openai: Vec<ModelCapability>,
     pub google: Vec<ModelCapability>,
+    pub openai_image: &'static [&'static str],
+    pub google_image: &'static [&'static str],
 }
 
 pub fn catalog() -> ModelCatalog {
@@ -73,6 +90,15 @@ pub fn catalog() -> ModelCatalog {
                 supports_temperature: false,
             })
             .collect(),
+        openai_image: OPENAI_IMAGE_MODELS,
+        google_image: GOOGLE_IMAGE_MODELS,
+    }
+}
+
+pub fn validate_image_model(provider: Provider, model: &str) -> bool {
+    match provider {
+        Provider::OpenAi => OPENAI_IMAGE_MODELS.contains(&model),
+        Provider::Google => GOOGLE_IMAGE_MODELS.contains(&model),
     }
 }
 
@@ -126,6 +152,22 @@ mod tests {
             ["none", "low", "medium", "high", "xhigh", "max"]
         );
         assert!(!openai_reasoning("gpt-5.4").contains(&"minimal"));
+    }
+
+    #[test]
+    fn image_models_are_validated_against_their_own_provider() {
+        assert!(validate_image_model(Provider::OpenAi, "gpt-image-2"));
+        assert!(validate_image_model(
+            Provider::Google,
+            "gemini-3.1-flash-image"
+        ));
+        // A text model is not an image model, and neither crosses providers.
+        assert!(!validate_image_model(Provider::OpenAi, "gpt-5.6-terra"));
+        assert!(!validate_image_model(
+            Provider::OpenAi,
+            "gemini-3.1-flash-image"
+        ));
+        assert!(!validate_image_model(Provider::Google, "gpt-image-2"));
     }
 
     #[test]

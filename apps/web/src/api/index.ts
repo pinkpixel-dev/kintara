@@ -5,6 +5,7 @@ export { aiService } from "./ai";
 export type {
   AiConversation,
   AiPassage,
+  CoverCandidate,
   AiSearchInterpretation,
   AiSettings,
   ModelCatalog,

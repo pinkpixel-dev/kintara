@@ -25,6 +25,10 @@ export function AiSettingsSection({ onEnabledChange }: Props) {
   const selectedModels = settings.provider === "openai" ? models.openai : models.google;
   const selectedModel = settings.provider === "openai" ? settings.openaiModel : settings.googleModel;
   const capability = selectedModels.find((model) => model.id === selectedModel) ?? selectedModels[0];
+  // Image models are a separate catalogue with no reasoning levels of their own.
+  const imageModels = settings.provider === "openai" ? models.openaiImage : models.googleImage;
+  const imageModel = settings.provider === "openai"
+    ? settings.openaiImageModel : settings.googleImageModel;
 
   const update = <K extends keyof AiSettings>(key: K, value: AiSettings[K]) =>
     setSettings((current) => current ? { ...current, [key]: value } : current);
@@ -49,6 +53,8 @@ export function AiSettingsSection({ onEnabledChange }: Props) {
     googleThinking: settings.googleThinking,
     temperature: settings.provider === "openai" && settings.openaiReasoning === "none"
       ? settings.temperature : null,
+    openaiImageModel: settings.openaiImageModel,
+    googleImageModel: settings.googleImageModel,
     openaiApiKey: openaiKey.trim() || undefined,
     googleApiKey: googleKey.trim() || undefined,
     removeOpenaiKey: removeOpenai,
@@ -103,6 +109,20 @@ export function AiSettingsSection({ onEnabledChange }: Props) {
             {capability.reasoning.map((value) => <option key={value}>{value}</option>)}
           </select>
         </label>
+        <label>Cover image model
+          <select className="input" value={imageModel}
+            onChange={(e) => update(
+              settings.provider === "openai" ? "openaiImageModel" : "googleImageModel",
+              e.target.value,
+            )}>
+            {imageModels.map((id) => <option key={id}>{id}</option>)}
+          </select>
+        </label>
+        {settings.provider === "openai" && (
+          <p className="text-xs text-muted">GPT Image models need organization verification on
+            your OpenAI account, and their endpoint has no retention setting — cover prompts
+            are the one request Kintara cannot send with storage disabled.</p>
+        )}
         {settings.provider === "openai" && settings.openaiReasoning === "none" && capability.supportsTemperature && (
           <label>Temperature <input className="input" type="number" min="0" max="2" step="0.1"
             value={settings.temperature ?? 1} onChange={(e) => update("temperature", Number(e.target.value))} /></label>

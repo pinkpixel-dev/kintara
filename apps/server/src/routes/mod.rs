@@ -1,7 +1,9 @@
 pub mod ai;
 pub mod ai_chat;
+pub mod ai_cover;
 pub mod ai_find;
 pub mod ai_search;
+pub mod ai_settings;
 pub mod annotations;
 pub mod auth;
 pub mod collections;
@@ -37,8 +39,10 @@ pub fn router(state: AppState) -> Router {
             "/ai",
             ai::router()
                 .merge(ai_chat::router())
+                .merge(ai_cover::router())
                 .merge(ai_find::router())
-                .merge(ai_search::router()),
+                .merge(ai_search::router())
+                .merge(ai_settings::router()),
         )
         .nest(
             "/documents",

@@ -59,6 +59,14 @@ pub struct Document {
     pub reading_progress: f64,
     pub is_favorite: bool,
     pub has_thumbnail: bool,
+    /// Cache key for the cover, not a path.
+    ///
+    /// `/documents/{id}/thumbnail` is a stable URL served with a week-long
+    /// max-age, so a replaced cover would keep showing the old image until the
+    /// cache expired. The stored filename changes every time a cover is
+    /// written, which makes it exactly the version marker the client needs to
+    /// append to that URL.
+    pub cover_version: Option<String>,
 }
 
 impl From<DocumentRow> for Document {
@@ -80,6 +88,7 @@ impl From<DocumentRow> for Document {
             reading_progress: row.reading_progress,
             is_favorite: row.is_favorite != 0,
             has_thumbnail: row.thumbnail_name.is_some(),
+            cover_version: row.thumbnail_name,
         }
     }
 }
