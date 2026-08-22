@@ -25,11 +25,11 @@ import { useDocumentTabs } from "./hooks/useDocumentTabs";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useDocumentImport } from "./hooks/useDocumentImport";
 import { useEntitySettings } from "./hooks/useEntitySettings";
+import { useDocumentPagination } from "./hooks/useDocumentPagination";
 import { loadSettings, saveSettings } from "./lib/settings";
 
 
 function App() {
-  const [documents, setDocuments] = useState<Document[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   
   const [activeView, setActiveView] = useState<ActiveView>({ type: 'recent' });
@@ -81,6 +81,23 @@ function App() {
     onApplied: () => { setViewMode('grid'); if (isNarrow()) setIsLeftSidebarOpen(false); },
   });
 
+  const {
+    documents,
+    total: documentTotal,
+    hasMore: hasMoreDocuments,
+    isLoading: isLoadingDocuments,
+    isLoadingMore,
+    error: documentLoadError,
+    loadMore: loadMoreDocuments,
+    retry: retryDocumentLoad,
+    refresh: refreshDocuments,
+    replaceListedDocument,
+  } = useDocumentPagination({
+    activeView,
+    searchQuery,
+    interpretation: aiSearch.interpretation,
+  });
+
   // Theming is applied in main.tsx before the first render; this only decides
   // whether the onboarding overlay is due.
   useEffect(() => {
@@ -112,40 +129,6 @@ function App() {
     };
   }, []);
 
-  const loadDocuments = async () => {
-    try {
-      // Every view is the same endpoint with different filters now, rather than
-      // a separate query per view.
-      const query: Parameters<typeof documentService.list>[0] = {};
-      const trimmed = searchQuery.trim();
-
-      if (trimmed.length > 0) query.q = trimmed;
-
-      // Searching happens *inside* the current view rather than replacing it,
-      // so a library stays a library once you start typing. The server ANDs the
-      // two, so both are sent together.
-      if (activeView.type === 'recent') {
-        // The exception. "Recent" is the last ten things, not a scope worth
-        // searching within, so a query here searches everything.
-        if (!trimmed) query.limit = 10;
-      } else if (activeView.type === 'favorites') {
-        query.favorite = true;
-      } else if (activeView.type === 'library' && activeView.id) {
-        query.libraryId = activeView.id;
-      } else if (activeView.type === 'collection' && activeView.id) {
-        query.collectionId = activeView.id;
-      }
-
-      // Tag and sort come from an AI rewrite; no sidebar view expresses either.
-      aiSearch.applyTo(query);
-
-      const page = await documentService.list(query);
-      setDocuments(page.items);
-    } catch (err) {
-      console.error("Failed to load documents", err);
-    }
-  };
-
   /**
    * Closes tabs whose document no longer exists.
    *
@@ -167,15 +150,13 @@ function App() {
   };
 
   useEffect(() => {
-    loadDocuments();
-
     const handleRefresh = () => {
-      loadDocuments();
+      refreshDocuments();
       reconcileTabs();
     };
     window.addEventListener('refresh-documents', handleRefresh);
     return () => window.removeEventListener('refresh-documents', handleRefresh);
-  }, [searchQuery, activeView, aiSearch.interpretation]);
+  }, [refreshDocuments]);
 
   // Checked when the view changes rather than on every keystroke, so typing in
   // the search box does not fire a request per open tab.
@@ -211,7 +192,7 @@ function App() {
   const openDetails = (doc: Document) => setDetailsDocument(doc);
 
   const handleDocumentUpdate = () => {
-    loadDocuments();
+    refreshDocuments();
 
     // The reader's copy of the document has to be refreshed too, not just the
     // panel's. Refreshing only the panel left the tab stale, so edited metadata
@@ -239,7 +220,7 @@ function App() {
       const updated = await documentService.get(doc.id);
       replaceDocument(updated);
       setDetailsDocument(prev => (prev && prev.id === doc.id ? updated : prev));
-      loadDocuments();
+      refreshDocuments();
     } catch (err) {
       console.error("Failed to update favorite", err);
     }
@@ -254,7 +235,7 @@ function App() {
       await documentService.remove(doc.id);
       if (closeTabForDocument(doc.id)) setViewMode('grid');
       if (detailsDocument?.id === doc.id) setDetailsDocument(null);
-      loadDocuments();
+      refreshDocuments();
     } catch (err) {
       console.error("Failed to delete document", err);
     }
@@ -262,7 +243,7 @@ function App() {
 
   const handleDocumentDelete = () => {
     setDetailsDocument(null);
-    loadDocuments();
+    refreshDocuments();
     // Close tab if open
     if (detailsDocument && closeTabForDocument(detailsDocument.id)) {
       setViewMode('grid');
@@ -323,7 +304,7 @@ function App() {
           onClose={() => setMovingDocument(null)}
           onMoved={() => {
             setMovingDocument(null);
-            loadDocuments();
+            refreshDocuments();
             window.dispatchEvent(new CustomEvent('reload-sidebar'));
           }}
         />
@@ -351,7 +332,7 @@ function App() {
           onClose={importFlow.finish}
           onComplete={() => {
             importFlow.finish();
-            loadDocuments();
+            refreshDocuments();
             // A new library may have been created from inside the modal.
             window.dispatchEvent(new CustomEvent('reload-sidebar'));
           }}
@@ -366,7 +347,7 @@ function App() {
           onClose={importFlow.finish}
           onComplete={() => {
             importFlow.finish();
-            loadDocuments();
+            refreshDocuments();
             // A new library may have been created from inside the modal.
             window.dispatchEvent(new CustomEvent('reload-sidebar'));
           }}
@@ -432,6 +413,11 @@ function App() {
               <AiSearchSummary search={aiSearch} />
               <DocumentGrid
                 documents={documents}
+                total={documentTotal}
+                hasMore={hasMoreDocuments}
+                isLoading={isLoadingDocuments}
+                isLoadingMore={isLoadingMore}
+                loadError={documentLoadError}
                 emptyReason={emptyReasonFor(searchQuery, activeView, scopeName)}
                 onOpenDocument={(doc) => {
                   openDocument(doc);
@@ -439,7 +425,9 @@ function App() {
                 }}
                 onOpenDetails={openDetails}
                 onMove={setMovingDocument}
-                onRefresh={loadDocuments}
+                onRefresh={refreshDocuments}
+                onLoadMore={loadMoreDocuments}
+                onRetry={retryDocumentLoad}
                 onSearchEverywhere={handleSearchEverywhere}
                 onImport={() => importFlow.start()}
               />
@@ -466,7 +454,7 @@ function App() {
           onClose={() => setDetailsDocument(null)}
         />
       )}
-      {isAiOpen && viewMode === "reading" && activeDocument && <AiPanel document={activeDocument} settingsRevision={aiSettingsRevision} onClose={() => setIsAiOpen(false)} onUpdated={(updated) => { replaceDocument(updated); setDocuments((items) => items.map((item) => item.id === updated.id ? updated : item)); }} />}
+      {isAiOpen && viewMode === "reading" && activeDocument && <AiPanel document={activeDocument} settingsRevision={aiSettingsRevision} onClose={() => setIsAiOpen(false)} onUpdated={(updated) => { replaceDocument(updated); replaceListedDocument(updated); }} />}
     </div>
   );
 }

@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.13.8] - 2026-08-22
+
+### 🐛 Library browsing
+
+- Added an explicit **Load more** control after the first 50 documents. Library,
+  collection, favorite, and search views now expose every matching document in stable
+  batches instead of stopping after the first server page.
+- Kept the loaded count visible and preserved all loaded pages when a document changes.
+- Added clear initial, loading, and retry states without changing the ten-item Recent view.
+- Added document IDs as stable sort tie-breakers so equal titles or timestamps cannot
+  skip or repeat documents across page boundaries.
+
+### 🧪 Tests
+
+- Added frontend coverage for page replacement, ordered appends, duplicate protection,
+  offsets, and Recent-view behavior.
+- Added real router and SQLite coverage for stable pagination across every document sort.
+
+### 🏷️ Versioning
+
+- Bumped Kintara from 1.13.7 to 1.13.8 for complete large-library browsing.
+
 ## [1.13.7] - 2026-08-22
 
 ### 🐛 Imports

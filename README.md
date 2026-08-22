@@ -21,6 +21,8 @@ folder, indexes its contents, and serves the library through a browser or instal
 - Extracts PDF metadata, searchable text, page counts, and cover thumbnails with Poppler.
 - Streams PDFs with HTTP Range support, so large files do not need one full download.
 - Keeps libraries, collections, highlights, favorites, and reading progress per user.
+- Loads large library and collection views in batches, with every matching document
+  reachable from the grid.
 - Supports private libraries with viewer and editor sharing.
 - Uses GitHub OAuth for sign-in and administrator invitations for new accounts.
 - Offers optional OpenAI and Google features with a separate provider key for each user.

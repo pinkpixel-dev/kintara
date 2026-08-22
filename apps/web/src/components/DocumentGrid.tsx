@@ -6,23 +6,37 @@ import { EmptyState, type EmptyReason } from "./EmptyState";
 
 interface DocumentGridProps {
   documents: Document[];
+  total: number;
+  hasMore: boolean;
+  isLoading: boolean;
+  isLoadingMore: boolean;
+  loadError: string | null;
   /** Why the grid is empty, when it is. Never read while there are documents. */
   emptyReason: EmptyReason;
   onOpenDocument: (doc: Document) => void;
   onOpenDetails: (doc: Document) => void;
   onMove: (doc: Document) => void;
   onRefresh: () => void;
+  onLoadMore: () => void;
+  onRetry: () => void;
   onSearchEverywhere: () => void;
   onImport: () => void;
 }
 
 export function DocumentGrid({
   documents,
+  total,
+  hasMore,
+  isLoading,
+  isLoadingMore,
+  loadError,
   emptyReason,
   onOpenDocument,
   onOpenDetails,
   onMove,
   onRefresh,
+  onLoadMore,
+  onRetry,
   onSearchEverywhere,
   onImport,
 }: DocumentGridProps) {
@@ -65,26 +79,52 @@ export function DocumentGrid({
         onCancel={() => setPendingDelete(null)}
       />
 
-      {documents.length === 0 ? (
+      {isLoading && documents.length === 0 ? (
+        <div className="document-grid-status" role="status">Loading documents...</div>
+      ) : loadError && documents.length === 0 ? (
+        <div className="document-grid-status" role="alert">
+          <p>{loadError}</p>
+          <button type="button" className="btn btn-primary" onClick={onRetry}>Try again</button>
+        </div>
+      ) : documents.length === 0 ? (
         <EmptyState
           reason={emptyReason}
           onSearchEverywhere={onSearchEverywhere}
           onImport={onImport}
         />
       ) : (
-        <div className="document-grid">
-          {documents.map((doc) => (
-            <DocumentCard
-              key={doc.id}
-              document={doc}
-              onOpen={() => onOpenDocument(doc)}
-              onOpenDetails={() => onOpenDetails(doc)}
-              onToggleFavorite={() => toggleFavorite(doc)}
-              onMove={() => onMove(doc)}
-              onDelete={() => setPendingDelete(doc)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="document-grid">
+            {documents.map((doc) => (
+              <DocumentCard
+                key={doc.id}
+                document={doc}
+                onOpen={() => onOpenDocument(doc)}
+                onOpenDetails={() => onOpenDetails(doc)}
+                onToggleFavorite={() => toggleFavorite(doc)}
+                onMove={() => onMove(doc)}
+                onDelete={() => setPendingDelete(doc)}
+              />
+            ))}
+          </div>
+          <div className="document-grid-pagination">
+            <p className="document-grid-count" aria-live="polite">
+              Showing {documents.length} of {total} {total === 1 ? "document" : "documents"}
+            </p>
+            {loadError && <p className="document-grid-load-error" role="alert">{loadError}</p>}
+            {hasMore && (
+              <button
+                type="button"
+                className="btn btn-ghost document-grid-load-more"
+                onClick={loadError ? onRetry : onLoadMore}
+                disabled={isLoadingMore}
+                aria-busy={isLoadingMore}
+              >
+                {isLoadingMore ? "Loading..." : loadError ? "Try again" : "Load more"}
+              </button>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

@@ -119,11 +119,11 @@ impl Sort {
     /// user input — the enum is the whitelist.
     pub fn order_by(self) -> &'static str {
         match self {
-            Sort::Recent => "d.modified_at DESC",
-            Sort::Added => "d.created_at DESC",
-            Sort::Title => "d.title COLLATE NOCASE ASC",
-            Sort::Author => "d.author COLLATE NOCASE ASC, d.title COLLATE NOCASE ASC",
-            Sort::Year => "d.year DESC, d.title COLLATE NOCASE ASC",
+            Sort::Recent => "d.modified_at DESC, d.id DESC",
+            Sort::Added => "d.created_at DESC, d.id DESC",
+            Sort::Title => "d.title COLLATE NOCASE ASC, d.id DESC",
+            Sort::Author => "d.author COLLATE NOCASE ASC, d.title COLLATE NOCASE ASC, d.id DESC",
+            Sort::Year => "d.year DESC, d.title COLLATE NOCASE ASC, d.id DESC",
         }
     }
 }
