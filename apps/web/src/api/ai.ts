@@ -55,10 +55,23 @@ export interface SummaryPreflight {
   textStatus: string;
   hasSummary: boolean;
   canSummarize: boolean;
+  canSuggestMetadata: boolean;
   imageModel: string;
   hasCover: boolean;
   /** True when this provider's image endpoint cannot disable retention. */
   imageStoredByProvider: boolean;
+}
+
+export interface MetadataSuggestionCandidate {
+  title: string | null;
+  author: string | null;
+  summary: string | null;
+  keywords: string | null;
+  doi: string | null;
+  isbn: string | null;
+  year: number | null;
+  provider: AiProvider;
+  model: string;
 }
 
 export interface CoverCandidate {
@@ -135,6 +148,11 @@ export const aiService = {
     api.post<AiChatResponse>(`/api/ai/documents/${documentId}/conversation`, {
       action: "summarize",
       overwrite,
+    }),
+  suggestMetadata: (documentId: number, expectedProvider: AiProvider, expectedModel: string) =>
+    api.post<MetadataSuggestionCandidate>(`/api/ai/documents/${documentId}/metadata`, {
+      expectedProvider,
+      expectedModel,
     }),
   generateCover: (documentId: number) =>
     api.post<CoverCandidate>(`/api/ai/documents/${documentId}/cover`, {}),

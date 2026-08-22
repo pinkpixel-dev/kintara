@@ -234,3 +234,195 @@ async fn image_model_choices_are_saved_and_returned_per_user() {
     assert_eq!(saved["openaiImageModel"], "gpt-image-2");
     assert_eq!(saved["googleImageModel"], "gemini-3-pro-image");
 }
+
+#[tokio::test]
+async fn metadata_suggestions_require_a_session() {
+    let app = TestApp::new().await;
+    let response = app
+        .request(
+            Request::builder()
+                .method("POST")
+                .uri("/api/ai/documents/1/metadata")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn metadata_suggestions_allow_editors_but_not_viewers() {
+    let app = TestApp::new().await;
+    let (owner_id, _cookie) = signed_in_owner(&app).await;
+    let viewer_id = invited_user(&app, owner_id, "metadata-viewer", 606).await;
+    let editor_id = invited_user(&app, owner_id, "metadata-editor", 707).await;
+    let editor_cookie = app.session_cookie_for(editor_id).await;
+    let disabled_settings = json_with_cookie(
+        &app,
+        "PUT",
+        "/api/ai/settings",
+        &editor_cookie,
+        settings(None, false),
+    )
+    .await;
+    assert_eq!(disabled_settings.status(), StatusCode::OK);
+    let document_id = app
+        .insert_row("Filename fallback", "shared-metadata.md", "md", 10)
+        .await;
+    let library_id: i64 = sqlx::query_scalar(
+        "INSERT INTO libraries (owner_id, name) VALUES (?, 'Metadata library') RETURNING id",
+    )
+    .bind(owner_id)
+    .fetch_one(&app.db)
+    .await
+    .unwrap();
+    sqlx::query("INSERT INTO library_documents (library_id, document_id) VALUES (?, ?)")
+        .bind(library_id)
+        .bind(document_id)
+        .execute(&app.db)
+        .await
+        .unwrap();
+    for (user_id, role) in [(viewer_id, "viewer"), (editor_id, "editor")] {
+        sqlx::query("INSERT INTO library_members (library_id, user_id, role) VALUES (?, ?, ?)")
+            .bind(library_id)
+            .bind(user_id)
+            .bind(role)
+            .execute(&app.db)
+            .await
+            .unwrap();
+    }
+    sqlx::query("UPDATE documents SET text_status = 'ok' WHERE id = ?")
+        .bind(document_id)
+        .execute(&app.db)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO document_pages (document_id, page_number, text) VALUES (?, 1, ?)")
+        .bind(document_id)
+        .bind("A Real Title\nBy A Real Author\nPublished 2024")
+        .execute(&app.db)
+        .await
+        .unwrap();
+
+    let viewer = app
+        .send_json_as(
+            "POST",
+            &format!("/api/ai/documents/{document_id}/metadata"),
+            json!({ "expectedProvider": "openai", "expectedModel": "gpt-5.6-terra" }),
+            viewer_id,
+        )
+        .await;
+    assert_eq!(viewer.status(), StatusCode::NOT_FOUND);
+
+    // The editor passes the metadata permission check and reaches the next
+    // safe refusal. AI is disabled, so no provider request can occur.
+    let editor = app
+        .send_json_as(
+            "POST",
+            &format!("/api/ai/documents/{document_id}/metadata"),
+            json!({ "expectedProvider": "openai", "expectedModel": "gpt-5.6-terra" }),
+            editor_id,
+        )
+        .await;
+    assert_eq!(editor.status(), StatusCode::BAD_REQUEST);
+    assert!(body_json(editor).await["error"]
+        .as_str()
+        .unwrap()
+        .contains("AI features are disabled"));
+
+    let usage: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM ai_usage")
+        .fetch_one(&app.db)
+        .await
+        .unwrap();
+    assert_eq!(usage, 0);
+    let title: String = sqlx::query_scalar("SELECT title FROM documents WHERE id = ?")
+        .bind(document_id)
+        .fetch_one(&app.db)
+        .await
+        .unwrap();
+    assert_eq!(title, "Filename fallback");
+}
+
+#[tokio::test]
+async fn metadata_suggestions_refuse_unreadable_text_without_writing() {
+    let app = TestApp::new().await;
+    let (_owner_id, cookie) = signed_in_owner(&app).await;
+    let document_id = app
+        .insert_row("Image only", "image-only.pdf", "pdf", 10)
+        .await;
+    sqlx::query("UPDATE documents SET text_status = 'empty', author = 'Human edit' WHERE id = ?")
+        .bind(document_id)
+        .execute(&app.db)
+        .await
+        .unwrap();
+
+    let response = json_with_cookie(
+        &app,
+        "POST",
+        &format!("/api/ai/documents/{document_id}/metadata"),
+        &cookie,
+        json!({ "expectedProvider": "openai", "expectedModel": "gpt-5.6-terra" }),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert!(body_json(response).await["error"]
+        .as_str()
+        .unwrap()
+        .contains("OCR is not available"));
+
+    let (author, usage): (Option<String>, i64) = sqlx::query_as(
+        "SELECT author, (SELECT COUNT(*) FROM ai_usage) FROM documents WHERE id = ?",
+    )
+    .bind(document_id)
+    .fetch_one(&app.db)
+    .await
+    .unwrap();
+    assert_eq!(author.as_deref(), Some("Human edit"));
+    assert_eq!(usage, 0);
+}
+
+#[tokio::test]
+async fn metadata_suggestions_reject_stale_provider_confirmation() {
+    let app = TestApp::new().await;
+    let (_owner_id, cookie) = signed_in_owner(&app).await;
+    let configured = json_with_cookie(
+        &app,
+        "PUT",
+        "/api/ai/settings",
+        &cookie,
+        settings(Some("sk-not-a-real-provider-key"), true),
+    )
+    .await;
+    assert_eq!(configured.status(), StatusCode::OK);
+
+    let document_id = app.insert_row("Confirmed", "confirmed.md", "md", 10).await;
+    sqlx::query("UPDATE documents SET text_status = 'ok' WHERE id = ?")
+        .bind(document_id)
+        .execute(&app.db)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO document_pages (document_id, page_number, text) VALUES (?, 1, ?)")
+        .bind(document_id)
+        .bind("A titled document with readable text.")
+        .execute(&app.db)
+        .await
+        .unwrap();
+
+    let response = json_with_cookie(
+        &app,
+        "POST",
+        &format!("/api/ai/documents/{document_id}/metadata"),
+        &cookie,
+        json!({ "expectedProvider": "google", "expectedModel": "gemini-3.7-flash" }),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::CONFLICT);
+    assert!(body_json(response).await["error"]
+        .as_str()
+        .unwrap()
+        .contains("review the provider request again"));
+    let usage: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM ai_usage")
+        .fetch_one(&app.db)
+        .await
+        .unwrap();
+    assert_eq!(usage, 0);
+}

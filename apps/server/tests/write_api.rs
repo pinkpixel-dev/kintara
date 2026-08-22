@@ -57,6 +57,23 @@ async fn an_empty_title_is_rejected() {
 }
 
 #[tokio::test]
+async fn an_invalid_metadata_year_is_rejected() {
+    let app = TestApp::new().await;
+    let id = app.add_document("paper.pdf", b"bytes").await;
+
+    for year in [999, 9999] {
+        let response = app
+            .send_json(
+                "PATCH",
+                &format!("/api/documents/{id}"),
+                json!({ "year": year }),
+            )
+            .await;
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+}
+
+#[tokio::test]
 async fn editing_a_document_keeps_the_search_index_in_step() {
     let app = TestApp::new().await;
     let id = app.add_document("paper.pdf", b"bytes").await;

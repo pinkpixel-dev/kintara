@@ -1,6 +1,7 @@
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
+use chrono::Datelike;
 use serde::Deserialize;
 
 use crate::access;
@@ -44,6 +45,14 @@ pub async fn update(
     if let Some(title) = &body.title {
         if title.trim().is_empty() {
             return Err(AppError::BadRequest("title cannot be empty".into()));
+        }
+    }
+    if let Some(Some(year)) = body.year {
+        let current_year = chrono::Utc::now().year() as i64;
+        if !(1000..=current_year).contains(&year) {
+            return Err(AppError::BadRequest(format!(
+                "year must be between 1000 and {current_year}"
+            )));
         }
     }
 

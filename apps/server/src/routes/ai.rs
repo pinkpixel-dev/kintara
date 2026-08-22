@@ -28,6 +28,7 @@ pub struct Preflight {
     text_status: String,
     has_summary: bool,
     can_summarize: bool,
+    can_suggest_metadata: bool,
     image_model: String,
     has_cover: bool,
     /// Whether this provider can send image requests with retention disabled.
@@ -97,13 +98,15 @@ pub async fn preflight(
     .await?;
     let text = readable_text(status.as_deref(), text.as_deref())?;
     let settings = public_settings(load_row(&state, user_id).await?, UsageTotals::default());
+    let can_edit = access::can_edit_document(&state, document_id, user_id).await?;
     Ok(Json(Preflight {
         provider: configured.provider,
         model: configured.model,
         approximate_input_tokens: approximate_tokens(text),
         text_status: status.unwrap_or_else(|| "failed".into()),
         has_summary: summary.is_some_and(|value| !value.trim().is_empty()),
-        can_summarize: access::can_edit_document(&state, document_id, user_id).await?,
+        can_summarize: can_edit,
+        can_suggest_metadata: can_edit,
         image_model: match configured.provider {
             Provider::OpenAi => settings.openai_image_model,
             Provider::Google => settings.google_image_model,

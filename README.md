@@ -23,7 +23,8 @@ live, run it on your NAS, and read them from any device on your network.
 - **Keeps access tied to GitHub.** The first GitHub account becomes the owner, and admins
   invite everyone else by GitHub username. Kintara keeps its own sessions, not passwords.
 - **Adds AI only when you ask for it.** Each person can save their own encrypted OpenAI
-  or Google key, then chat with a document, ask follow-up questions, and see page citations.
+  or Google key, then chat with a document, ask follow-up questions, see page citations,
+  and review metadata suggestions before saving them.
 
 ## Running it
 
@@ -99,9 +100,13 @@ secret manager.
 The AI button appears only after you enable AI and open a document. Ask a question in the
 right panel or use the Summarize action below the composer. Before a summary request,
 Kintara shows the provider, model, approximate input tokens, and replacement warning.
-OpenAI and Google requests always set `store: false`. Kintara stores each person's chat
-history itself and sends only recent messages needed for a follow-up. There is no
-automatic or background AI processing.
+Document owners and shared-library editors can also choose Suggest with AI in Details.
+Kintara shows the provider, model, and input estimate before sending readable document
+text, then returns field-by-field candidates to review. It does not invent a missing
+author or publication year, and applying a candidate does not write anything until Save
+Details is pressed. OpenAI and Google text requests always set `store: false`. Kintara
+stores each person's chat history itself and sends only recent messages needed for a
+follow-up. There is no automatic or background AI processing.
 
 ## Developing
 
@@ -110,7 +115,7 @@ You need Rust, Node, and `poppler-utils` (for `pdfinfo`, `pdftoppm`, and `pdftot
 ```bash
 npm install
 npm run dev      # starts the API on :8080 and the frontend on :1420
-npm test         # 160 tests, no mocks
+npm test         # 224 tests, no mocks
 ```
 
 `npm run dev` runs both halves — the frontend proxies `/api` to the server, so starting

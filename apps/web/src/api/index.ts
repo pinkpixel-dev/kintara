@@ -9,6 +9,7 @@ export type {
   AiSearchInterpretation,
   AiSettings,
   ModelCatalog,
+  MetadataSuggestionCandidate,
   SummaryPreflight,
 } from "./ai";
 export type {

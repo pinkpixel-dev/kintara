@@ -454,6 +454,7 @@ function App() {
       {detailsDocument && (
         <DetailsSidebar
           document={detailsDocument}
+          aiEnabled={aiEnabled}
           onUpdate={handleDocumentUpdate}
           onDelete={handleDocumentDelete}
           onClose={() => setDetailsDocument(null)}

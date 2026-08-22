@@ -2,6 +2,7 @@ pub mod ai;
 pub mod ai_chat;
 pub mod ai_cover;
 pub mod ai_find;
+pub mod ai_metadata;
 pub mod ai_search;
 pub mod ai_settings;
 pub mod annotations;
@@ -41,6 +42,7 @@ pub fn router(state: AppState) -> Router {
                 .merge(ai_chat::router())
                 .merge(ai_cover::router())
                 .merge(ai_find::router())
+                .merge(ai_metadata::router())
                 .merge(ai_search::router())
                 .merge(ai_settings::router()),
         )

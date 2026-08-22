@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { useRef } from "react";
-import { documentService, documentUrls, tagService, type Document, type Tag } from "../api";
+import { ApiError, documentService, documentUrls, tagService, type Document, type Tag } from "../api";
 import { Save, Image as ImageIcon, X } from "lucide-react";
+import { AiMetadataSuggestions } from "./AiMetadataSuggestions";
 
 interface DetailsSidebarProps {
   document: Document;
+  aiEnabled: boolean;
   onUpdate: () => void;
   onDelete: () => void;
   onClose: () => void;
@@ -17,9 +19,11 @@ interface DetailsSidebarProps {
  * header control that used to open and close it is gone, so without one there
  * would be no way out of the panel.
  */
-export function DetailsSidebar({ document, onUpdate, onClose }: DetailsSidebarProps) {
+export function DetailsSidebar({ document, aiEnabled, onUpdate, onClose }: DetailsSidebarProps) {
   const [docState, setDocState] = useState<Document>(document);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [tags, setTags] = useState<Tag[]>([]);
   const [newTagInput, setNewTagInput] = useState("");
   const [coverVersion, setCoverVersion] = useState(0);
@@ -27,6 +31,8 @@ export function DetailsSidebar({ document, onUpdate, onClose }: DetailsSidebarPr
 
   useEffect(() => {
     setDocState(document);
+    setSaveError(null);
+    setSaveMessage(null);
     loadTags(document.id);
   }, [document]);
 
@@ -90,6 +96,14 @@ export function DetailsSidebar({ document, onUpdate, onClose }: DetailsSidebarPr
   };
 
   const handleSave = async () => {
+    setSaveError(null);
+    setSaveMessage(null);
+    const currentYear = new Date().getFullYear();
+    if (docState.year !== null
+      && (!Number.isInteger(docState.year) || docState.year < 1000 || docState.year > currentYear)) {
+      setSaveError(`Year must be a whole number between 1000 and ${currentYear}.`);
+      return;
+    }
     setIsSaving(true);
     try {
       const orNull = (value: string | null) => {
@@ -104,10 +118,13 @@ export function DetailsSidebar({ document, onUpdate, onClose }: DetailsSidebarPr
         keywords: orNull(docState.keywords),
         doi: orNull(docState.doi),
         isbn: orNull(docState.isbn),
+        year: docState.year,
       });
       onUpdate();
+      setSaveMessage("Details saved.");
     } catch (err) {
       console.error("Failed to save document details", err);
+      setSaveError(err instanceof ApiError ? err.message : "Document details could not be saved.");
     } finally {
       setIsSaving(false);
     }
@@ -158,6 +175,10 @@ export function DetailsSidebar({ document, onUpdate, onClose }: DetailsSidebarPr
           )}
         </button>
 
+        {aiEnabled && (
+          <AiMetadataSuggestions document={docState} onApply={setDocState} />
+        )}
+
         <div className="flex flex-col gap-1">
           <label className="text-xs text-muted font-medium uppercase tracking-wider">Title</label>
           <input 
@@ -173,6 +194,23 @@ export function DetailsSidebar({ document, onUpdate, onClose }: DetailsSidebarPr
             className="input text-sm" 
             value={docState.author || ""} 
             onChange={e => handleChange("author", e.target.value)}
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label htmlFor="document-year" className="text-xs text-muted font-medium uppercase tracking-wider">Year</label>
+          <input
+            id="document-year"
+            className="input text-sm"
+            type="number"
+            min="1000"
+            max={new Date().getFullYear()}
+            step="1"
+            value={docState.year ?? ""}
+            onChange={e => setDocState(prev => ({
+              ...prev,
+              year: e.target.value === "" ? null : Number(e.target.value),
+            }))}
           />
         </div>
 
@@ -240,6 +278,9 @@ export function DetailsSidebar({ document, onUpdate, onClose }: DetailsSidebarPr
             onKeyDown={handleAddTag}
           />
         </div>
+
+        {saveError && <p className="auth-error" role="alert">{saveError}</p>}
+        {saveMessage && <p className="settings-message" role="status">{saveMessage}</p>}
 
         <button 
           className="btn btn-primary mt-4 py-2 w-full flex justify-center items-center gap-2"

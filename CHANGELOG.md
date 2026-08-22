@@ -4,6 +4,48 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-08-22
+
+### 🧾 AI metadata
+
+- Added Suggest with AI to document Details. It returns reviewable title, author,
+  summary, keywords, DOI, ISBN, and publication-year candidates from readable document
+  text.
+- Leaves author blank unless the document explicitly credits one. Publication year is
+  left blank unless a publication or copyright year for the work is clear.
+- Selects suggestions for blank fields by default and leaves populated fields protected.
+  Applying suggestions only updates the Details form; Save Details remains the write.
+
+### 🔒 Privacy and permissions
+
+- Limited metadata suggestions to document owners and shared-library editors. Viewers can
+  still read the document but cannot request changes to its shared metadata.
+- Shows the provider, model, and input estimate before each request. The server binds the
+  request to that confirmation and refuses it if the AI settings changed in the meantime.
+- Sends metadata requests with provider storage disabled and records usage only after a
+  successful response.
+
+### 🐛 Fixes
+
+- Validated edited years on both sides of the API and surfaced Details save failures in
+  the panel instead of leaving them in the console.
+- Kept the existing metadata field labelled Year because imported PDFs may contain a file
+  creation year. The AI candidate calls its value Publication year and never uses a file
+  creation date.
+
+### 🧪 Tests
+
+- Added server coverage for metadata schema and grounding, owner/editor permissions,
+  signed-out and unreadable-document refusal, stale provider confirmation, no-write
+  behavior, and year validation.
+- Added frontend coverage for reviewable fields, protected existing values, selected-only
+  application, and uncertain author or publication year remaining blank.
+- The full server and web suites pass with 224 tests.
+
+### 🏷️ Versioning
+
+- Bumped Kintara from 1.11.0 to 1.12.0 for AI metadata suggestions.
+
 ## [1.11.0] - 2026-08-22
 
 ### 🖼️ Cover generation
