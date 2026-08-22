@@ -19,6 +19,11 @@ All notable changes to this project will be documented in this file.
   tags the requester can already see leave the machine, and the sidebar says so in Ask mode.
 - Resolved every returned id back against the requester's own catalogue, so a borrowed or
   invented id is dropped rather than applied.
+- Stopped a rewrite from searching for what it has already filtered by. A request like
+  "cheatsheets by title" set the right library and the right sort and then also searched
+  that library for the word "title", which matched nothing. Scope names, sort key names,
+  and favourite wording are now removed from the free text whenever the rewrite has
+  already encoded them as a field.
 
 ### 🧹 Maintenance
 
@@ -33,8 +38,11 @@ All notable changes to this project will be documented in this file.
   own libraries and tags, and the unsupported-sort fallback.
 - Added route coverage proving a search request is refused for a signed-out caller, for
   disabled AI, and for empty or oversized text before any provider call.
+- Added regression coverage for the redundant-term cases: a sort key, a scope name,
+  favourite wording, punctuation and casing, and the words that must survive when no such
+  filter was set.
 - Added frontend coverage for scope hints, view selection, layered filters, and the
-  interpretation labels. The full server and web suites pass with 173 tests.
+  interpretation labels. The full server and web suites pass with 178 tests.
 
 ### 🏷️ Versioning
 
