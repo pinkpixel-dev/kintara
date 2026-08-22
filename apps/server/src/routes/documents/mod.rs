@@ -119,8 +119,25 @@ fn push_search(builder: &mut QueryBuilder<Sqlite>, search: &Search) {
 /// Search is one filter among the rest rather than a mode of its own: a query
 /// and a `library_id` arrive together whenever someone searches from inside a
 /// library, and both have to apply.
-fn push_filters(builder: &mut QueryBuilder<Sqlite>, query: &ListQuery, search: Option<&Search>) {
-    builder.push(" WHERE 1 = 1");
+fn push_filters(
+    builder: &mut QueryBuilder<Sqlite>,
+    query: &ListQuery,
+    search: Option<&Search>,
+    user_id: i64,
+) {
+    builder
+        .push(" WHERE (d.owner_id = ")
+        .push_bind(user_id)
+        .push(" OR EXISTS (
+            SELECT 1 FROM library_documents access_ld
+            JOIN libraries access_l ON access_l.id = access_ld.library_id
+            LEFT JOIN library_members access_lm
+              ON access_lm.library_id = access_l.id AND access_lm.user_id = ")
+        .push_bind(user_id)
+        .push(" WHERE access_ld.document_id = d.id
+                AND (access_l.owner_id = ")
+        .push_bind(user_id)
+        .push(" OR access_lm.user_id IS NOT NULL)))");
 
     if let Some(search) = search {
         push_search(builder, search);
@@ -128,18 +145,33 @@ fn push_filters(builder: &mut QueryBuilder<Sqlite>, query: &ListQuery, search: O
 
     if let Some(library_id) = query.library_id {
         builder
-            .push(" AND d.id IN (SELECT document_id FROM library_documents WHERE library_id = ")
+            .push(" AND d.id IN (
+                SELECT ld.document_id FROM library_documents ld
+                JOIN libraries l ON l.id = ld.library_id
+                LEFT JOIN library_members lm
+                  ON lm.library_id = l.id AND lm.user_id = ")
+            .push_bind(user_id)
+            .push(" WHERE ld.library_id = ")
             .push_bind(library_id)
-            .push(")");
+            .push(" AND (l.owner_id = ")
+            .push_bind(user_id)
+            .push(" OR lm.user_id IS NOT NULL))");
     }
 
     if let Some(collection_id) = query.collection_id {
         builder
-            .push(
-                " AND d.id IN (SELECT document_id FROM document_collections WHERE collection_id = ",
-            )
+            .push(" AND d.id IN (
+                SELECT dc.document_id FROM document_collections dc
+                JOIN collections c ON c.id = dc.collection_id
+                JOIN libraries l ON l.id = c.library_id
+                LEFT JOIN library_members lm
+                  ON lm.library_id = l.id AND lm.user_id = ")
+            .push_bind(user_id)
+            .push(" WHERE dc.collection_id = ")
             .push_bind(collection_id)
-            .push(")");
+            .push(" AND (l.owner_id = ")
+            .push_bind(user_id)
+            .push(" OR lm.user_id IS NOT NULL))");
     }
 
     if let Some(tag_id) = query.tag_id {
@@ -183,7 +215,7 @@ pub async fn list(
          LEFT JOIN user_document_state s ON s.document_id = d.id AND s.user_id = ",
     );
     count.push_bind(user_id);
-    push_filters(&mut count, &query, search.as_ref());
+    push_filters(&mut count, &query, search.as_ref(), user_id);
 
     let total: i64 = count.build_query_scalar().fetch_one(&state.db).await?;
 
@@ -193,7 +225,7 @@ pub async fn list(
           LEFT JOIN user_document_state s ON s.document_id = d.id AND s.user_id = ",
     );
     page.push_bind(user_id);
-    push_filters(&mut page, &query, search.as_ref());
+    push_filters(&mut page, &query, search.as_ref(), user_id);
 
     // Sort is an enum, so this fragment is a literal rather than user input.
     page.push(" ORDER BY ").push(query.sort.order_by());
@@ -222,12 +254,20 @@ pub async fn get_one(
         select_columns!(),
         " FROM documents d
           LEFT JOIN user_document_state s ON s.document_id = d.id AND s.user_id = ?
-          WHERE d.id = ?"
+          WHERE d.id = ? AND (d.owner_id = ? OR EXISTS (
+            SELECT 1 FROM library_documents ld
+            JOIN libraries l ON l.id = ld.library_id
+            LEFT JOIN library_members lm ON lm.library_id = l.id AND lm.user_id = ?
+            WHERE ld.document_id = d.id AND (l.owner_id = ? OR lm.user_id IS NOT NULL)
+          ))"
     );
 
     let row: DocumentRow = sqlx::query_as(SQL)
         .bind(user_id)
         .bind(id)
+        .bind(user_id)
+        .bind(user_id)
+        .bind(user_id)
         .fetch_optional(&state.db)
         .await?
         .ok_or(AppError::NotFound)?;
@@ -243,12 +283,20 @@ pub(crate) async fn fetch_one(state: &AppState, id: i64, user_id: i64) -> AppRes
         select_columns!(),
         " FROM documents d
           LEFT JOIN user_document_state s ON s.document_id = d.id AND s.user_id = ?
-          WHERE d.id = ?"
+          WHERE d.id = ? AND (d.owner_id = ? OR EXISTS (
+            SELECT 1 FROM library_documents ld
+            JOIN libraries l ON l.id = ld.library_id
+            LEFT JOIN library_members lm ON lm.library_id = l.id AND lm.user_id = ?
+            WHERE ld.document_id = d.id AND (l.owner_id = ? OR lm.user_id IS NOT NULL)
+          ))"
     );
 
     let row: DocumentRow = sqlx::query_as(SQL)
         .bind(user_id)
         .bind(id)
+        .bind(user_id)
+        .bind(user_id)
+        .bind(user_id)
         .fetch_optional(&state.db)
         .await?
         .ok_or(AppError::NotFound)?;

@@ -3,6 +3,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 
+use crate::access;
 use crate::current_user::CurrentUser;
 use crate::error::{AppError, AppResult};
 use crate::files::resolve_in_root;
@@ -35,9 +36,11 @@ pub struct UpdateDocument {
 
 pub async fn update(
     State(state): State<AppState>,
+    CurrentUser(user_id): CurrentUser,
     Path(id): Path<i64>,
     Json(body): Json<UpdateDocument>,
 ) -> AppResult<StatusCode> {
+    access::require_document_editor(&state, id, user_id).await?;
     if let Some(title) = &body.title {
         if title.trim().is_empty() {
             return Err(AppError::BadRequest("title cannot be empty".into()));
@@ -129,7 +132,7 @@ pub async fn set_progress(
         ));
     }
 
-    ensure_document_exists(&state, id).await?;
+    access::require_document_view(&state, id, user_id).await?;
 
     // Upsert, because a user who has never opened this document has no row.
     sqlx::query(
@@ -160,7 +163,7 @@ pub async fn set_favorite(
     Path(id): Path<i64>,
     Json(body): Json<FavoriteBody>,
 ) -> AppResult<StatusCode> {
-    ensure_document_exists(&state, id).await?;
+    access::require_document_view(&state, id, user_id).await?;
 
     sqlx::query(
         "INSERT INTO user_document_state (user_id, document_id, is_favorite)
@@ -183,7 +186,12 @@ pub async fn set_favorite(
 /// the library, so removing only the row would make the document reappear on
 /// the next scan and "delete" would look broken. Callers are expected to
 /// confirm with the user first.
-pub async fn delete(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<StatusCode> {
+pub async fn delete(
+    State(state): State<AppState>,
+    CurrentUser(user_id): CurrentUser,
+    Path(id): Path<i64>,
+) -> AppResult<StatusCode> {
+    access::require_document_owner(&state, id, user_id).await?;
     let row: Option<(String, Option<String>)> =
         sqlx::query_as("SELECT relative_path, thumbnail_name FROM documents WHERE id = ?")
             .bind(id)
@@ -213,13 +221,4 @@ pub async fn delete(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
     }
 
     Ok(StatusCode::NO_CONTENT)
-}
-
-async fn ensure_document_exists(state: &AppState, id: i64) -> AppResult<()> {
-    let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM documents WHERE id = ?")
-        .bind(id)
-        .fetch_optional(&state.db)
-        .await?;
-
-    exists.map(|_| ()).ok_or(AppError::NotFound)
 }

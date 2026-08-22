@@ -5,6 +5,8 @@ use axum::response::{IntoResponse, Response};
 use tower::ServiceExt;
 use tower_http::services::ServeFile;
 
+use crate::access;
+use crate::current_user::CurrentUser;
 use crate::error::{AppError, AppResult};
 use crate::files::{download_filename, resolve_in_root};
 use crate::state::AppState;
@@ -16,7 +18,8 @@ struct Located {
     document_type: String,
 }
 
-async fn locate(state: &AppState, id: i64) -> AppResult<Located> {
+async fn locate(state: &AppState, id: i64, user_id: i64) -> AppResult<Located> {
+    access::require_document_view(state, id, user_id).await?;
     let (relative_path, document_type): (String, String) =
         sqlx::query_as("SELECT relative_path, document_type FROM documents WHERE id = ?")
             .bind(id)
@@ -52,10 +55,11 @@ fn content_type_for(document_type: &str, path: &std::path::Path) -> String {
 /// and a 200 MB scan would also mean a 200 MB allocation per reader.
 pub async fn file(
     State(state): State<AppState>,
+    CurrentUser(user_id): CurrentUser,
     Path(id): Path<i64>,
     request: Request,
 ) -> AppResult<Response> {
-    let located = locate(&state, id).await?;
+    let located = locate(&state, id, user_id).await?;
     let content_type = content_type_for(&located.document_type, &located.path);
 
     let response = ServeFile::new_with_mime(
@@ -74,10 +78,11 @@ pub async fn file(
 /// Same bytes as `file`, but asks the browser to save rather than display.
 pub async fn download(
     State(state): State<AppState>,
+    CurrentUser(user_id): CurrentUser,
     Path(id): Path<i64>,
     request: Request,
 ) -> AppResult<Response> {
-    let located = locate(&state, id).await?;
+    let located = locate(&state, id, user_id).await?;
     let filename = download_filename(&located.relative_path, id);
 
     let mut response = ServeFile::new(&located.path)
@@ -109,7 +114,12 @@ pub async fn download(
 }
 
 /// Serves a generated thumbnail from the data directory.
-pub async fn thumbnail(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<Response> {
+pub async fn thumbnail(
+    State(state): State<AppState>,
+    CurrentUser(user_id): CurrentUser,
+    Path(id): Path<i64>,
+) -> AppResult<Response> {
+    access::require_document_view(&state, id, user_id).await?;
     let name: Option<String> =
         sqlx::query_scalar("SELECT thumbnail_name FROM documents WHERE id = ?")
             .bind(id)

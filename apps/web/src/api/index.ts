@@ -9,6 +9,7 @@ export type {
   Document,
   DocumentQuery,
   Library,
+  LibraryMember,
   Page,
   SortOrder,
   Tag,

@@ -107,7 +107,6 @@ export function AiSettingsSection({ onEnabledChange }: Props) {
           <label>Temperature <input className="input" type="number" min="0" max="2" step="0.1"
             value={settings.temperature ?? 1} onChange={(e) => update("temperature", Number(e.target.value))} /></label>
         )}
-        <p className="settings-disclosure">Document text is sent only after you confirm an AI action. Provider requests are forced to <code>store: false</code>.</p>
         <p className="text-xs text-muted">Usage recorded here: {settings.usage.inputTokens.toLocaleString()} input / {settings.usage.outputTokens.toLocaleString()} output tokens.</p>
         {message && <p className="settings-message" role="status">{message}</p>}
         <div className="settings-actions"><button className="btn btn-ghost" disabled={busy} onClick={test}>Test saved key</button>

@@ -10,8 +10,9 @@ live, run it on your NAS, and read them from any device on your network.
   delete it on the share and Kintara keeps up.
 - **Reads in the browser.** PDFs stream with range requests, so page turns are quick even
   on a phone and a large scan does not have to download in full first.
-- **Organises without moving anything.** Libraries, collections, and tags are views over
-  your files. Deleting a library never touches the documents inside it.
+- **Keeps each person's libraries separate.** Your libraries are private until you share
+  one with another Kintara user as a viewer or editor. Deleting a library never deletes
+  the document files inside it.
 - **Searches where you are looking.** Open a library or collection and the search box
   searches inside it, with one click to widen the same query to everything. It matches
   titles, authors, keywords, summaries, and tag names.
@@ -50,7 +51,18 @@ services:
 Create a GitHub OAuth app for the URL you use to reach Kintara. Set its callback URL to
 `https://kintara.example.com/api/auth/github/callback`, then set the three matching
 variables above. Open Kintara and continue with GitHub. The first GitHub account becomes
-the owner; after that, an admin must invite each GitHub username in Settings.
+the installation owner; after that, an admin must invite each GitHub username in
+Settings. Each invited person starts with an empty personal library area.
+
+Library owners can share a library from its settings after the other person has signed in
+once. A viewer can read its documents. An editor can also manage its documents and
+collections. The person who owns a document remains the only person who can permanently
+delete its file.
+
+Files found by the NAS scanner belong to the installation owner. Files uploaded through
+the browser belong to the person who uploaded them. The sidebar keeps owned and shared
+libraries in separate collapsible sections, so another person's filing system can stay
+out of the way until you need it.
 
 A ready-to-edit compose file is in [`docker/docker-compose.yml`](docker/docker-compose.yml).
 
@@ -94,7 +106,7 @@ You need Rust, Node, and `poppler-utils` (for `pdfinfo`, `pdftoppm`, and `pdftot
 ```bash
 npm install
 npm run dev      # starts the API on :8080 and the frontend on :1420
-npm test         # 143 tests, no mocks
+npm test         # 146 tests, no mocks
 ```
 
 `npm run dev` runs both halves — the frontend proxies `/api` to the server, so starting
@@ -120,8 +132,6 @@ docker/     Dockerfile, entrypoint, compose file.
 
 ## Known limits
 
-- Fonts are loaded from Google Fonts, so on a fully offline NAS the app falls back to
-  system fonts. It works; it just looks wrong.
 - The PDF reader has no pinch-zoom or swipe paging yet.
 - Single library root. Multiple shares are not supported.
 

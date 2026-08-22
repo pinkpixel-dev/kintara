@@ -3,6 +3,7 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
+use crate::access;
 use crate::ai::Provider;
 use crate::ai::models;
 use crate::ai::providers::{self, GenerateRequest};
@@ -314,6 +315,7 @@ pub async fn preflight(
     AuthenticatedUser(user_id): AuthenticatedUser,
     Path(document_id): Path<i64>,
 ) -> AppResult<Json<Preflight>> {
+    access::require_document_view(&state, document_id, user_id).await?;
     let configured = configured_provider(&state, user_id).await?;
     let (status, text, summary): (Option<String>, Option<String>, Option<String>) =
         sqlx::query_as("SELECT text_status, extracted_text, summary FROM documents WHERE id = ?")
@@ -336,6 +338,7 @@ pub async fn summarize(
     Path(document_id): Path<i64>,
     Json(body): Json<SummarizeRequest>,
 ) -> AppResult<Json<crate::models::Document>> {
+    access::require_document_editor(&state, document_id, user_id).await?;
     let (status, text, summary): (Option<String>, Option<String>, Option<String>) =
         sqlx::query_as("SELECT text_status, extracted_text, summary FROM documents WHERE id = ?")
             .bind(document_id)

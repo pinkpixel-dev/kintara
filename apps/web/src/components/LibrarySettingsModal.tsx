@@ -10,6 +10,7 @@ import {
   ChefHat, TreePine, Waves, Rocket, Bot
 } from "lucide-react";
 import { collectionService, libraryService, type Collection, type Library } from "../api";
+import { LibrarySharingSection } from "./LibrarySharingSection";
 
 // ─── Icon catalogue ──────────────────────────────────────────────────────────
 const ICONS: { name: string; component: React.ElementType }[] = [
@@ -286,6 +287,10 @@ export function LibrarySettingsModal({
                 </div>
               </div>
             </>
+          )}
+
+          {mode === "library" && library?.accessRole === "owner" && (
+            <LibrarySharingSection library={library} />
           )}
 
           {/* Delete zone */}

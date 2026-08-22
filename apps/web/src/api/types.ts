@@ -33,6 +33,15 @@ export interface Library {
   icon: string | null;
   iconColor: string | null;
   documentCount: number;
+  ownerUsername: string;
+  accessRole: "owner" | "editor" | "viewer";
+}
+
+export interface LibraryMember {
+  userId: number;
+  username: string;
+  avatarUrl: string | null;
+  role: "editor" | "viewer";
 }
 
 export interface Collection {

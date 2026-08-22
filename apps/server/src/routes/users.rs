@@ -145,6 +145,20 @@ pub async fn remove_user(
             "you cannot remove your own account".into(),
         ));
     }
+    let owned_content: i64 = sqlx::query_scalar(
+        "SELECT
+            (SELECT COUNT(*) FROM libraries WHERE owner_id = ?) +
+            (SELECT COUNT(*) FROM documents WHERE owner_id = ?)",
+    )
+    .bind(target_id)
+    .bind(target_id)
+    .fetch_one(&state.db)
+    .await?;
+    if owned_content != 0 {
+        return Err(AppError::Conflict(
+            "remove or transfer this user's libraries and documents first".into(),
+        ));
+    }
     let result = sqlx::query("DELETE FROM users WHERE id = ? AND github_user_id IS NOT NULL")
         .bind(target_id)
         .execute(&state.db)

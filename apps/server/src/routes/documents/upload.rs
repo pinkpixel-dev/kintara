@@ -5,6 +5,8 @@ use axum::http::StatusCode;
 use axum::Json;
 use tokio::io::AsyncWriteExt;
 
+use crate::access;
+use crate::current_user::CurrentUser;
 use crate::error::{AppError, AppResult};
 use crate::media;
 use crate::models::Document;
@@ -32,6 +34,7 @@ const INCOMING_DIR: &str = ".kintara-incoming";
 /// NAS with 2 GB of RAM falls over.
 pub async fn upload(
     State(state): State<AppState>,
+    CurrentUser(user_id): CurrentUser,
     mut multipart: Multipart,
 ) -> AppResult<(StatusCode, Json<Document>)> {
     let incoming = state.config.library_dir.join(INCOMING_DIR);
@@ -119,7 +122,7 @@ pub async fn upload(
     let upload = upload.ok_or_else(|| AppError::BadRequest("no file provided".into()))?;
 
     // From here on any early return has to remove the temp file.
-    let result = finish(&state, &upload, library_id, collection_id).await;
+    let result = finish(&state, user_id, &upload, library_id, collection_id).await;
     if result.is_err() {
         let _ = tokio::fs::remove_file(&upload.temp_path).await;
     }
@@ -136,8 +139,9 @@ struct StreamedUpload {
 
 async fn finish(
     state: &AppState,
+    user_id: i64,
     upload: &StreamedUpload,
-    library_id: Option<i64>,
+    mut library_id: Option<i64>,
     collection_id: Option<i64>,
 ) -> AppResult<(StatusCode, Json<Document>)> {
     if upload.size == 0 {
@@ -145,8 +149,11 @@ async fn finish(
     }
 
     // The same file uploaded twice should not become two library entries.
-    let existing: Option<i64> = sqlx::query_scalar("SELECT id FROM documents WHERE file_hash = ?")
+    let existing: Option<i64> = sqlx::query_scalar(
+        "SELECT id FROM documents WHERE file_hash = ? AND owner_id = ?",
+    )
         .bind(&upload.hash)
+        .bind(user_id)
         .fetch_optional(&state.db)
         .await?;
 
@@ -154,6 +161,24 @@ async fn finish(
         return Err(AppError::Conflict(format!(
             "this file is already in the library as document {id}"
         )));
+    }
+
+    if let Some(collection_id) = collection_id {
+        let parent_id: i64 =
+            sqlx::query_scalar("SELECT library_id FROM collections WHERE id = ?")
+                .bind(collection_id)
+                .fetch_optional(&state.db)
+                .await?
+                .ok_or(AppError::NotFound)?;
+        access::require_library_editor(state, parent_id, user_id).await?;
+        if library_id.is_some_and(|id| id != parent_id) {
+            return Err(AppError::BadRequest(
+                "the collection does not belong to the selected library".into(),
+            ));
+        }
+        library_id = Some(parent_id);
+    } else if let Some(library_id) = library_id {
+        access::require_library_editor(state, library_id, user_id).await?;
     }
 
     let relative_path = unique_relative_path(state, &upload.filename).await?;
@@ -184,11 +209,12 @@ async fn finish(
 
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO documents
-            (title, author, relative_path, document_type, file_hash, file_size,
+            (owner_id, title, author, relative_path, document_type, file_hash, file_size,
              keywords, page_count, year, indexed_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
          RETURNING id",
     )
+    .bind(user_id)
     .bind(&title)
     .bind(&metadata.author)
     .bind(&relative_path)
@@ -233,7 +259,7 @@ async fn finish(
         .await?;
     }
 
-    let document = super::fetch_one(state, id, 0).await?;
+    let document = super::fetch_one(state, id, user_id).await?;
     Ok((StatusCode::CREATED, Json(document)))
 }
 
@@ -243,9 +269,11 @@ async fn finish(
 /// library, because they are derived assets rather than documents.
 pub async fn upload_cover(
     State(state): State<AppState>,
+    CurrentUser(user_id): CurrentUser,
     axum::extract::Path(id): axum::extract::Path<i64>,
     mut multipart: Multipart,
 ) -> AppResult<StatusCode> {
+    access::require_document_editor(&state, id, user_id).await?;
     let previous: Option<Option<String>> =
         sqlx::query_scalar("SELECT thumbnail_name FROM documents WHERE id = ?")
             .bind(id)

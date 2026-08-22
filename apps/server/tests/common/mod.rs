@@ -101,6 +101,52 @@ impl TestApp {
         self.request(request).await
     }
 
+    pub async fn session_cookie_for(&self, user_id: i64) -> String {
+        let state = AppState::new(self.db.clone(), self.config.clone());
+        let session = auth::create_session(&state, user_id)
+            .await
+            .expect("test session");
+        format!("kintara_session={session}")
+    }
+
+    pub async fn request_as(&self, mut request: Request<Body>, user_id: i64) -> Response {
+        request.headers_mut().insert(
+            axum::http::header::COOKIE,
+            self.session_cookie_for(user_id)
+                .await
+                .parse()
+                .expect("valid test cookie"),
+        );
+        self.request(request).await
+    }
+
+    pub async fn get_as(&self, uri: &str, user_id: i64) -> Response {
+        self.request_as(
+            Request::builder().uri(uri).body(Body::empty()).unwrap(),
+            user_id,
+        )
+        .await
+    }
+
+    pub async fn send_json_as(
+        &self,
+        method: &str,
+        uri: &str,
+        body: serde_json::Value,
+        user_id: i64,
+    ) -> Response {
+        self.request_as(
+            Request::builder()
+                .method(method)
+                .uri(uri)
+                .header("content-type", "application/json")
+                .body(Body::from(body.to_string()))
+                .unwrap(),
+            user_id,
+        )
+        .await
+    }
+
     pub async fn send_json(&self, method: &str, uri: &str, body: serde_json::Value) -> Response {
         self.authenticated_request(
             Request::builder()
@@ -213,10 +259,15 @@ impl TestApp {
         document_type: &str,
         file_size: i64,
     ) -> i64 {
+        let owner_id: i64 = sqlx::query_scalar("SELECT id FROM users ORDER BY id LIMIT 1")
+            .fetch_one(&self.db)
+            .await
+            .expect("seeded owner");
         sqlx::query_scalar(
-            "INSERT INTO documents (title, relative_path, document_type, file_size)
-             VALUES (?, ?, ?, ?) RETURNING id",
+            "INSERT INTO documents (owner_id, title, relative_path, document_type, file_size)
+             VALUES (?, ?, ?, ?, ?) RETURNING id",
         )
+        .bind(owner_id)
         .bind(title)
         .bind(relative_path)
         .bind(document_type)

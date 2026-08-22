@@ -1,0 +1,219 @@
+.sidebar-library-group {
+  min-width: 0;
+}
+
+.sidebar-section-heading {
+  gap: 0.35rem;
+}
+
+.sidebar-section-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+
+.sidebar-section-toggle:focus-visible,
+.sidebar-row-icon-btn:focus-visible,
+.sidebar-row-action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sidebar-section-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 0.67rem;
+  line-height: 1;
+}
+
+.sidebar-library-row {
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+.sidebar-library-row .sidebar-row-label {
+  flex: 1;
+}
+
+.sidebar-library-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.sidebar-library-name small {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-item.active .sidebar-library-name small {
+  color: currentColor;
+  opacity: 0.72;
+}
+
+.sidebar-collection-row {
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem 0.4rem 2.25rem;
+  font-size: 0.875rem;
+}
+
+.sidebar-group-empty,
+.sidebar-feedback {
+  margin: 0.2rem 0.5rem 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.sidebar-feedback {
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.library-sharing {
+  display: grid;
+  gap: 1rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.library-sharing h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.library-sharing p {
+  margin: 0.25rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.library-share-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 7rem auto;
+  align-items: end;
+  gap: 0.6rem;
+}
+
+.library-share-form label {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.library-share-form .btn {
+  min-height: 38px;
+  white-space: nowrap;
+}
+
+.library-member-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.library-member {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 7rem 2.25rem;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+}
+
+.library-member > div {
+  display: grid;
+  min-width: 0;
+}
+
+.library-member strong,
+.library-member span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-member strong {
+  color: var(--text-primary);
+  font-size: 0.8rem;
+}
+
+.library-member span {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+}
+
+.library-member-remove {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+}
+
+.library-sharing-empty {
+  padding: 0.7rem;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+@media (max-width: 560px) {
+  .library-share-form {
+    grid-template-columns: minmax(0, 1fr) 6.5rem;
+  }
+
+  .library-share-form .btn {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+  }
+
+  .library-member {
+    grid-template-columns: minmax(0, 1fr) 6.5rem 2.75rem;
+  }
+
+  .library-member-remove {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+}
+
+@media (hover: none) {
+  .sidebar-section-toggle,
+  .sidebar-row-icon-btn,
+  .sidebar-row-action {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

@@ -1,28 +1,13 @@
 import { useState, useEffect } from "react";
 import {
-  Search, Library as LibraryIcon, Star, Plus, ChevronRight, ChevronDown,
-  FolderOpen, Settings, HelpCircle,
+  Search, Library as LibraryIcon, Star, Plus, Settings, HelpCircle,
   LogOut, X, Clock,
-  BookOpen, BookMarked, Palette,
-  Monitor, Code2, Music, Film, Camera,
-  Dumbbell, Plane, Heart, Coffee,
-  Leaf, Globe, Briefcase, Gamepad2, FlaskConical,
-  GraduationCap, Microscope, Landmark, Building2,
-  ChefHat, TreePine, Waves, Rocket, Bot
 } from "lucide-react";
-import { ApiError, collectionService, libraryService, type Collection, type Library } from "../api";
+import { collectionService, libraryService, type Collection, type Library } from "../api";
 import { authService } from "../api/auth";
 import { SidebarPrompt, type PromptConfig } from "./SidebarPrompt";
 import { SidebarRowMenu, type RowMenuState } from "./SidebarRowMenu";
-
-// Map icon name strings → components for rendering
-const ICON_MAP: Record<string, React.ElementType> = {
-  Library: LibraryIcon, BookOpen, BookMarked, FolderOpen, Palette,
-  Monitor, Code2, Music, Film, Camera, FlaskConical, Dumbbell, Plane,
-  Heart, Star, Coffee, Leaf, Globe, Briefcase, Gamepad2,
-  GraduationCap, Microscope, Landmark, Building2, ChefHat, TreePine,
-  Waves, Rocket, Bot,
-};
+import { SidebarLibraryGroup } from "./SidebarLibraryGroups";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -48,36 +33,23 @@ export interface ImportTarget {
   collectionId?: number;
 }
 
-/**
- * Shared across callers so the default library is only ever created once.
- *
- * `loadData` both reads and writes, and React invokes effects twice in
- * development, so two overlapping calls would each see an empty list and both
- * POST. Deduping here means one request rather than one plus a 409.
- */
-let defaultLibraryInFlight: Promise<void> | null = null;
-
-async function ensureDefaultLibrary(): Promise<void> {
-  defaultLibraryInFlight ??= (async () => {
-    try {
-      await libraryService.create({ name: "My Library", themeColor: "#410186" });
-    } catch (err) {
-      // Another tab or an earlier run got there first; that is the desired end
-      // state either way.
-      if (!(err instanceof ApiError && err.status === 409)) {
-        defaultLibraryInFlight = null;
-        throw err;
-      }
-    }
-  })();
-
-  return defaultLibraryInFlight;
-}
-
 export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setActiveView, onSearchEverywhere, onScopeNameChange, onImport }: SidebarProps) {
   const [libraries, setLibraries] = useState<Library[]>([]);
   const [collectionsByLibrary, setCollectionsByLibrary] = useState<Record<number, Collection[]>>({});
-  const [expandedLibraries, setExpandedLibraries] = useState<Record<number, boolean>>({});
+  const [expandedLibraries, setExpandedLibraries] = useState<Record<number, boolean>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("kintara.sidebar.expandedLibraries") ?? "{}");
+    } catch {
+      return {};
+    }
+  });
+  const [ownedExpanded, setOwnedExpanded] = useState(
+    () => localStorage.getItem("kintara.sidebar.myLibraries") !== "false",
+  );
+  const [sharedExpanded, setSharedExpanded] = useState(
+    () => localStorage.getItem("kintara.sidebar.sharedLibraries") === "true",
+  );
+  const [sidebarMessage, setSidebarMessage] = useState<string | null>(null);
 
   const [prompt, setPrompt] = useState<PromptConfig | null>(null);
 
@@ -100,11 +72,7 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
 
   const loadData = async () => {
     try {
-      let libs = await libraryService.list();
-      if (libs.length === 0) {
-        await ensureDefaultLibrary();
-        libs = await libraryService.list();
-      }
+      const libs = await libraryService.list();
       setLibraries(libs);
 
       const colMap: Record<number, Collection[]> = {};
@@ -112,7 +80,7 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
       for (const lib of libs) {
         const cols = await collectionService.list(lib.id);
         colMap[lib.id] = cols;
-        if (expMap[lib.id] === undefined) expMap[lib.id] = true;
+        if (expMap[lib.id] === undefined) expMap[lib.id] = false;
       }
       setCollectionsByLibrary(colMap);
       setExpandedLibraries(expMap);
@@ -124,44 +92,26 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
   useEffect(() => {
     loadData();
 
-    // Listen for custom event to trigger library rename for onboarding
-    const handleRenamePrompt = async () => {
-      // Onboarding is tracked per device in localStorage, but libraries live on
-      // the server and are shared. A second device, a different browser, or
-      // cleared site data would otherwise re-run onboarding and rename a
-      // library the user had already set up. Ask the server what actually
-      // exists rather than trusting the local flag.
-      const libs = await libraryService.list().catch(() => null);
-      if (libs === null) return;
-
-      const isUntouchedInstall =
-        libs.length === 0 ||
-        (libs.length === 1 && libs[0].name === "My Library" && libs[0].documentCount === 0);
-
-      if (!isUntouchedInstall) return;
-
-      openPrompt("Name your first library", "Library name...", "My Library", async (val) => {
-        const current = await libraryService.list();
-        if (current.length > 0) {
-          await libraryService.update(current[0].id, { name: val });
-        } else {
-          // The default library never got made, so create rather than give up.
-          await libraryService.create({ name: val, themeColor: "#410186" });
-        }
-        await loadData();
-      });
-    };
-    window.addEventListener('prompt-rename-first-library', handleRenamePrompt);
-
     // Listen for sidebar reload requests (e.g. after library/collection edit from App.tsx)
     const handleReload = () => loadData();
     window.addEventListener('reload-sidebar', handleReload);
 
     return () => {
-      window.removeEventListener('prompt-rename-first-library', handleRenamePrompt);
       window.removeEventListener('reload-sidebar', handleReload);
     };
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem("kintara.sidebar.expandedLibraries", JSON.stringify(expandedLibraries));
+  }, [expandedLibraries]);
+
+  useEffect(() => {
+    localStorage.setItem("kintara.sidebar.myLibraries", String(ownedExpanded));
+  }, [ownedExpanded]);
+
+  useEffect(() => {
+    localStorage.setItem("kintara.sidebar.sharedLibraries", String(sharedExpanded));
+  }, [sharedExpanded]);
 
   const toggleLibrary = (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -202,6 +152,12 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
   useEffect(() => {
     onScopeNameChange(scopeName);
   }, [scopeName, onScopeNameChange]);
+
+  const ownedLibraries = libraries.filter((library) => library.accessRole === "owner");
+  const sharedLibraries = libraries.filter((library) => library.accessRole !== "owner");
+  const openSettings = (type: "library" | "collection", id: number) => {
+    window.dispatchEvent(new CustomEvent("open-entity-settings", { detail: { type, id } }));
+  };
 
   if (!isOpen) return null;
 
@@ -287,150 +243,47 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
             </div>
           </div>
 
-          <div>
-            <div className="sidebar-section-label">
-              Libraries
-              <button
-                className="sidebar-section-add"
-                title="New Library"
-                aria-label="New Library"
-                onClick={() => {
-                  openPrompt("Create Library", "Library name...", "", async (val) => {
-                    await libraryService.create({ name: val });
-                    await loadData();
-                  });
-                }}
-              >
-                <Plus size={12} />
-              </button>
-            </div>
-            <div className="sidebar-tree">
-              {libraries.map(lib => {
-                const isExpanded = expandedLibraries[lib.id];
-                const collections = collectionsByLibrary[lib.id] || [];
-                const isActiveLib = activeView.type === 'library' && activeView.id === lib.id;
+          {sidebarMessage && <p className="sidebar-feedback" role="alert">{sidebarMessage}</p>}
 
-                // Resolve icon component
-                const LibIcon = (lib.icon && ICON_MAP[lib.icon]) ? ICON_MAP[lib.icon] : FolderOpen;
-                const iconColor = lib.iconColor || undefined;
+          <SidebarLibraryGroup
+            title="My Libraries"
+            libraries={ownedLibraries}
+            collectionsByLibrary={collectionsByLibrary}
+            expandedLibraries={expandedLibraries}
+            expanded={ownedExpanded}
+            activeView={activeView}
+            onToggleGroup={() => setOwnedExpanded((value) => !value)}
+            onToggleLibrary={toggleLibrary}
+            onSelect={setActiveView}
+            onCreateLibrary={() => openPrompt("Create Library", "Library name...", "", async (value) => {
+              await libraryService.create({ name: value });
+              await loadData();
+            })}
+            onImport={onImport}
+            onOpenMenu={(event, library) => openRowMenu(event, library.id, library.name)}
+            onAddDocument={(libraryId, documentId) => libraryService.addDocument(libraryId, documentId)}
+            onAddToCollection={(collectionId, documentId) => collectionService.addDocument(collectionId, documentId)}
+            onOpenSettings={openSettings}
+            onError={setSidebarMessage}
+          />
 
-                return (
-                  <div key={`lib-${lib.id}`}>
-                    <div
-                      className={`sidebar-item flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer text-sm ${isActiveLib ? 'active' : ''}`}
-                      onClick={() => setActiveView({ type: 'library', id: lib.id })}
-                      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
-                      onDrop={async (e) => {
-                        e.preventDefault();
-                        const docId = Number(e.dataTransfer.getData('text/plain'));
-                        if (docId) {
-                          await libraryService.addDocument(lib.id, docId);
-                          window.dispatchEvent(new CustomEvent('refresh-documents'));
-                        }
-                      }}
-                    >
-                      <div className="sidebar-row-label">
-                        <button
-                          className="sidebar-row-icon-btn"
-                          onClick={(e) => toggleLibrary(lib.id, e)}
-                        >
-                          {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                        </button>
-                        <LibIcon
-                          size={14}
-                          className="flex-shrink-0"
-                          style={isActiveLib ? {} : (iconColor ? { color: iconColor } : {})}
-                        />
-                        <span className="truncate">{lib.name}</span>
-                      </div>
-
-                      <div className="row-actions flex items-center flex-shrink-0">
-                        <button
-                          className="sidebar-row-action"
-                          title={`Add to ${lib.name}`}
-                          aria-label={`Add to ${lib.name}`}
-                          aria-haspopup="menu"
-                          aria-expanded={rowMenu?.libraryId === lib.id}
-                          onClick={(e) => openRowMenu(e, lib.id, lib.name)}
-                        >
-                          <Plus size={14} />
-                        </button>
-                        <button
-                          className="sidebar-row-action"
-                          title={`${lib.name} settings`}
-                          aria-label={`Settings for ${lib.name}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            window.dispatchEvent(
-                              new CustomEvent("open-entity-settings", {
-                                detail: { type: "library", id: lib.id },
-                              }),
-                            );
-                          }}
-                        >
-                          <Settings size={14} />
-                        </button>
-                      </div>
-                    </div>
-
-                    {isExpanded && collections.map(col => {
-                      const isActiveCol = activeView.type === 'collection' && activeView.id === col.id;
-                      return (
-                        <div
-                          key={`col-${col.id}`}
-                          className={`sidebar-item flex items-center gap-2 pl-9 pr-2 py-1.5 rounded-md cursor-pointer text-sm ${isActiveCol ? 'active' : ''}`}
-                          onClick={() => setActiveView({ type: 'collection', id: col.id })}
-                          onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
-                          onDrop={async (e) => {
-                            e.preventDefault();
-                            const docId = Number(e.dataTransfer.getData('text/plain'));
-                            if (docId) {
-                              await collectionService.addDocument(col.id, docId);
-                              window.dispatchEvent(new CustomEvent('refresh-documents'));
-                            }
-                          }}
-                        >
-                          <span className="sidebar-collection-dot"></span>
-                          <span className="truncate flex-1 min-w-0">{col.name}</span>
-                          <div className="row-actions flex items-center flex-shrink-0">
-                            {/* One action rather than a menu: a collection holds
-                                documents and nothing else, so there is nothing
-                                to choose between. */}
-                            <button
-                              className="sidebar-row-action"
-                              title={`Import a document into ${col.name}`}
-                              aria-label={`Import a document into ${col.name}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onImport({ libraryId: lib.id, collectionId: col.id });
-                              }}
-                            >
-                              <Plus size={14} />
-                            </button>
-                            <button
-                              className="sidebar-row-action"
-                              title={`${col.name} settings`}
-                              aria-label={`Settings for ${col.name}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                window.dispatchEvent(
-                                  new CustomEvent("open-entity-settings", {
-                                    detail: { type: "collection", id: col.id },
-                                  }),
-                                );
-                              }}
-                            >
-                              <Settings size={14} />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <SidebarLibraryGroup
+            title="Shared With Me"
+            libraries={sharedLibraries}
+            collectionsByLibrary={collectionsByLibrary}
+            expandedLibraries={expandedLibraries}
+            expanded={sharedExpanded}
+            activeView={activeView}
+            onToggleGroup={() => setSharedExpanded((value) => !value)}
+            onToggleLibrary={toggleLibrary}
+            onSelect={setActiveView}
+            onImport={onImport}
+            onOpenMenu={(event, library) => openRowMenu(event, library.id, library.name)}
+            onAddDocument={(libraryId, documentId) => libraryService.addDocument(libraryId, documentId)}
+            onAddToCollection={(collectionId, documentId) => collectionService.addDocument(collectionId, documentId)}
+            onOpenSettings={openSettings}
+            onError={setSidebarMessage}
+          />
         </div>
 
         {/* Sidebar Footer */}

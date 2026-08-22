@@ -190,6 +190,7 @@ async fn add(
     hash: &str,
     size: i64,
 ) -> AppResult<i64> {
+    let owner_id = crate::access::installation_owner_id(state).await?;
     let extension = extension_of(path);
     let metadata = if extension == "pdf" {
         media::extract_pdf_metadata(path).await
@@ -210,11 +211,12 @@ async fn add(
 
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO documents
-            (title, author, relative_path, document_type, file_hash, file_size,
+            (owner_id, title, author, relative_path, document_type, file_hash, file_size,
              keywords, page_count, year, indexed_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
          RETURNING id",
     )
+    .bind(owner_id)
     .bind(&title)
     .bind(&metadata.author)
     .bind(relative_path)

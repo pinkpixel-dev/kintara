@@ -1,5 +1,5 @@
 import { api, queryString } from "./client";
-import type { Annotation, Collection, Library, Tag } from "./types";
+import type { Annotation, Collection, Library, LibraryMember, Tag } from "./types";
 
 export const libraryService = {
   list(): Promise<Library[]> {
@@ -38,6 +38,22 @@ export const libraryService = {
 
   removeDocument(id: number, documentId: number): Promise<void> {
     return api.delete(`/api/libraries/${id}/documents/${documentId}`);
+  },
+
+  members(id: number): Promise<LibraryMember[]> {
+    return api.get(`/api/libraries/${id}/members`);
+  },
+
+  share(id: number, username: string, role: "viewer" | "editor"): Promise<LibraryMember> {
+    return api.post(`/api/libraries/${id}/members`, { username, role });
+  },
+
+  updateMember(id: number, userId: number, role: "viewer" | "editor"): Promise<LibraryMember> {
+    return api.patch(`/api/libraries/${id}/members/${userId}`, { role });
+  },
+
+  removeMember(id: number, userId: number): Promise<void> {
+    return api.delete(`/api/libraries/${id}/members/${userId}`);
   },
 };
 

@@ -4,6 +4,40 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-08-21
+
+### 🔐 Private libraries
+
+- Every library and document now has an owner. Existing NAS content belongs to the
+  installation owner, scanned files continue to belong to that owner, and browser
+  uploads belong to the person who uploaded them.
+- Library owners can share a library with an existing Kintara user as a viewer or editor.
+  Viewers can read its documents. Editors can also manage its documents and collections.
+  Only the document owner can delete the file from Kintara.
+- Document lists, search, Recent, Favorites, files, covers, annotations, tags, and AI
+  routes now apply the requesting user's access before returning or changing data.
+
+### 🗂️ Sidebar
+
+- The sidebar now separates `My Libraries` from `Shared With Me`. Both groups and each
+  library are collapsible, and their open state stays on the current device.
+- New accounts start without an automatic library. The user can create one from the
+  sidebar, while existing content remains with the installation owner.
+- Shared library rows show the owner's GitHub username. Viewer rows do not show import,
+  filing, collection settings, or sharing controls.
+
+### 🧪 Tests
+
+- Added real SQLite and Axum tests for private library isolation, same-name libraries,
+  viewer and editor permissions, permanent-delete protection, and access revocation.
+- Verified the sidebar and sharing modal against an isolated local server at 320px,
+  375px, 414px, 768px, and desktop widths. The browser reported no console errors or
+  horizontal overflow.
+
+### 🏷️ Versioning
+
+- Bumped Kintara from 1.6.0 to 1.7.0 for private libraries and explicit sharing.
+
 ## [1.6.0] - 2026-08-21
 
 ### 🤖 AI

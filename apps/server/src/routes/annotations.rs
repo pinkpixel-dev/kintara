@@ -3,6 +3,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
+use crate::access;
 use crate::current_user::CurrentUser;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
@@ -40,6 +41,7 @@ pub async fn for_document(
     CurrentUser(user_id): CurrentUser,
     Path(document_id): Path<i64>,
 ) -> AppResult<Json<Vec<Annotation>>> {
+    access::require_document_view(&state, document_id, user_id).await?;
     let annotations = sqlx::query_as::<_, Annotation>(
         "SELECT id, document_id, annotation_type, serialized_position, content, color, created_at
          FROM annotations
@@ -73,13 +75,7 @@ pub async fn create(
         ));
     }
 
-    let document_exists: Option<i64> = sqlx::query_scalar("SELECT id FROM documents WHERE id = ?")
-        .bind(body.document_id)
-        .fetch_optional(&state.db)
-        .await?;
-    if document_exists.is_none() {
-        return Err(AppError::NotFound);
-    }
+    access::require_document_view(&state, body.document_id, user_id).await?;
 
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO annotations
@@ -113,6 +109,16 @@ pub async fn delete(
     CurrentUser(user_id): CurrentUser,
     Path(id): Path<i64>,
 ) -> AppResult<StatusCode> {
+    let document_id: i64 = sqlx::query_scalar(
+        "SELECT document_id FROM annotations WHERE id = ? AND user_id = ?",
+    )
+    .bind(id)
+    .bind(user_id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    access::require_document_view(&state, document_id, user_id).await?;
+
     let result = sqlx::query("DELETE FROM annotations WHERE id = ? AND user_id = ?")
         .bind(id)
         .bind(user_id)

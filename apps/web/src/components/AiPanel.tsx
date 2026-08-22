@@ -56,7 +56,6 @@ export function AiPanel({ document, onClose, onUpdated }: Props) {
             <dl><div><dt>Provider</dt><dd>{preflight.provider === "openai" ? "OpenAI" : "Google"}</dd></div>
               <div><dt>Model</dt><dd>{preflight.model}</dd></div>
               <div><dt>Approx. input</dt><dd>{preflight.approximateInputTokens.toLocaleString()} tokens</dd></div></dl>
-            <p>Your document text will leave this NAS for this request. Provider storage is disabled.</p>
             {preflight.hasSummary && <p className="ai-warning">This will replace the existing summary.</p>}
             <div className="settings-actions"><button className="btn btn-ghost" onClick={() => setPreflight(null)}>Cancel</button>
               <button className="btn btn-primary" disabled={busy} onClick={requestSummary}>{busy ? "Summarizing…" : "Confirm and send"}</button></div>

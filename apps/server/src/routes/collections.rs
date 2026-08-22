@@ -4,6 +4,8 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
+use crate::access;
+use crate::current_user::CurrentUser;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 
@@ -50,6 +52,7 @@ pub fn router() -> Router<AppState> {
 
 pub async fn list(
     State(state): State<AppState>,
+    CurrentUser(user_id): CurrentUser,
     Query(query): Query<ListQuery>,
 ) -> AppResult<Json<Vec<Collection>>> {
     const SQL: &str = "
@@ -57,10 +60,14 @@ pub async fn list(
                (SELECT COUNT(*) FROM document_collections dc WHERE dc.collection_id = c.id)
                    AS document_count
         FROM collections c
-        WHERE (?1 IS NULL OR c.library_id = ?1)
+        JOIN libraries l ON l.id = c.library_id
+        LEFT JOIN library_members lm ON lm.library_id = l.id AND lm.user_id = ?1
+        WHERE (l.owner_id = ?1 OR lm.user_id IS NOT NULL)
+          AND (?2 IS NULL OR c.library_id = ?2)
         ORDER BY c.name COLLATE NOCASE ASC";
 
     let collections = sqlx::query_as::<_, Collection>(SQL)
+        .bind(user_id)
         .bind(query.library_id)
         .fetch_all(&state.db)
         .await?;
@@ -70,6 +77,7 @@ pub async fn list(
 
 pub async fn create(
     State(state): State<AppState>,
+    CurrentUser(user_id): CurrentUser,
     Json(body): Json<CreateCollection>,
 ) -> AppResult<(StatusCode, Json<Collection>)> {
     let name = body.name.trim();
@@ -77,15 +85,7 @@ pub async fn create(
         return Err(AppError::BadRequest("name cannot be empty".into()));
     }
 
-    // Checked explicitly so a bad library id reads as 404 rather than surfacing
-    // as an opaque foreign key violation.
-    let library_exists: Option<i64> = sqlx::query_scalar("SELECT id FROM libraries WHERE id = ?")
-        .bind(body.library_id)
-        .fetch_optional(&state.db)
-        .await?;
-    if library_exists.is_none() {
-        return Err(AppError::NotFound);
-    }
+    access::require_library_editor(&state, body.library_id, user_id).await?;
 
     let id: i64 =
         sqlx::query_scalar("INSERT INTO collections (library_id, name) VALUES (?, ?) RETURNING id")
@@ -94,11 +94,15 @@ pub async fn create(
             .fetch_one(&state.db)
             .await?;
 
-    Ok((StatusCode::CREATED, Json(fetch(&state, id).await?)))
+    Ok((
+        StatusCode::CREATED,
+        Json(fetch(&state, id, user_id).await?),
+    ))
 }
 
 pub async fn update(
     State(state): State<AppState>,
+    CurrentUser(user_id): CurrentUser,
     Path(id): Path<i64>,
     Json(body): Json<UpdateCollection>,
 ) -> AppResult<Json<Collection>> {
@@ -106,6 +110,13 @@ pub async fn update(
     if name.is_empty() {
         return Err(AppError::BadRequest("name cannot be empty".into()));
     }
+
+    let library_id: i64 = sqlx::query_scalar("SELECT library_id FROM collections WHERE id = ?")
+        .bind(id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    access::require_library_editor(&state, library_id, user_id).await?;
 
     let result = sqlx::query("UPDATE collections SET name = ? WHERE id = ?")
         .bind(name)
@@ -117,10 +128,20 @@ pub async fn update(
         return Err(AppError::NotFound);
     }
 
-    Ok(Json(fetch(&state, id).await?))
+    Ok(Json(fetch(&state, id, user_id).await?))
 }
 
-pub async fn delete(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<StatusCode> {
+pub async fn delete(
+    State(state): State<AppState>,
+    CurrentUser(user_id): CurrentUser,
+    Path(id): Path<i64>,
+) -> AppResult<StatusCode> {
+    let library_id: i64 = sqlx::query_scalar("SELECT library_id FROM collections WHERE id = ?")
+        .bind(id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    access::require_library_editor(&state, library_id, user_id).await?;
     let result = sqlx::query("DELETE FROM collections WHERE id = ?")
         .bind(id)
         .execute(&state.db)
@@ -135,8 +156,21 @@ pub async fn delete(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
 
 pub async fn add_document(
     State(state): State<AppState>,
+    CurrentUser(user_id): CurrentUser,
     Path((id, document_id)): Path<(i64, i64)>,
 ) -> AppResult<StatusCode> {
+    let library_id: i64 = sqlx::query_scalar("SELECT library_id FROM collections WHERE id = ?")
+        .bind(id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    access::require_library_editor(&state, library_id, user_id).await?;
+    access::require_document_owner(&state, document_id, user_id).await?;
+    sqlx::query("INSERT OR IGNORE INTO library_documents (library_id, document_id) VALUES (?, ?)")
+        .bind(library_id)
+        .bind(document_id)
+        .execute(&state.db)
+        .await?;
     sqlx::query(
         "INSERT OR IGNORE INTO document_collections (collection_id, document_id) VALUES (?, ?)",
     )
@@ -150,8 +184,15 @@ pub async fn add_document(
 
 pub async fn remove_document(
     State(state): State<AppState>,
+    CurrentUser(user_id): CurrentUser,
     Path((id, document_id)): Path<(i64, i64)>,
 ) -> AppResult<StatusCode> {
+    let library_id: i64 = sqlx::query_scalar("SELECT library_id FROM collections WHERE id = ?")
+        .bind(id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    access::require_library_editor(&state, library_id, user_id).await?;
     sqlx::query("DELETE FROM document_collections WHERE collection_id = ? AND document_id = ?")
         .bind(id)
         .bind(document_id)
@@ -161,14 +202,19 @@ pub async fn remove_document(
     Ok(StatusCode::NO_CONTENT)
 }
 
-async fn fetch(state: &AppState, id: i64) -> AppResult<Collection> {
+async fn fetch(state: &AppState, id: i64, user_id: i64) -> AppResult<Collection> {
     sqlx::query_as::<_, Collection>(
         "SELECT c.id, c.library_id, c.name,
                 (SELECT COUNT(*) FROM document_collections dc WHERE dc.collection_id = c.id)
                     AS document_count
-         FROM collections c WHERE c.id = ?",
+         FROM collections c
+         JOIN libraries l ON l.id = c.library_id
+         LEFT JOIN library_members lm ON lm.library_id = l.id AND lm.user_id = ?
+         WHERE c.id = ? AND (l.owner_id = ? OR lm.user_id IS NOT NULL)",
     )
+    .bind(user_id)
     .bind(id)
+    .bind(user_id)
     .fetch_optional(&state.db)
     .await?
     .ok_or(AppError::NotFound)

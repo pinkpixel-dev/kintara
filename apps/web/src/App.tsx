@@ -293,11 +293,6 @@ function App() {
   const handleOnboardingComplete = () => {
     setShowOnboarding(false);
     saveSettings({ ...loadSettings(), hasSeenOnboarding: true });
-
-    // Trigger prompt to rename first library
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('prompt-rename-first-library'));
-    }, 400);
   };
 
   const handleLibSettingsSaved = () => {

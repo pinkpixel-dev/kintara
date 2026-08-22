@@ -26,9 +26,10 @@ async fn seed(pool: &SqlitePool) -> (i64, i64) {
         .expect("insert user");
 
     let doc_id: i64 = sqlx::query_scalar(
-        "INSERT INTO documents (title, relative_path, document_type)
-         VALUES (?, ?, ?) RETURNING id",
+        "INSERT INTO documents (owner_id, title, relative_path, document_type)
+         VALUES (?, ?, ?, ?) RETURNING id",
     )
+    .bind(user_id)
     .bind("Attention Is All You Need")
     .bind("papers/attention.pdf")
     .bind("pdf")
@@ -57,6 +58,7 @@ async fn migrations_apply_to_an_empty_database() {
         "document_pages",
         "github_invitations",
         "libraries",
+        "library_members",
         "user_ai_settings",
         "user_document_state",
         "users",
@@ -171,8 +173,15 @@ async fn deleting_a_document_cascades_to_per_user_state_and_annotations() {
 async fn deleting_a_library_cascades_to_its_collections() {
     let (_dir, pool) = fresh_db().await;
 
-    let library_id: i64 =
-        sqlx::query_scalar("INSERT INTO libraries (name) VALUES ('Papers') RETURNING id")
+    let owner_id: i64 = sqlx::query_scalar("SELECT id FROM users ORDER BY id LIMIT 1")
+        .fetch_one(&pool)
+        .await
+        .expect("seeded owner");
+
+    let library_id: i64 = sqlx::query_scalar(
+        "INSERT INTO libraries (owner_id, name) VALUES (?, 'Papers') RETURNING id",
+    )
+            .bind(owner_id)
             .fetch_one(&pool)
             .await
             .expect("insert library");
@@ -269,8 +278,9 @@ async fn relative_path_is_unique() {
     seed(&pool).await;
 
     let duplicate = sqlx::query(
-        "INSERT INTO documents (title, relative_path, document_type)
-         VALUES ('Another', 'papers/attention.pdf', 'pdf')",
+        "INSERT INTO documents (owner_id, title, relative_path, document_type)
+         VALUES ((SELECT id FROM users ORDER BY id LIMIT 1), 'Another',
+                 'papers/attention.pdf', 'pdf')",
     )
     .execute(&pool)
     .await;
