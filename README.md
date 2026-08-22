@@ -100,11 +100,16 @@ secret manager.
 The AI button appears only after you enable AI and open a document. Ask a question in the
 right panel or use the Summarize action below the composer. Before a summary request,
 Kintara shows the provider, model, approximate input tokens, and replacement warning.
-Document owners and shared-library editors can also choose Suggest with AI in Details.
+Document owners and shared-library editors can also choose Suggest metadata with AI in Details.
 Kintara shows the provider, model, and input estimate before sending readable document
 text, then returns field-by-field candidates to review. It does not invent a missing
 author or publication year, and applying a candidate does not write anything until Save
-Details is pressed. OpenAI and Google text requests always set `store: false`. Kintara
+Details is pressed. Details also lets editors upload or replace a cover, including the
+first-page cover extracted from a PDF, or open the same generator found in the AI panel's
+Cover tab. The generator can use document metadata or a custom prompt, previews one
+candidate, and writes it only after Accept. A custom cover request sends only that prompt;
+the standard cover request sends title, author, keywords, and summary. Neither sends
+document text. OpenAI and Google text requests always set `store: false`. Kintara
 stores each person's chat history itself and sends only recent messages needed for a
 follow-up. There is no automatic or background AI processing.
 
@@ -115,7 +120,7 @@ You need Rust, Node, and `poppler-utils` (for `pdfinfo`, `pdftoppm`, and `pdftot
 ```bash
 npm install
 npm run dev      # starts the API on :8080 and the frontend on :1420
-npm test         # 224 tests, no mocks
+npm test         # 230 tests, no mocks
 ```
 
 `npm run dev` runs both halves — the frontend proxies `/api` to the server, so starting

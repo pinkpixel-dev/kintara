@@ -156,7 +156,7 @@ export function AiMetadataSuggestions({ document, onApply }: Props) {
         </div>
       ) : (
         <button className="btn btn-ghost ai-metadata-trigger" onClick={() => setConfirming(true)}>
-          <Sparkles size={15} aria-hidden="true" /> Suggest with AI
+          <Sparkles size={15} aria-hidden="true" /> Suggest metadata with AI
         </button>
       )}
 

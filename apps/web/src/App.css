@@ -686,7 +686,7 @@ select, option {
 
 /* Inspector Pane */
 .inspector-pane {
-  width: 300px;
+  width: 360px;
   background-color: var(--bg-secondary);
   border-left: 1px solid var(--border-color);
   display: flex;
@@ -714,7 +714,7 @@ select, option {
 }
 
 /*
-  The cover well in the details panel, which doubles as the file picker.
+  The static cover well in the details panel. The upload action sits below it.
 
   `group` and its `group-hover:` partners are Tailwind's parent-hover mechanism
   and do not exist in this stylesheet, so the icon and label never responded to
@@ -733,42 +733,24 @@ select, option {
   border: 1px dashed var(--border-color);
   border-radius: var(--radius-md);
   background-color: var(--bg-tertiary);
-  cursor: pointer;
-  transition: border-color 150ms ease;
-}
-
-.cover-picker:hover,
-.cover-picker:focus-visible {
-  border-color: var(--accent);
-}
-
-.cover-picker:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 .cover-picker-icon {
   color: var(--text-muted);
   opacity: 0.5;
   margin-bottom: 0.5rem;
-  transition: color 150ms ease;
 }
 
 .cover-picker-label {
   font-size: 0.75rem;
   line-height: 1rem;
   color: var(--text-muted);
-  transition: color 150ms ease;
 }
 
-.cover-picker:hover .cover-picker-icon,
-.cover-picker:focus-visible .cover-picker-icon {
-  color: var(--accent);
-}
-
-.cover-picker:hover .cover-picker-label,
-.cover-picker:focus-visible .cover-picker-label {
-  color: var(--text-primary);
+.cover-upload-action {
+  width: 100%;
+  justify-content: center;
+  white-space: nowrap;
 }
 
 /* A tag on a document, with its own dismiss. */

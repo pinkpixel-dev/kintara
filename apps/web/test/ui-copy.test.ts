@@ -37,9 +37,10 @@ test("authentication copy is deployment neutral", async () => {
 });
 
 test("copy that affects a decision remains visible", async () => {
-  const [aiPanel, aiMetadata, details, authGate] = await Promise.all([
+  const [aiPanel, aiMetadata, aiCover, details, authGate] = await Promise.all([
     component("AiPanel.tsx"),
     component("AiMetadataSuggestions.tsx"),
+    component("AiCoverMode.tsx"),
     component("DetailsSidebar.tsx"),
     component("AuthGate.tsx"),
   ]);
@@ -49,6 +50,14 @@ test("copy that affects a decision remains visible", async () => {
   assert.match(aiMetadata, /Confirm provider request/);
   assert.match(aiMetadata, /document text is sent to your AI provider with storage disabled/);
   assert.match(aiMetadata, /Nothing changes until you apply suggestions and save details/);
+  assert.match(aiMetadata, /Metadata suggestions/);
+  assert.match(aiMetadata, /Suggest metadata with AI/);
+  assert.match(aiCover, /title, author, keywords, and summary are sent/);
+  assert.match(aiCover, /custom prompt is sent\. Document metadata and text are not/i);
+  assert.match(aiCover, /OpenAI's image endpoint has no retention setting/);
+  assert.match(aiCover, /already has a cover\. You can compare\s+before replacing it/);
+  assert.match(aiPanel, /<AiCoverMode/);
+  assert.match(details, /<AiCoverMode/);
   assert.match(details, />Year<\/label>/);
   assert.match(authGate, /first GitHub account to sign in becomes the owner/);
 });

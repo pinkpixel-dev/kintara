@@ -4,6 +4,46 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-08-22
+
+### 🖼️ Cover editing
+
+- Added the same cover generator to Details and the AI panel's Cover tab. Both surfaces
+  keep generated images as candidates until Accept sends them through the ordinary cover
+  upload route.
+- Added an explicit upload or replace action in Details, including for PDFs currently
+  using their first page as the cover.
+- Widened the desktop Details panel and separated cover controls from metadata suggestions.
+
+### ✍️ Custom prompts
+
+- Added a custom cover prompt option in Details and the AI panel, with a Unicode-aware
+  1,000-character limit.
+- Kept the two request modes distinct. Standard generation sends title, author, keywords,
+  and summary; custom generation sends only the reader-written prompt. Neither sends
+  document text.
+- Shows the exact request contents and provider retention disclosure before generation.
+
+### 🐛 Fixes
+
+- Allowed cover generation for scanned and image-only PDFs that have no readable text.
+- Surfaced cover upload failures in Details instead of leaving them only in the console.
+- Renamed the metadata action to Suggest metadata with AI and gave it a labelled section,
+  so it is not mistaken for another cover action.
+
+### 🧪 Tests
+
+- Added route coverage for custom prompt validation, editor permissions, signed-out
+  refusal, and cover preflight on an unreadable PDF.
+- Added frontend checks for shared cover-generator wiring, decision copy, metadata action
+  labelling, and Unicode-aware prompt limits.
+- The full server and web suites pass with 230 tests. The production frontend build and
+  CSS class check also pass.
+
+### 🏷️ Versioning
+
+- Bumped Kintara from 1.12.0 to 1.13.0 for the expanded cover workflow.
+
 ## [1.12.0] - 2026-08-22
 
 ### 🧾 AI metadata

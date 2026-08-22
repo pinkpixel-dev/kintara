@@ -56,6 +56,7 @@ export interface SummaryPreflight {
   hasSummary: boolean;
   canSummarize: boolean;
   canSuggestMetadata: boolean;
+  canGenerateCover: boolean;
   imageModel: string;
   hasCover: boolean;
   /** True when this provider's image endpoint cannot disable retention. */
@@ -154,8 +155,9 @@ export const aiService = {
       expectedProvider,
       expectedModel,
     }),
-  generateCover: (documentId: number) =>
-    api.post<CoverCandidate>(`/api/ai/documents/${documentId}/cover`, {}),
+  generateCover: (documentId: number, customPrompt?: string) =>
+    api.post<CoverCandidate>(`/api/ai/documents/${documentId}/cover`,
+      customPrompt === undefined ? {} : { customPrompt }),
   find: (documentId: number, request: string) =>
     api.post<{ passages: AiPassage[] }>(`/api/ai/documents/${documentId}/find`, { request }),
   search: (request: string, scope: { libraryId?: number; collectionId?: number } = {}) =>

@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useRef } from "react";
 import { ApiError, documentService, documentUrls, tagService, type Document, type Tag } from "../api";
-import { Save, Image as ImageIcon, X } from "lucide-react";
+import { Save, Image as ImageIcon, Upload, X } from "lucide-react";
 import { AiMetadataSuggestions } from "./AiMetadataSuggestions";
+import { AiCoverMode } from "./AiCoverMode";
 
 interface DetailsSidebarProps {
   document: Document;
@@ -27,6 +28,7 @@ export function DetailsSidebar({ document, aiEnabled, onUpdate, onClose }: Detai
   const [tags, setTags] = useState<Tag[]>([]);
   const [newTagInput, setNewTagInput] = useState("");
   const [coverVersion, setCoverVersion] = useState(0);
+  const [coverError, setCoverError] = useState<string | null>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -54,6 +56,7 @@ export function DetailsSidebar({ document, aiEnabled, onUpdate, onClose }: Detai
     event.target.value = "";
     if (!file) return;
 
+    setCoverError(null);
     try {
       await documentService.uploadCover(document.id, file);
       setDocState(prev => ({ ...prev, hasThumbnail: true }));
@@ -63,7 +66,19 @@ export function DetailsSidebar({ document, aiEnabled, onUpdate, onClose }: Detai
       onUpdate();
     } catch (err) {
       console.error("Failed to update cover", err);
+      setCoverError(err instanceof ApiError ? err.message : "That cover could not be uploaded.");
     }
+  };
+
+  const handleGeneratedCover = (updated: Document) => {
+    setDocState((current) => ({
+      ...current,
+      hasThumbnail: updated.hasThumbnail,
+      coverVersion: updated.coverVersion,
+    }));
+    setCoverVersion((value) => value + 1);
+    setCoverError(null);
+    onUpdate();
   };
 
   const handleAddTag = async (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -131,7 +146,7 @@ export function DetailsSidebar({ document, aiEnabled, onUpdate, onClose }: Detai
   };
 
   return (
-    <aside className="inspector-pane transition-all duration-300 flex-shrink-0 w-80 bg-[var(--bg-secondary)] border-l border-[var(--border-color)] flex flex-col h-full">
+    <aside className="inspector-pane transition-all duration-300 flex-shrink-0 bg-[var(--bg-secondary)] border-l border-[var(--border-color)] flex flex-col h-full">
       <div className="inspector-header font-semibold py-3 px-4 border-b border-[var(--border-color)] flex justify-between items-center">
         <span>Details</span>
         <button
@@ -154,26 +169,31 @@ export function DetailsSidebar({ document, aiEnabled, onUpdate, onClose }: Detai
           className="hidden"
           onChange={handleCoverSelected}
         />
-        <button
-          type="button"
-          className="cover-picker"
-          onClick={() => coverInputRef.current?.click()}
-          title="Change cover image"
-          aria-label="Change cover image"
-        >
+        <div className="cover-picker" aria-label="Current document cover">
           {docState.hasThumbnail ? (
             <img
-              src={`${documentUrls.thumbnail(docState.id)}?v=${coverVersion}`}
-              alt=""
+              src={`${documentUrls.thumbnail(docState.id)}?v=${docState.coverVersion ?? "cover"}-${coverVersion}`}
+              alt={`Cover for ${docState.title}`}
               className="object-cover w-full h-full"
             />
           ) : (
             <>
               <ImageIcon size={32} className="cover-picker-icon" />
-              <span className="cover-picker-label">Click to upload cover</span>
+              <span className="cover-picker-label">No cover selected</span>
             </>
           )}
+        </div>
+
+        <button type="button" className="btn btn-ghost cover-upload-action"
+          onClick={() => coverInputRef.current?.click()}>
+          <Upload size={15} aria-hidden="true" />
+          {docState.hasThumbnail ? "Upload a different cover" : "Upload cover"}
         </button>
+        {coverError && <p className="auth-error" role="alert">{coverError}</p>}
+
+        {aiEnabled && (
+          <AiCoverMode document={docState} onUpdated={handleGeneratedCover} embedded />
+        )}
 
         {aiEnabled && (
           <AiMetadataSuggestions document={docState} onApply={setDocState} />
