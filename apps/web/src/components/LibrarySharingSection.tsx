@@ -77,10 +77,7 @@ export function LibrarySharingSection({ library }: LibrarySharingSectionProps) {
 
   return (
     <section className="library-sharing" aria-labelledby="library-sharing-title">
-      <div>
-        <h3 id="library-sharing-title">Sharing</h3>
-        <p>People only see this library after you share it with them.</p>
-      </div>
+      <h3 id="library-sharing-title">Sharing</h3>
 
       <form className="library-share-form" onSubmit={share}>
         <label>
@@ -115,7 +112,6 @@ export function LibrarySharingSection({ library }: LibrarySharingSectionProps) {
           <div className="library-member" key={member.userId}>
             <div>
               <strong>{member.username}</strong>
-              <span>GitHub account</span>
             </div>
             <select
               className="input"

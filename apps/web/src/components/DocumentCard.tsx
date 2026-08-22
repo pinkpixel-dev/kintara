@@ -139,9 +139,8 @@ export function DocumentCard({
             <FolderInput size={14} />
           </button>
 
-          {/* An anchor rather than a button so the browser handles the save
-              itself. On a NAS the whole point is getting a copy onto the device
-              you are actually reading on. */}
+          {/* An anchor rather than a button so the browser handles the save and
+              puts the copy on the device the reader is currently using. */}
           <a
             className="document-card-action"
             href={documentUrls.download(document.id)}

@@ -126,11 +126,6 @@ export const MarkdownReader: React.FC<MarkdownReaderProps> = ({ documentId }) =>
 
   return (
     <div className="markdown-reader-container relative" ref={containerRef} onMouseUp={handleTextSelection}>
-      <div className="markdown-meta">
-        <Link size={12} />
-        <span>Select text to highlight · Click a highlight to remove it</span>
-      </div>
-
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw]}
@@ -174,9 +169,6 @@ export const MarkdownReader: React.FC<MarkdownReaderProps> = ({ documentId }) =>
           <Link size={18} className="text-[var(--accent)]" />
           Linked Mentions
         </h3>
-        <p className="text-sm text-secondary italic">
-          (Backlinks engine parses SQLite for documents containing `[[this_file]]`)
-        </p>
       </div>
     </div>
   );

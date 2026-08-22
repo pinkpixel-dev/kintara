@@ -12,13 +12,11 @@
   justify-content: space-between;
 }
 
-.settings-switch span,
 .access-row span {
   display: flex;
   flex-direction: column;
 }
 
-.settings-switch small,
 .access-row small,
 .key-status {
   color: var(--text-muted);

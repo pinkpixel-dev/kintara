@@ -1,0 +1,48 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+
+const component = (name: string) =>
+  readFile(new URL(`../src/components/${name}`, import.meta.url), "utf8");
+
+test("redundant helper copy stays out of the interface", async () => {
+  const sources = await Promise.all([
+    component("AiPanel.tsx"),
+    component("SettingsModal.tsx"),
+    component("OnboardingOverlay.tsx"),
+    component("LibrarySharingSection.tsx"),
+    component("BulkImportModal.tsx"),
+    component("MoveDocumentModal.tsx"),
+    component("MarkdownReader.tsx"),
+  ]);
+  const renderedCopy = sources.join("\n");
+
+  for (const sentence of [
+    "Generate a concise summary",
+    "Highlights, buttons, and focus rings",
+    "People only see this library",
+    "A document can belong to more than one library",
+    "One at a time, so a large batch",
+    "Select text to highlight",
+  ]) {
+    assert.doesNotMatch(renderedCopy, new RegExp(sentence));
+  }
+});
+
+test("authentication copy is deployment neutral", async () => {
+  const source = await component("AuthGate.tsx");
+
+  assert.doesNotMatch(source, /\bNAS\b/i);
+  assert.match(source, /Set the GitHub OAuth environment variables, then restart Kintara\./);
+});
+
+test("copy that affects a decision remains visible", async () => {
+  const [aiPanel, authGate] = await Promise.all([
+    component("AiPanel.tsx"),
+    component("AuthGate.tsx"),
+  ]);
+
+  assert.match(aiPanel, /This document already has a summary/);
+  assert.match(aiPanel, /Confirm provider request/);
+  assert.match(authGate, /first GitHub account to sign in becomes the owner/);
+});

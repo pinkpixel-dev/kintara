@@ -91,10 +91,7 @@ export function SettingsModal({ isOpen, onClose, onAiEnabledChange }: SettingsMo
                   carries its own data-accent so it paints itself from the same
                   table the app uses. */}
               <div className="flex flex-col gap-2 mt-2">
-                <div className="flex flex-col">
-                  <span className="text-sm">Accent Colour</span>
-                  <span className="text-xs text-muted">Highlights, buttons, and focus rings</span>
-                </div>
+                <span className="text-sm">Accent Colour</span>
                 <div className="accent-grid" role="group" aria-label="Accent colour">
                   {accents.map((option) => {
                     const isActive = settings.accent === option.value;
@@ -131,10 +128,7 @@ export function SettingsModal({ isOpen, onClose, onAiEnabledChange }: SettingsMo
               {/* Sits with the theme rather than under Typography: it moves the
                   cards and icons as much as it moves the text. */}
               <div className="flex items-center justify-between mt-2">
-                <div className="flex flex-col">
-                  <label className="text-sm" htmlFor="ui-size">Interface Size</label>
-                  <span className="text-xs text-muted">Text, icons, and cards</span>
-                </div>
+                <label className="text-sm" htmlFor="ui-size">Interface Size</label>
                 <select
                   id="ui-size"
                   className="input settings-control"
@@ -220,9 +214,6 @@ export function SettingsModal({ isOpen, onClose, onAiEnabledChange }: SettingsMo
                   );
                 })}
               </div>
-              <p style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "0.75rem", lineHeight: 1.5 }}>
-                Click highlighted text to remove it.
-              </p>
             </div>
           </section>
 

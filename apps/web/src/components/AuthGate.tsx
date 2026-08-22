@@ -34,7 +34,6 @@ export function AuthGate({ children }: AuthGateProps) {
       <div className="auth-screen">
         <div className="auth-card" role="alert">
           <h1 className="auth-title">Can&rsquo;t reach the Kintara server</h1>
-          <p className="auth-subtitle">The web app loaded, but the Kintara API did not answer.</p>
           <button className="btn btn-primary auth-submit" onClick={refresh}>Try again</button>
         </div>
       </div>
@@ -48,18 +47,14 @@ export function AuthGate({ children }: AuthGateProps) {
       <div className="auth-card">
         <img src="/logo.png" alt="" width={56} height={56} />
         <h1 className="auth-title">{status.needsOwner ? "Claim this Kintara" : "Sign in to Kintara"}</h1>
-        <p className="auth-subtitle">
-          {status.needsOwner
-            ? "The first GitHub account to sign in becomes the owner."
-            : "Access is limited to GitHub accounts invited by a Kintara admin."}
-        </p>
+        {status.needsOwner && <p className="auth-subtitle">The first GitHub account to sign in becomes the owner.</p>}
         {status.oauthConfigured ? (
           <a className="btn btn-primary auth-submit auth-github" href={authService.githubStartUrl()}>
             <LogIn size={18} /> Continue with GitHub
           </a>
         ) : (
           <p className="auth-error" role="alert">
-            GitHub login is not configured. Set the GitHub OAuth environment variables on the NAS, then restart Kintara.
+            GitHub login is not configured. Set the GitHub OAuth environment variables, then restart Kintara.
           </p>
         )}
       </div>

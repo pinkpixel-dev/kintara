@@ -35,9 +35,9 @@ interface FileResult {
  * uploaded, and lets the extracted titles stand. Anything that needs correcting
  * afterwards is a card away in the library.
  *
- * Uploads run one at a time on purpose. Each one streams to disk on a NAS that
- * may only have a couple of gigabytes of RAM, and forty concurrent uploads is
- * how you find that out the hard way.
+ * Uploads run one at a time on purpose. Each one streams to disk, and a
+ * resource-constrained installation should not process forty concurrent
+ * uploads.
  */
 export function BulkImportModal({
   files,
@@ -264,11 +264,6 @@ export function BulkImportModal({
                 ))}
               </div>
 
-              <p className="text-xs text-muted m-0">
-                Titles and covers are read from each file. You can correct any of them
-                afterwards from the document's details.
-              </p>
-
               {fatalError && <p className="auth-error" role="alert">{fatalError}</p>}
 
               <div className="import-actions">
@@ -303,9 +298,6 @@ export function BulkImportModal({
                   style={{ width: `${(completed / files.length) * 100}%` }}
                 />
               </div>
-              <p className="text-xs text-muted m-0">
-                One at a time, so a large batch does not overwhelm the server.
-              </p>
               <div className="import-actions">
                 <button
                   className="btn btn-ghost"

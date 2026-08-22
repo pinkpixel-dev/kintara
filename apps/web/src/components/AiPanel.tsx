@@ -49,7 +49,6 @@ export function AiPanel({ document, onClose, onUpdated }: Props) {
     <div className="inspector-content">
       {!document ? <p className="text-sm text-muted">Open a document to use AI tools.</p> : <>
         <h3 className="ai-document-title">{document.title}</h3>
-        <p className="text-sm text-muted">Generate a concise summary from Kintara&rsquo;s extracted document text.</p>
         {!preflight ? <button className="btn btn-primary ai-primary-action" disabled={busy} onClick={prepare}>{busy ? "Checking…" : "Summarize"}</button> :
           <div className="ai-confirmation">
             <strong>Confirm provider request</strong>

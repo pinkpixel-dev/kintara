@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-08-22
+
+### 🎨 Interface
+
+- Removed helper sentences that repeated visible headings, labels, buttons, and controls
+  across AI tools, Settings, onboarding, sharing, imports, filing, authentication, and
+  the Markdown reader.
+- Kept decision-critical copy for provider requests, summary replacement, permanent
+  deletion, first-owner setup, errors, progress, saved keys, and empty states.
+- Removed NAS-specific wording from the GitHub OAuth configuration error so the sign-in
+  screen applies to every Kintara installation.
+
+### 🧪 Tests
+
+- Added frontend copy checks for redundant helper text, deployment-neutral auth wording,
+  and the warnings that must remain visible.
+
+### 🏷️ Versioning
+
+- Bumped Kintara from 1.7.0 to 1.7.1 for the interface copy cleanup.
+
 ## [1.7.0] - 2026-08-21
 
 ### 🔐 Private libraries

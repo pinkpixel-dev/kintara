@@ -84,14 +84,6 @@ export function MoveDocumentModal({ document, scope, onClose, onMoved }: MoveDoc
     return libraries.find((l) => l.id === libraryId)?.name ?? "";
   })();
 
-  // Resolved from the lists already loaded here rather than passed in, so the
-  // caller only has to know which view the document came from.
-  const scopeName = (() => {
-    if (!scope) return null;
-    if (scope.type === 'library') return libraries.find((l) => l.id === scope.id)?.name ?? null;
-    return Object.values(collections).flat().find((c) => c.id === scope.id)?.name ?? null;
-  })();
-
   const submit = async (mode: "move" | "add") => {
     if (libraryId === "") return;
     setBusy(mode);
@@ -181,12 +173,6 @@ export function MoveDocumentModal({ document, scope, onClose, onMoved }: MoveDoc
           )}
 
           {error && <p className="auth-error" role="alert">{error}</p>}
-
-          <p className="text-xs text-muted m-0">
-            {scopeName
-              ? `Move takes it out of ${scopeName}. Add leaves it there as well.`
-              : "A document can belong to more than one library."}
-          </p>
 
           <div className="import-actions">
             <button className="btn btn-ghost" onClick={onClose} disabled={busy !== null}>

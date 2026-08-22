@@ -22,31 +22,19 @@ export function OnboardingOverlay({ onComplete }: OnboardingOverlayProps) {
           </div>
 
           <h1 className="onboarding-title">Welcome to Kintara</h1>
-          <p className="onboarding-subtitle">
-            Your minimal, powerful document manager and reader.
-          </p>
 
           <div className="onboarding-features">
             <div className="onboarding-feature">
               <Layers className="onboarding-feature-icon" size={24} />
               <h3 className="onboarding-feature-title">Organize</h3>
-              <p className="text-sm text-muted">
-                Create Libraries and nested Collections to keep your research structured.
-              </p>
             </div>
             <div className="onboarding-feature">
               <BookOpen className="onboarding-feature-icon" size={24} />
               <h3 className="onboarding-feature-title">Read</h3>
-              <p className="text-sm text-muted">
-                A distraction-free reading environment for PDFs, Markdown, and text files.
-              </p>
             </div>
             <div className="onboarding-feature">
               <LayoutPanelLeft className="onboarding-feature-icon" size={24} />
               <h3 className="onboarding-feature-title">Details</h3>
-              <p className="text-sm text-muted">
-                View extracted metadata and add notes alongside your documents.
-              </p>
             </div>
           </div>
 

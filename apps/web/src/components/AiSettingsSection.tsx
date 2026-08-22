@@ -78,7 +78,7 @@ export function AiSettingsSection({ onEnabledChange }: Props) {
     <section>
       <h3 className="settings-section-title"><Bot size={14} /> AI</h3>
       <div className="settings-section-body ai-settings">
-        <label className="settings-switch"><span><strong>Enable AI</strong><small>Per account. Off by default.</small></span>
+        <label className="settings-switch"><strong>Enable AI</strong>
           <input type="checkbox" checked={settings.enabled} onChange={(e) => update("enabled", e.target.checked)} />
         </label>
         <label>Provider

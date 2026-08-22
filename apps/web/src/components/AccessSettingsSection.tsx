@@ -40,7 +40,6 @@ export function AccessSettingsSection() {
       confirmLabel="Remove" danger onConfirm={removeUser} onCancel={() => setPendingRemoval(null)} />
     <h3 className="settings-section-title"><ShieldCheck size={14} /> Access</h3>
     <div className="settings-section-body">
-      <p className="text-xs text-muted">Only invited GitHub accounts can join this Kintara.</p>
       <form className="access-invite" onSubmit={invite}>
         <label>GitHub username<input className="input" value={login} onChange={(e) => setLogin(e.target.value)} required /></label>
         <label className="key-remove"><input type="checkbox" checked={admin} onChange={(e) => setAdmin(e.target.checked)} /> Administrator</label>
