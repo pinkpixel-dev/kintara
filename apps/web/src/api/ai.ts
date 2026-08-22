@@ -69,6 +69,17 @@ export interface AiSearchInterpretation {
   explanation: string;
 }
 
+/**
+ * A passage the model found in a document, verified server-side to occur
+ * verbatim on the page it names. The exact wording is what lets the reader
+ * place a highlight over it.
+ */
+export interface AiPassage {
+  page: number;
+  excerpt: string;
+  note: string;
+}
+
 export interface AiCitation { page: number; excerpt: string }
 export interface AiMessage {
   id: number;
@@ -107,6 +118,8 @@ export const aiService = {
       action: "summarize",
       overwrite,
     }),
+  find: (documentId: number, request: string) =>
+    api.post<{ passages: AiPassage[] }>(`/api/ai/documents/${documentId}/find`, { request }),
   search: (request: string, scope: { libraryId?: number; collectionId?: number } = {}) =>
     api.post<AiSearchInterpretation>("/api/ai/search", { request, ...scope }),
   summarize: (documentId: number, overwrite = false) =>

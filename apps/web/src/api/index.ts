@@ -4,6 +4,7 @@ export { annotationService, collectionService, libraryService, tagService } from
 export { aiService } from "./ai";
 export type {
   AiConversation,
+  AiPassage,
   AiSearchInterpretation,
   AiSettings,
   ModelCatalog,

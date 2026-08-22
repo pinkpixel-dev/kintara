@@ -7,6 +7,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { Bot, Send, Sparkles, X } from "lucide-react";
+import { AiFindMode } from "./AiFindMode";
 import ReactMarkdown from "react-markdown";
 import { ApiError, aiService, type AiConversation, type Document, type SummaryPreflight } from "../api";
 import {
@@ -31,6 +32,7 @@ export function AiPanel({ document, onClose, onUpdated }: Props) {
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<"chat" | "find">("chat");
   const [width, setWidth] = useState(() =>
     loadAiPanelWidth(typeof localStorage === "undefined" ? null : localStorage));
   const transcriptRef = useRef<HTMLDivElement>(null);
@@ -41,6 +43,7 @@ export function AiPanel({ document, onClose, onUpdated }: Props) {
     setConfirmSummary(false);
     setDraft("");
     setError(null);
+    setMode("chat");
     Promise.all([aiService.conversation(document.id), aiService.preflight(document.id)])
       .then(([nextConversation, nextPreflight]) => {
         setConversation(nextConversation);
@@ -137,6 +140,28 @@ export function AiPanel({ document, onClose, onUpdated }: Props) {
       </header>
       <div className="ai-document-name" title={document.title}>{document.title}</div>
 
+      <div className="ai-mode" role="group" aria-label="AI mode">
+        <button
+          type="button"
+          className={mode === "chat" ? "search-mode-option active" : "search-mode-option"}
+          aria-pressed={mode === "chat"}
+          onClick={() => setMode("chat")}
+        >
+          Chat
+        </button>
+        <button
+          type="button"
+          className={mode === "find" ? "search-mode-option active" : "search-mode-option"}
+          aria-pressed={mode === "find"}
+          onClick={() => setMode("find")}
+        >
+          Find
+        </button>
+      </div>
+
+      {mode === "find" && <AiFindMode document={document} preflight={preflight} />}
+
+      {mode === "chat" && <>
       <div className="ai-transcript" ref={transcriptRef} aria-live="polite">
         {conversation?.messages.map((message) => (
           <article key={message.id} className={message.role === "user"
@@ -195,6 +220,7 @@ export function AiPanel({ document, onClose, onUpdated }: Props) {
           </button>
         )}
       </div>
+      </>}
     </aside>
   );
 }

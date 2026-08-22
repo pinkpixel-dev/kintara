@@ -398,3 +398,90 @@ async fn library_search_requires_a_session() {
         .await;
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
+
+#[tokio::test]
+async fn in_document_find_refuses_before_any_provider_call() {
+    let app = TestApp::new().await;
+    let (_user_id, cookie) = signed_in_owner(&app).await;
+    let document_id = app.insert_row("Notes", "notes.md", "md", 10).await;
+
+    // AI is off, so nothing can reach a provider whatever the request says.
+    let disabled = json_with_cookie(
+        &app,
+        "POST",
+        &format!("/api/ai/documents/{document_id}/find"),
+        &cookie,
+        json!({ "request": "where is the magic ring" }),
+    )
+    .await;
+    assert_eq!(disabled.status(), StatusCode::BAD_REQUEST);
+
+    json_with_cookie(
+        &app,
+        "PUT",
+        "/api/ai/settings",
+        &cookie,
+        settings(Some("sk-test-key"), true),
+    )
+    .await;
+
+    let empty = json_with_cookie(
+        &app,
+        "POST",
+        &format!("/api/ai/documents/{document_id}/find"),
+        &cookie,
+        json!({ "request": "  " }),
+    )
+    .await;
+    assert_eq!(empty.status(), StatusCode::BAD_REQUEST);
+    assert!(
+        body_json(empty).await["error"]
+            .as_str()
+            .unwrap()
+            .contains("describe what to look for")
+    );
+
+    // This row has no extracted text at all, which must be refused rather than
+    // sent as an empty document.
+    let no_text = json_with_cookie(
+        &app,
+        "POST",
+        &format!("/api/ai/documents/{document_id}/find"),
+        &cookie,
+        json!({ "request": "where is the magic ring" }),
+    )
+    .await;
+    assert_eq!(no_text.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn in_document_find_is_refused_on_a_document_the_caller_cannot_see() {
+    let app = TestApp::new().await;
+    let (owner_id, _cookie) = signed_in_owner(&app).await;
+    sqlx::query("INSERT INTO github_invitations (github_login, invited_by) VALUES ('outsider', ?)")
+        .bind(owner_id)
+        .execute(&app.db)
+        .await
+        .unwrap();
+    let outsider_id = auth::resolve_github_user(
+        &state_of(&app),
+        &GitHubIdentity {
+            id: 404,
+            login: "outsider".into(),
+            avatar_url: None,
+        },
+    )
+    .await
+    .unwrap();
+    let document_id = app.insert_row("Private", "private.md", "md", 10).await;
+
+    let response = app
+        .send_json_as(
+            "POST",
+            &format!("/api/ai/documents/{document_id}/find"),
+            json!({ "request": "anything" }),
+            outsider_id,
+        )
+        .await;
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}

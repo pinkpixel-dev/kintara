@@ -6,6 +6,7 @@ use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
 use crate::access;
+use crate::ai::document_context::{PageRow, approximate_tokens, load_pages, require_readable};
 use crate::ai::providers::{self, GenerateRequest, JsonSchema};
 use crate::current_user::AuthenticatedUser;
 use crate::error::{AppError, AppResult};
@@ -79,12 +80,6 @@ struct HistoryRow {
     content: String,
 }
 
-#[derive(Debug, sqlx::FromRow)]
-struct PageRow {
-    page_number: i64,
-    text: String,
-}
-
 #[derive(Debug, Deserialize)]
 struct GroundedAnswer {
     answer: String,
@@ -140,17 +135,7 @@ pub async fn send_message(
         ));
     }
 
-    let pages: Vec<PageRow> = sqlx::query_as(
-        "SELECT page_number, text FROM document_pages WHERE document_id = ? ORDER BY page_number",
-    )
-    .bind(document_id)
-    .fetch_all(&state.db)
-    .await?;
-    if pages.is_empty() || pages.iter().all(|page| page.text.trim().is_empty()) {
-        return Err(AppError::BadRequest(
-            "this document has no extracted text".into(),
-        ));
-    }
+    let pages = load_pages(&state, document_id).await?;
 
     let history = load_history(&state, user_id, document_id).await?;
     let input = build_input(&title, &pages, &history, &user_text);
@@ -281,21 +266,6 @@ fn request_text(body: &ChatRequest) -> AppResult<String> {
         )));
     }
     Ok(text)
-}
-
-fn require_readable(status: Option<&str>) -> AppResult<()> {
-    match status {
-        Some("ok") => Ok(()),
-        Some("truncated") => Err(AppError::BadRequest(
-            "this document's extracted text was truncated and cannot be sent safely".into(),
-        )),
-        Some("empty") => Err(AppError::BadRequest(
-            "this document has no text layer; OCR is not available".into(),
-        )),
-        _ => Err(AppError::BadRequest(
-            "text extraction failed for this document".into(),
-        )),
-    }
 }
 
 async fn load_history(
@@ -459,10 +429,6 @@ fn parse_grounded(text: &str, pages: &[PageRow]) -> AppResult<GroundedAnswer> {
             .map(|(page, excerpt)| GroundedCitation { page, excerpt })
             .collect(),
     })
-}
-
-fn approximate_tokens(text: &str) -> usize {
-    text.chars().count().div_ceil(4)
 }
 
 #[cfg(test)]

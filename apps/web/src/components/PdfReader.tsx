@@ -1,11 +1,37 @@
 import React, { useEffect, useState, useRef } from "react";
 import { pdfAssetOptions, pdfjsLib } from "../lib/pdf";
 import { annotationService, documentService, documentUrls, type Annotation } from "../api";
+import { highlightBoxes, locatePassage, type TextPiece } from "../lib/pdf-text-locate";
+import { onHighlightRequest, onPageRequest, reportHighlight } from "../lib/reader-events";
 import "./PdfReader.css";
 
 interface PdfReaderProps {
   documentId: number;
   isSplitView?: boolean;
+}
+
+/**
+ * Converts one pdf.js text run into canvas coordinates.
+ *
+ * `item.transform` is in PDF user space, so it goes through the viewport's own
+ * matrix first. The run's height comes from the transformed matrix rather than
+ * `item.height`, which is unreliable for rotated or scaled text, and its width
+ * is the text-space width scaled to the viewport — the same arithmetic pdf.js
+ * uses to build its own text layer. Runs without a `transform` are skipped.
+ */
+function toPiece(item: unknown, viewport: { transform: number[]; scale: number }): TextPiece[] {
+  const run = item as { str?: string; transform?: number[]; width?: number; hasEOL?: boolean };
+  if (typeof run.str !== "string" || !Array.isArray(run.transform)) return [];
+  const tx = pdfjsLib.Util.transform(viewport.transform, run.transform);
+  const height = Math.hypot(tx[2], tx[3]);
+  return [{
+    str: run.str,
+    left: tx[4],
+    top: tx[5] - height,
+    width: (run.width ?? 0) * viewport.scale,
+    height,
+    endsLine: run.hasEOL === true,
+  }];
 }
 
 /** Read the current --highlight-color CSS variable from the document root. */
@@ -39,6 +65,8 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ documentId }) => {
    * ways, or they drift off the text as soon as the canvas is scaled.
    */
   const [displayScale, setDisplayScale] = useState(1);
+  /** Shown when an accepted passage could not be found on its page. */
+  const [placementNotice, setPlacementNotice] = useState<string | null>(null);
 
   const measureScale = () => {
     const canvas = canvasRef.current;
@@ -183,6 +211,61 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ documentId }) => {
     setCurrentBox(null);
   };
 
+  /**
+   * Places an accepted AI passage as a real highlight.
+   *
+   * The quote was already verified against the server's extracted text, but the
+   * boxes have to come from pdf.js, so it can still fail to place here — a page
+   * whose text is drawn out of order, for instance. That is reported rather
+   * than swallowed: the reader is moved to the page either way, so the passage
+   * is at least in front of them.
+   */
+  useEffect(() => {
+    if (!pdfDoc) return;
+    return onHighlightRequest(documentId, async ({ page, excerpt }) => {
+      setPageNumber(Math.min(Math.max(1, page), pdfDoc.numPages));
+      setPlacementNotice(null);
+      let boxes: ReturnType<typeof locatePassage> = [];
+      try {
+        const pdfPage = await pdfDoc.getPage(page);
+        const viewport = pdfPage.getViewport({ scale: 1.5 });
+        const content = await pdfPage.getTextContent();
+        boxes = locatePassage(content.items.flatMap((item) => toPiece(item, viewport)), excerpt);
+      } catch (err) {
+        console.error("Failed to read page text", err);
+      }
+
+      if (boxes.length === 0) {
+        setPlacementNotice(`That passage could not be located on page ${page}.`);
+        reportHighlight({ documentId, excerpt, placed: false });
+        return;
+      }
+
+      try {
+        await annotationService.create({
+          documentId,
+          annotationType: "highlight",
+          serializedPosition: JSON.stringify({ page, boxes }),
+          content: excerpt,
+          color: getHighlightColor(),
+        });
+        await loadAnnotations();
+        reportHighlight({ documentId, excerpt, placed: true });
+      } catch (err) {
+        console.error("Failed to save annotation", err);
+        setPlacementNotice("That highlight could not be saved.");
+        reportHighlight({ documentId, excerpt, placed: false });
+      }
+    });
+  }, [documentId, pdfDoc]);
+
+  useEffect(() => {
+    if (!pdfDoc) return;
+    return onPageRequest(documentId, ({ page }) => {
+      setPageNumber(Math.min(Math.max(1, page), pdfDoc.numPages));
+    });
+  }, [documentId, pdfDoc]);
+
   /** Click on an existing PDF highlight box → delete it. */
   const handleAnnotationClick = async (e: React.MouseEvent, annId: number) => {
     e.stopPropagation();
@@ -225,6 +308,20 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ documentId }) => {
           </button>
         </div>
 
+        {placementNotice && (
+          <p className="pdf-placement-notice" role="status">
+            {placementNotice}
+            <button
+              type="button"
+              className="pdf-placement-dismiss"
+              onClick={() => setPlacementNotice(null)}
+              aria-label="Dismiss"
+            >
+              Dismiss
+            </button>
+          </p>
+        )}
+
         <div
           className="pdf-canvas-wrapper"
           onMouseDown={handleMouseDown}
@@ -233,25 +330,18 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ documentId }) => {
         >
           <canvas ref={canvasRef} style={{ display: "block" }} />
 
-          {annotations.map((ann) => {
-            let pos: any;
-            try {
-              pos = JSON.parse(ann.serializedPosition);
-            } catch {
-              return null;
-            }
-            if (pos.page !== pageNumber) return null;
-            return (
+          {annotations.flatMap((ann) =>
+            highlightBoxes(ann.serializedPosition, pageNumber).map((box, index) => (
               <div
-                key={ann.id}
+                key={`${ann.id}-${index}`}
                 title="Click to remove highlight"
                 onClick={(e) => handleAnnotationClick(e, ann.id)}
                 style={{
                   position: "absolute",
-                  left: pos.x * displayScale,
-                  top: pos.y * displayScale,
-                  width: pos.w * displayScale,
-                  height: pos.h * displayScale,
+                  left: box.x * displayScale,
+                  top: box.y * displayScale,
+                  width: box.w * displayScale,
+                  height: box.h * displayScale,
                   backgroundColor: ann.color || "rgba(234, 179, 8, 0.4)",
                   cursor: "pointer",
                   transition: "opacity 0.15s ease",
@@ -259,8 +349,8 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ documentId }) => {
                 onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.5")}
                 onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
               />
-            );
-          })}
+            )),
+          )}
 
           {isDrawing && currentBox && (
             <div

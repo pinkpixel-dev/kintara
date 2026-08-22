@@ -4,6 +4,7 @@ import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import { codeToHtml } from "shiki";
 import { annotationService, documentService, type Annotation } from "../api";
+import { onHighlightRequest, reportHighlight } from "../lib/reader-events";
 import "./MarkdownReader.css";
 import { Link } from "lucide-react";
 
@@ -21,6 +22,8 @@ export const MarkdownReader: React.FC<MarkdownReaderProps> = ({ documentId }) =>
   const [content, setContent] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  /** Shown when an accepted passage is not present in the loaded source. */
+  const [placementNotice, setPlacementNotice] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const loadAnnotations = useCallback(async () => {
@@ -43,6 +46,40 @@ export const MarkdownReader: React.FC<MarkdownReaderProps> = ({ documentId }) =>
     };
     loadFile();
   }, [documentId]);
+
+  /**
+   * Places an accepted AI passage as a highlight.
+   *
+   * Markdown extracts to a single page of the file's own source, so the quote
+   * should be a literal slice of what is loaded here. It is checked anyway: a
+   * document edited on disk since it was indexed would otherwise store a
+   * highlight that never renders.
+   */
+  useEffect(() => {
+    return onHighlightRequest(documentId, async ({ excerpt }) => {
+      setPlacementNotice(null);
+      if (!content.includes(excerpt)) {
+        setPlacementNotice("That passage is not in the current version of this document.");
+        reportHighlight({ documentId, excerpt, placed: false });
+        return;
+      }
+      try {
+        await annotationService.create({
+          documentId,
+          annotationType: "highlight",
+          serializedPosition: "text_match",
+          content: excerpt,
+          color: getHighlightColor(),
+        });
+        await loadAnnotations();
+        reportHighlight({ documentId, excerpt, placed: true });
+      } catch (err) {
+        console.error("Failed to save annotation", err);
+        setPlacementNotice("That highlight could not be saved.");
+        reportHighlight({ documentId, excerpt, placed: false });
+      }
+    });
+  }, [documentId, content, loadAnnotations]);
 
   /** On mouseup — immediately highlight selected text, no confirmation dialog. */
   const handleTextSelection = async () => {
@@ -126,6 +163,19 @@ export const MarkdownReader: React.FC<MarkdownReaderProps> = ({ documentId }) =>
 
   return (
     <div className="markdown-reader-container relative" ref={containerRef} onMouseUp={handleTextSelection}>
+      {placementNotice && (
+        <p className="pdf-placement-notice" role="status">
+          {placementNotice}
+          <button
+            type="button"
+            className="pdf-placement-dismiss"
+            onClick={() => setPlacementNotice(null)}
+            aria-label="Dismiss"
+          >
+            Dismiss
+          </button>
+        </p>
+      )}
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw]}

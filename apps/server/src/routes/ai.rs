@@ -1,6 +1,7 @@
 use crate::access;
 use crate::ai::Provider;
 use crate::ai::credentials::{clean_key, key_context, last_four};
+use crate::ai::document_context::approximate_tokens;
 use crate::ai::models;
 use crate::ai::providers::{self, GenerateRequest};
 use crate::current_user::AuthenticatedUser;
@@ -463,19 +464,5 @@ fn readable_text<'a>(status: Option<&str>, text: Option<&'a str>) -> AppResult<&
         _ => Err(AppError::BadRequest(
             "text extraction failed for this document".into(),
         )),
-    }
-}
-
-fn approximate_tokens(text: &str) -> usize {
-    text.chars().count().div_ceil(4)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn token_estimate_rounds_up() {
-        assert_eq!(approximate_tokens("12345"), 2);
     }
 }

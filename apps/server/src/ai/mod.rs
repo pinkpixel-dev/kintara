@@ -1,6 +1,8 @@
 pub mod credentials;
+pub mod document_context;
 pub mod models;
 pub mod providers;
+pub mod search_rewrite;
 
 use serde::{Deserialize, Serialize};
 

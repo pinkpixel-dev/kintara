@@ -4,6 +4,54 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-08-22
+
+### 🔦 Find in a document
+
+- Added a Find mode to the AI panel, beside Chat. Describe what you are after and Kintara
+  returns the passages that answer it, each with its page, the quote itself, and a short
+  note on why it matches.
+- Verified every quote against the page it claims to come from before returning it. A
+  paraphrase is dropped rather than shown, because a passage that cannot be located is one
+  the reader cannot act on.
+- Nothing is written until Highlight is pressed. A suggestion never creates an annotation
+  on its own.
+
+### 🖍️ AI highlights
+
+- Accepting a passage places a real highlight, the same kind dragging one out by hand
+  produces. In a PDF the text is located through pdf.js and boxed line by line; in Markdown
+  it reuses the existing text match.
+- Stored multi-line highlights as one annotation with a box per line, so a quote that wraps
+  does not cover the margins between its lines. Hand-drawn single-box highlights are
+  unchanged and still render.
+- Matching ignores whitespace, because pdf.js and Poppler disagree about it constantly —
+  pdf.js splits "highlight" into two runs where Poppler keeps it whole.
+- Said so plainly when a passage cannot be placed, and moved the reader to its page anyway.
+  Added Go to page as its own action for PDFs.
+
+### 🧹 Maintenance
+
+- Extracted the page loading, readability check, and token estimate shared by chat,
+  summarize, and find into `ai::document_context`, replacing three copies with one.
+- Split the search rewrite rules out of the route into `ai::search_rewrite`, which brought
+  `routes/ai_search.rs` back under the file size limit.
+
+### 🧪 Tests
+
+- Added passage verification coverage: quotes that cross a line break, paraphrases, quotes
+  attributed to the wrong page, unknown pages, duplicates, and the result cap.
+- Added text location coverage: a word split across two pdf.js runs, a quote spanning two
+  lines, line breaks taken from `hasEOL` rather than vertical position, and text that is
+  simply not on the page.
+- Added route coverage proving find is refused for disabled AI, empty requests, documents
+  with no extracted text, and documents the caller cannot see.
+- The full server and web suites pass with 195 tests.
+
+### 🏷️ Versioning
+
+- Bumped Kintara from 1.9.0 to 1.10.0 for in-document find and AI highlights.
+
 ## [1.9.0] - 2026-08-22
 
 ### 🔎 Natural-language library search
