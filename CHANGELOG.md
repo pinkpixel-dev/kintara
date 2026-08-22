@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.13.5] - 2026-08-22
+
+### 📚 Documentation
+
+- Added three product screenshots to the README for the document library, AI cover
+  generation, and document summaries.
+
+### 🏷️ Versioning
+
+- Bumped Kintara from 1.13.4 to 1.13.5 for the README screenshot update.
+
 ## [1.13.4] - 2026-08-22
 
 ### 📚 Documentation

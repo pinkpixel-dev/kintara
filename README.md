@@ -7,6 +7,14 @@
 Kintara is a self-hosted document library and reader. It watches an existing document
 folder, indexes its contents, and serves the library through a browser or installable PWA.
 
+## Screenshots
+
+![Kintara document library with collections and cover thumbnails](assets/screenshots/screenshot.png)
+
+![Kintara PDF reader with an AI-generated document summary](assets/screenshots/screenshot-summarize.png)
+
+![Kintara PDF reader with AI cover generation and metadata suggestions](assets/screenshots/screenshot-cover-generation.png)
+
 ## What Kintara does
 
 - Watches one folder for PDF, Markdown, and text documents. Documents can also be manually imported.
