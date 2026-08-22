@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.13.4] - 2026-08-22
+
+### 📚 Documentation
+
+- Corrected the Docker Hub build commands to use the repository root as the build context.
+- Clarified that Docker Hub publishing creates a separate copy of the current GHCR image.
+- Added local tag checks, Buildx setup, and troubleshooting for missing build-context files.
+
+### 🧪 Tests
+
+- Built the versioned and `latest` Docker images through all frontend, Rust, and runtime
+  stages. The full suite passes with 235 tests.
+
+### 🏷️ Versioning
+
+- Bumped Kintara from 1.13.3 to 1.13.4 for the Docker publishing guide correction.
+
 ## [1.13.3] - 2026-08-22
 
 ### 🐛 AI models
