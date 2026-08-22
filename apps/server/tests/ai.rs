@@ -93,6 +93,43 @@ async fn invalid_parameter_combinations_are_rejected_before_any_provider_call() 
     invalid["temperature"] = json!(0.4);
     let response = json_with_cookie(&app, "PUT", "/api/ai/settings", &cookie, invalid).await;
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    let mut invalid_google = settings(Some("sk-test"), true);
+    invalid_google["googleModel"] = json!("gemini-2.5-flash-lite");
+    let response = json_with_cookie(&app, "PUT", "/api/ai/settings", &cookie, invalid_google).await;
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn removed_google_models_fall_back_to_the_current_default() {
+    let app = TestApp::new().await;
+    let (user_id, cookie) = signed_in_owner(&app).await;
+    assert_eq!(
+        json_with_cookie(
+            &app,
+            "PUT",
+            "/api/ai/settings",
+            &cookie,
+            settings(Some("sk-test"), true),
+        )
+        .await
+        .status(),
+        StatusCode::OK
+    );
+    sqlx::query(
+        "UPDATE user_ai_settings SET google_model = 'gemini-2.5-flash-lite',
+         google_thinking = 'low' WHERE user_id = ?",
+    )
+    .bind(user_id)
+    .execute(&app.db)
+    .await
+    .unwrap();
+
+    let settings =
+        body_json(json_with_cookie(&app, "GET", "/api/ai/settings", &cookie, json!({})).await)
+            .await;
+    assert_eq!(settings["googleModel"], "gemini-3.7-flash");
+    assert_eq!(settings["googleThinking"], "low");
 }
 
 #[tokio::test]
@@ -241,4 +278,34 @@ async fn document_conversations_are_private_even_when_the_document_is_shared() {
     .await;
     assert_eq!(owner["messages"][0]["content"], "Owner question");
     assert_eq!(reader["messages"][0]["content"], "Reader question");
+
+    let cleared = app
+        .send_json_as(
+            "DELETE",
+            &format!("/api/ai/documents/{document_id}/conversation"),
+            json!({}),
+            reader_id,
+        )
+        .await;
+    assert_eq!(cleared.status(), StatusCode::NO_CONTENT);
+
+    let owner_after = body_json(
+        app.get_as(
+            &format!("/api/ai/documents/{document_id}/conversation"),
+            owner_id,
+        )
+        .await,
+    )
+    .await;
+    let reader_after = body_json(
+        app.get_as(
+            &format!("/api/ai/documents/{document_id}/conversation"),
+            reader_id,
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(owner_after["messages"][0]["content"], "Owner question");
+    assert_eq!(reader_after["conversationId"], serde_json::Value::Null);
+    assert_eq!(reader_after["messages"], json!([]));
 }

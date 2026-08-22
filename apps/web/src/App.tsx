@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 import "./components/Ai.css";
+import "./components/AiFeatures.css";
 import { ApiError, aiService, documentService, type Document } from "./api";
 import { Sidebar } from "./components/Sidebar";
 import { DocumentGrid } from "./components/DocumentGrid";
@@ -62,6 +63,7 @@ function App() {
   const [detailsDocument, setDetailsDocument] = useState<Document | null>(null);
   const [aiEnabled, setAiEnabled] = useState(false);
   const [isAiOpen, setIsAiOpen] = useState(false);
+  const [aiSettingsRevision, setAiSettingsRevision] = useState(0);
 
   // Modals state
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -285,7 +287,11 @@ function App() {
   return (
     <div className="app-container text-primary bg-[var(--bg-primary)]">
       {showOnboarding && <OnboardingOverlay onComplete={handleOnboardingComplete} />}
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} onAiEnabledChange={(enabled) => { setAiEnabled(enabled); if (!enabled) setIsAiOpen(false); }} />
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} onAiSettingsSaved={(settings) => {
+        setAiEnabled(settings.enabled);
+        setAiSettingsRevision((revision) => revision + 1);
+        if (!settings.enabled) setIsAiOpen(false);
+      }} />
       <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
       <LibrarySettingsModal
         isOpen={entitySettings.isOpen}
@@ -460,7 +466,7 @@ function App() {
           onClose={() => setDetailsDocument(null)}
         />
       )}
-      {isAiOpen && viewMode === "reading" && activeDocument && <AiPanel document={activeDocument} onClose={() => setIsAiOpen(false)} onUpdated={(updated) => { replaceDocument(updated); setDocuments((items) => items.map((item) => item.id === updated.id ? updated : item)); }} />}
+      {isAiOpen && viewMode === "reading" && activeDocument && <AiPanel document={activeDocument} settingsRevision={aiSettingsRevision} onClose={() => setIsAiOpen(false)} onUpdated={(updated) => { replaceDocument(updated); setDocuments((items) => items.map((item) => item.id === updated.id ? updated : item)); }} />}
     </div>
   );
 }

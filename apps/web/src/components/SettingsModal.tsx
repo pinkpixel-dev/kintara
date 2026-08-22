@@ -11,6 +11,7 @@ import {
 import { X, Settings as SettingsIcon, Type, Palette } from "lucide-react";
 import { AiSettingsSection } from "./AiSettingsSection";
 import { AccessSettingsSection } from "./AccessSettingsSection";
+import type { AiSettings } from "../api";
 
 // Preset highlight colors: [label, rgba value]
 const HIGHLIGHT_PRESETS: { label: string; value: string; swatch: string }[] = [
@@ -27,10 +28,10 @@ const HIGHLIGHT_PRESETS: { label: string; value: string; swatch: string }[] = [
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAiEnabledChange: (enabled: boolean) => void;
+  onAiSettingsSaved: (settings: AiSettings) => void;
 }
 
-export function SettingsModal({ isOpen, onClose, onAiEnabledChange }: SettingsModalProps) {
+export function SettingsModal({ isOpen, onClose, onAiSettingsSaved }: SettingsModalProps) {
   const [settings, setSettings] = useState<Settings>(defaultSettings);
 
   useEffect(() => {
@@ -217,7 +218,7 @@ export function SettingsModal({ isOpen, onClose, onAiEnabledChange }: SettingsMo
             </div>
           </section>
 
-          <AiSettingsSection onEnabledChange={onAiEnabledChange} />
+          <AiSettingsSection onSaved={onAiSettingsSaved} />
           <AccessSettingsSection />
         </div>
       </div>

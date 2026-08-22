@@ -125,6 +125,14 @@ pub(crate) fn public_settings(row: Option<SettingsRow>, usage: UsageTotals) -> A
         openai_image_model: None,
         google_image_model: None,
     });
+    let google_model = row
+        .google_model
+        .filter(|model| models::validate_model(Provider::Google, model))
+        .unwrap_or_else(|| DEFAULT_GOOGLE_MODEL.into());
+    let google_thinking = row
+        .google_thinking
+        .filter(|level| models::validate_reasoning(Provider::Google, &google_model, level))
+        .unwrap_or_else(|| "medium".into());
     AiSettings {
         enabled: row.enabled,
         provider: if row.provider.as_deref() == Some("google") {
@@ -143,11 +151,9 @@ pub(crate) fn public_settings(row: Option<SettingsRow>, usage: UsageTotals) -> A
         openai_model: row
             .openai_model
             .unwrap_or_else(|| DEFAULT_OPENAI_MODEL.into()),
-        google_model: row
-            .google_model
-            .unwrap_or_else(|| DEFAULT_GOOGLE_MODEL.into()),
+        google_model,
         openai_reasoning: row.openai_reasoning.unwrap_or_else(|| "medium".into()),
-        google_thinking: row.google_thinking.unwrap_or_else(|| "medium".into()),
+        google_thinking,
         temperature: row.temperature,
         openai_image_model: row
             .openai_image_model

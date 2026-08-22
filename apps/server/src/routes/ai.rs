@@ -242,9 +242,15 @@ pub(crate) async fn configured_provider(
         Provider::Google => (
             row.google_api_key,
             row.google_model
+                .filter(|model| models::validate_model(Provider::Google, model))
                 .unwrap_or_else(|| DEFAULT_GOOGLE_MODEL.into()),
             row.google_thinking.unwrap_or_else(|| "medium".into()),
         ),
+    };
+    let reasoning = if models::validate_reasoning(provider, &model, &reasoning) {
+        reasoning
+    } else {
+        "medium".into()
     };
     let encrypted = encrypted.ok_or_else(|| {
         AppError::BadRequest("the selected provider does not have an API key".into())

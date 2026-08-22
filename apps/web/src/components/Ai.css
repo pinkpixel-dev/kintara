@@ -126,6 +126,25 @@
 
 .ai-panel-title { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; }
 
+.ai-header-actions { display: flex; align-items: center; gap: 0.25rem; }
+
+.ai-header-action {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  background: transparent;
+}
+
+.ai-header-action:hover:not(:disabled) { color: var(--text-primary); background: var(--bg-tertiary); }
+.ai-header-action:active:not(:disabled) { background: var(--bg-primary); }
+.ai-header-action:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ai-header-action:disabled { opacity: 0.35; cursor: not-allowed; }
+
 .ai-document-name {
   padding: 0.625rem 1rem;
   color: var(--text-muted);
@@ -215,7 +234,7 @@
 }
 
 .ai-request-confirmation {
-  margin: 0 0.75rem 0.75rem;
+  margin: 0.75rem 0.75rem 0;
   padding: 0.75rem;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -237,6 +256,30 @@
   border-top: 1px solid var(--border-color);
   background: var(--bg-secondary);
 }
+
+.ai-chat-actions { padding: 0.75rem 0.75rem 0; }
+
+.ai-summary-action {
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0.5rem 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.ai-summary-action svg { color: var(--accent); }
+.ai-summary-action:hover:not(:disabled) { border-color: var(--accent); background: var(--bg-primary); }
+.ai-summary-action:active:not(:disabled) { background: var(--bg-secondary); }
+.ai-summary-action:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ai-summary-action:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .ai-composer-field {
   display: flex;
@@ -281,27 +324,8 @@
 
 .ai-send:hover:not(:disabled) { filter: brightness(1.08); }
 .ai-send:active:not(:disabled) { filter: brightness(0.94); }
-.ai-send:focus-visible,
-.ai-quick-action:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ai-send:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ai-send:disabled { opacity: 0.4; cursor: not-allowed; }
-
-.ai-quick-action {
-  min-height: 2.25rem;
-  margin-top: 0.5rem;
-  padding: 0.375rem 0.625rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  color: var(--text-secondary);
-  background: transparent;
-  font-size: 0.75rem;
-}
-
-.ai-quick-action:hover:not(:disabled) { color: var(--text-primary); background: var(--bg-tertiary); }
-.ai-quick-action:active:not(:disabled) { background: var(--bg-primary); }
-.ai-quick-action:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .auth-github {
   display: inline-flex;
@@ -433,424 +457,3 @@
 }
 
 .ai-metadata > .ai-thinking { align-self: center; }
-
-/* ---------------------------------------------------------------------------
-   Natural-language library search
-   --------------------------------------------------------------------------- */
-
-/* A segmented control rather than a checkbox: the two modes take different
-   kinds of input, so which one is active has to be readable at a glance. */
-.search-mode {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  margin-top: 0.375rem;
-}
-
-.search-mode-option {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  min-height: 28px;
-  padding: 0.25rem 0.5rem;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
-}
-
-.search-mode-option:hover {
-  color: var(--text-primary);
-  background-color: var(--bg-tertiary);
-}
-
-.search-mode-option:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-  color: var(--text-primary);
-}
-
-.search-mode-option.active {
-  border-color: var(--accent);
-  background-color: var(--accent-light);
-  color: var(--text-primary);
-}
-
-.search-mode-go {
-  min-height: 28px;
-  margin-left: auto;
-  padding: 0.25rem 0.625rem;
-  font-size: 0.75rem;
-  white-space: nowrap;
-}
-
-.search-mode-note,
-.search-mode-error {
-  margin: 0.375rem 0 0;
-  font-size: 0.6875rem;
-  line-height: 1.45;
-}
-
-.search-mode-note {
-  color: var(--text-muted);
-}
-
-.search-mode-error {
-  color: var(--danger, #dc2626);
-}
-
-/* Sits above the grid rather than in the sidebar, because the sidebar is a
-   drawer on a phone and closes as soon as the search runs. */
-.ai-search-summary {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.625rem;
-  flex-shrink: 0;
-  margin: 0.75rem 1rem 0;
-  padding: 0.625rem 0.75rem;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  background: var(--bg-secondary);
-}
-
-.ai-search-summary-icon {
-  flex-shrink: 0;
-  margin-top: 0.125rem;
-  color: var(--accent);
-}
-
-.ai-search-summary-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-  flex: 1;
-  min-width: 0;
-}
-
-.ai-search-summary-text {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 0.8125rem;
-  line-height: 1.45;
-}
-
-.ai-search-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.375rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.ai-search-chip {
-  padding: 0.125rem 0.4375rem;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  font-size: 0.6875rem;
-  white-space: nowrap;
-}
-
-.ai-search-undo {
-  display: flex;
-  align-items: center;
-  gap: 0.3125rem;
-  flex-shrink: 0;
-  min-height: 32px;
-  padding: 0.25rem 0.625rem;
-  font-size: 0.75rem;
-  white-space: nowrap;
-}
-
-@media (hover: none) {
-  /* Same reasoning as the other small controls: a 13px glyph is not a target. */
-  .search-mode-option,
-  .search-mode-go,
-  .ai-search-undo {
-    min-height: 40px;
-  }
-}
-
-@media (max-width: 640px) {
-  .ai-search-summary {
-    margin: 0.625rem 0.75rem 0;
-  }
-}
-
-/* ---------------------------------------------------------------------------
-   In-document find and AI passages
-   --------------------------------------------------------------------------- */
-
-.ai-mode {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0 0.875rem 0.625rem;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.ai-find {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-}
-
-/* Anchored across the panel like the chat composer, rather than floating in the
-   results. A find request is usually a whole sentence, so it gets more room to
-   write in than a chat turn does. */
-.ai-find-query {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  flex-shrink: 0;
-  padding: 0.75rem;
-  border-bottom: 1px solid var(--border-color);
-  background: var(--bg-secondary);
-}
-
-.ai-find-query textarea {
-  min-height: 4.5rem;
-}
-
-.ai-find-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 0.875rem;
-}
-
-.ai-find-note {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 0.6875rem;
-  line-height: 1.45;
-}
-
-.ai-find-empty {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 0.8125rem;
-}
-
-.ai-find-results {
-  display: flex;
-  flex-direction: column;
-  gap: 0.625rem;
-}
-
-.ai-passage {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.75rem;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  background: var(--bg-tertiary);
-}
-
-.ai-passage-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
-.ai-passage-state {
-  color: var(--text-muted);
-  font-size: 0.6875rem;
-}
-
-.ai-passage-state-failed {
-  color: var(--danger, #dc2626);
-}
-
-/* Quoted verbatim from the document, so it is set apart from Kintara's own
-   words rather than reading as something the model wrote. */
-.ai-passage-quote {
-  margin: 0;
-  padding-left: 0.625rem;
-  border-left: 2px solid var(--accent);
-  color: var(--text-primary);
-  font-size: 0.8125rem;
-  line-height: 1.5;
-}
-
-.ai-passage-note {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-  line-height: 1.45;
-}
-
-.ai-passage-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.375rem;
-}
-
-.ai-passage-action {
-  display: flex;
-  align-items: center;
-  gap: 0.3125rem;
-  min-height: 32px;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
-  white-space: nowrap;
-}
-
-.pdf-placement-notice {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin: 0 0 0.5rem;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-  font-size: 0.8125rem;
-}
-
-.pdf-placement-dismiss {
-  flex-shrink: 0;
-  min-height: 32px;
-  padding: 0.25rem 0.5rem;
-  border: none;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-  cursor: pointer;
-  transition: color 0.2s ease, background-color 0.2s ease;
-}
-
-.pdf-placement-dismiss:hover {
-  color: var(--text-primary);
-  background-color: var(--bg-tertiary);
-}
-
-.pdf-placement-dismiss:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-  color: var(--text-primary);
-}
-
-@media (hover: none) {
-  .ai-passage-action,
-  .pdf-placement-dismiss {
-    min-height: 40px;
-  }
-}
-
-/* ---------------------------------------------------------------------------
-   Cover generation
-   --------------------------------------------------------------------------- */
-
-.ai-cover {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.75rem;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 0.875rem;
-}
-
-.ai-cover-embedded {
-  flex: none;
-  width: 100%;
-  min-height: auto;
-  overflow: visible;
-  padding: 0;
-}
-
-.ai-cover-start-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  width: 100%;
-}
-
-.ai-cover-start-actions .btn {
-  flex: 1 1 12rem;
-  justify-content: center;
-  white-space: nowrap;
-}
-
-.ai-cover-custom {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  width: 100%;
-}
-
-.ai-cover-custom label {
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.ai-cover-custom textarea {
-  width: 100%;
-  min-height: 7rem;
-  resize: vertical;
-  padding: 0.625rem 0.75rem;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  font: inherit;
-  line-height: 1.45;
-}
-
-.ai-cover-custom textarea:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-color: var(--accent);
-}
-
-.ai-cover-custom small {
-  align-self: flex-end;
-  color: var(--text-muted);
-}
-
-.ai-cover-prompt-preview {
-  max-height: 9rem;
-  margin: 0 0 0.625rem;
-  padding: 0.625rem 0.75rem;
-  overflow-y: auto;
-  border-left: 2px solid var(--border-color);
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-/* Sized to the panel rather than to the image: covers come back portrait at
-   roughly 1024x1536, which would otherwise be taller than the panel itself. */
-.ai-cover-preview {
-  display: block;
-  width: 100%;
-  max-width: 260px;
-  height: auto;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  background: var(--bg-tertiary);
-}
-
-/* A retention warning is not decoration, so it does not read like the note
-   above it. */
-.ai-cover-retention {
-  color: var(--danger, #dc2626);
-}

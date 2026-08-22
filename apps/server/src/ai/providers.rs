@@ -152,12 +152,6 @@ async fn send_json(builder: reqwest::RequestBuilder) -> AppResult<Value> {
             "the provider rate limit was reached; try again shortly".into(),
         ));
     }
-    if !status.is_success() {
-        return Err(AppError::Unavailable(format!(
-            "the provider returned HTTP {}",
-            status.as_u16()
-        )));
-    }
     if response
         .content_length()
         .is_some_and(|size| size > MAX_PROVIDER_RESPONSE as u64)
@@ -178,8 +172,33 @@ async fn send_json(builder: reqwest::RequestBuilder) -> AppResult<Value> {
         }
         bytes.extend_from_slice(&chunk);
     }
+    if !status.is_success() {
+        let detail = provider_error_detail(&bytes)
+            .map(|message| format!(": {message}"))
+            .unwrap_or_default();
+        return Err(AppError::Unavailable(format!(
+            "the provider returned HTTP {}{detail}",
+            status.as_u16()
+        )));
+    }
     serde_json::from_slice(&bytes)
         .map_err(|err| AppError::Unavailable(format!("provider returned invalid JSON: {err}")))
+}
+
+/// Extracts only the provider's public error message. The rest of the body is
+/// discarded because it can contain request metadata that should not be
+/// reflected into the browser.
+fn provider_error_detail(bytes: &[u8]) -> Option<String> {
+    let value: Value = serde_json::from_slice(bytes).ok()?;
+    let message = value["error"]["message"]
+        .as_str()?
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    if message.is_empty() {
+        return None;
+    }
+    Some(message.chars().take(320).collect())
 }
 
 fn parse_openai(value: &Value) -> AppResult<GenerateResult> {
@@ -284,6 +303,25 @@ mod tests {
             "usage": {"total_input_tokens": 42, "total_output_tokens": 7}
         });
         assert_eq!(parse_google(&value).unwrap().text, "A summary.");
+    }
+
+    #[test]
+    fn provider_errors_expose_only_a_short_normalized_message() {
+        let body = br#"{"error":{"code":400,"message":"  Invalid   thinking level.\nTry low.  ","request":{"input":"private document"}}}"#;
+        assert_eq!(
+            provider_error_detail(body).as_deref(),
+            Some("Invalid thinking level. Try low.")
+        );
+        assert_eq!(provider_error_detail(b"not json"), None);
+
+        let long = json!({ "error": { "message": "x".repeat(400) } });
+        assert_eq!(
+            provider_error_detail(long.to_string().as_bytes())
+                .unwrap()
+                .chars()
+                .count(),
+            320
+        );
     }
 
     #[test]

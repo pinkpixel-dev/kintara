@@ -4,6 +4,46 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.13.2] - 2026-08-22
+
+### 🤖 AI chat
+
+- Moved Summarize document below the Chat, Find, and Cover tabs so the action stays visible
+  above the transcript.
+- Added a confirmed New chat action. It clears only the current user's transcript for the
+  current document and leaves the shared document summary unchanged.
+- Refreshes provider and model details in an open AI panel as soon as AI settings are saved.
+
+### 🐛 Provider errors
+
+- Removed Gemini 2.5 Flash and Flash-Lite from the selectable catalog after provider
+  responses showed that Flash is unavailable to new users and Flash-Lite rejects its
+  advertised thinking configurations. Existing selections load with Gemini 3.7 Flash.
+- Shows the provider's short public error message with HTTP 400 and 404 failures. Kintara
+  discards the rest of the response body and limits the displayed detail to 320 characters.
+
+### 🧪 Tests
+
+- Added a real router and SQLite test that clears one reader's private conversation without
+  changing another reader's conversation for the same shared document.
+- Added provider-error and frontend wiring checks for safe error detail, live settings
+  refresh, summary placement, and chat clearing.
+- Added settings coverage for rejecting removed Gemini models and moving an existing
+  selection to the current Google default.
+
+### 📚 Documentation
+
+- Clarified that the host path mapped to `/library` is the folder Kintara scans and watches.
+
+### 🧹 Maintenance
+
+- Split the AI stylesheet by feature area so each source file stays within the project size
+  limit without changing the existing selectors.
+
+### 🏷️ Versioning
+
+- Bumped Kintara from 1.13.1 to 1.13.2 for the AI panel fixes.
+
 ## [1.13.1] - 2026-08-22
 
 ### 🧹 Cleanup

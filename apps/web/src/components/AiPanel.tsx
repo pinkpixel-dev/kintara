@@ -6,7 +6,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { Bot, Send, Sparkles, X } from "lucide-react";
+import { Bot, MessageSquarePlus, Send, Sparkles, X } from "lucide-react";
 import { AiFindMode } from "./AiFindMode";
 import { AiCoverMode } from "./AiCoverMode";
 import ReactMarkdown from "react-markdown";
@@ -19,17 +19,20 @@ import {
   loadAiPanelWidth,
 } from "../lib/ai-panel-size";
 import { withPendingUserMessage } from "../lib/ai-conversation";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 interface Props {
   document: Document;
+  settingsRevision: number;
   onClose: () => void;
   onUpdated: (document: Document) => void;
 }
 
-export function AiPanel({ document, onClose, onUpdated }: Props) {
+export function AiPanel({ document, settingsRevision, onClose, onUpdated }: Props) {
   const [conversation, setConversation] = useState<AiConversation | null>(null);
   const [preflight, setPreflight] = useState<SummaryPreflight | null>(null);
   const [confirmSummary, setConfirmSummary] = useState(false);
+  const [confirmClearChat, setConfirmClearChat] = useState(false);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,13 +48,17 @@ export function AiPanel({ document, onClose, onUpdated }: Props) {
     setDraft("");
     setError(null);
     setMode("chat");
-    Promise.all([aiService.conversation(document.id), aiService.preflight(document.id)])
-      .then(([nextConversation, nextPreflight]) => {
-        setConversation(nextConversation);
-        setPreflight(nextPreflight);
-      })
+    aiService.conversation(document.id)
+      .then(setConversation)
       .catch((err) => setError(messageFor(err, "Could not load this conversation.")));
   }, [document.id]);
+
+  useEffect(() => {
+    setConfirmSummary(false);
+    aiService.preflight(document.id)
+      .then(setPreflight)
+      .catch((err) => setError(messageFor(err, "Could not load AI details for this document.")));
+  }, [document.id, settingsRevision]);
 
   useLayoutEffect(() => {
     const transcript = transcriptRef.current;
@@ -99,6 +106,21 @@ export function AiPanel({ document, onClose, onUpdated }: Props) {
     }
   };
 
+  const clearChat = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await aiService.clearConversation(document.id);
+      setConversation({ conversationId: null, documentId: document.id, messages: [] });
+      setConfirmClearChat(false);
+    } catch (err) {
+      setError(messageFor(err, "The chat could not be cleared."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const resize = (event: ReactPointerEvent<HTMLDivElement>) => {
     const startX = event.clientX;
     const startWidth = width;
@@ -135,9 +157,18 @@ export function AiPanel({ document, onClose, onUpdated }: Props) {
         onPointerDown={resize} onKeyDown={resizeWithKeyboard} />
       <header className="ai-chat-header">
         <span className="ai-panel-title"><Bot size={17} /> Ask Kintara</span>
-        <button className="modal-close" onClick={onClose} aria-label="Close AI chat">
-          <X size={18} />
-        </button>
+        <div className="ai-header-actions">
+          {mode === "chat" && (
+            <button className="ai-header-action" onClick={() => setConfirmClearChat(true)}
+              disabled={busy || !conversation?.messages.length} aria-label="Start a new chat"
+              title="Start a new chat">
+              <MessageSquarePlus size={17} />
+            </button>
+          )}
+          <button className="modal-close" onClick={onClose} aria-label="Close AI chat">
+            <X size={18} />
+          </button>
+        </div>
       </header>
       <div className="ai-document-name" title={document.title}>{document.title}</div>
 
@@ -181,6 +212,31 @@ export function AiPanel({ document, onClose, onUpdated }: Props) {
       )}
 
       {mode === "chat" && <>
+      {preflight?.canSummarize && (
+        <div className="ai-chat-actions">
+          <button className="ai-summary-action" disabled={busy || confirmSummary}
+            aria-expanded={confirmSummary} onClick={() => setConfirmSummary(true)}>
+            <Sparkles size={16} /> Summarize document
+          </button>
+        </div>
+      )}
+
+      {confirmSummary && preflight && (
+        <section className="ai-request-confirmation" aria-label="Confirm summary request">
+          <strong>Confirm provider request</strong>
+          <dl>
+            <div><dt>Provider</dt><dd>{preflight.provider === "openai" ? "OpenAI" : "Google"}</dd></div>
+            <div><dt>Model</dt><dd>{preflight.model}</dd></div>
+            <div><dt>Input</dt><dd>~{preflight.approximateInputTokens.toLocaleString()} tokens</dd></div>
+          </dl>
+          {preflight.hasSummary && <p>This document already has a summary. Replace it?</p>}
+          <div className="settings-actions">
+            <button className="btn btn-ghost" onClick={() => setConfirmSummary(false)}>Cancel</button>
+            <button className="btn btn-primary" disabled={busy} onClick={summarize}>Send</button>
+          </div>
+        </section>
+      )}
+
       <div className="ai-transcript" ref={transcriptRef} aria-live="polite">
         {conversation?.messages.map((message) => (
           <article key={message.id} className={message.role === "user"
@@ -201,22 +257,6 @@ export function AiPanel({ document, onClose, onUpdated }: Props) {
         </div>}
       </div>
 
-      {confirmSummary && preflight && (
-        <section className="ai-request-confirmation" aria-label="Confirm summary request">
-          <strong>Confirm provider request</strong>
-          <dl>
-            <div><dt>Provider</dt><dd>{preflight.provider === "openai" ? "OpenAI" : "Google"}</dd></div>
-            <div><dt>Model</dt><dd>{preflight.model}</dd></div>
-            <div><dt>Input</dt><dd>~{preflight.approximateInputTokens.toLocaleString()} tokens</dd></div>
-          </dl>
-          {preflight.hasSummary && <p>This document already has a summary. Replace it?</p>}
-          <div className="settings-actions">
-            <button className="btn btn-ghost" onClick={() => setConfirmSummary(false)}>Cancel</button>
-            <button className="btn btn-primary" disabled={busy} onClick={summarize}>Send</button>
-          </div>
-        </section>
-      )}
-
       {error && <p className="auth-error ai-chat-error" role="alert">{error}</p>}
       <div className="ai-composer">
         <div className="ai-composer-field">
@@ -232,14 +272,12 @@ export function AiPanel({ document, onClose, onUpdated }: Props) {
           <button className="ai-send" onClick={ask} disabled={busy || !draft.trim()}
             aria-label="Send question"><Send size={17} /></button>
         </div>
-        {preflight?.canSummarize && (
-          <button className="ai-quick-action" disabled={busy || confirmSummary}
-            onClick={() => setConfirmSummary(true)}>
-            <Sparkles size={15} /> Summarize
-          </button>
-        )}
       </div>
       </>}
+      <ConfirmDialog isOpen={confirmClearChat} title="Start a new chat"
+        message="Clear this document’s private chat history? Its saved summary will not be changed."
+        confirmLabel="Clear chat" danger onConfirm={clearChat}
+        onCancel={() => setConfirmClearChat(false)} />
     </aside>
   );
 }

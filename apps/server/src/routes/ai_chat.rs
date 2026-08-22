@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, HashSet};
 
 use axum::extract::{Path, State};
+use axum::http::StatusCode;
 use axum::routing::get;
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
@@ -95,7 +96,9 @@ struct GroundedCitation {
 pub fn router() -> Router<AppState> {
     Router::new().route(
         "/documents/{id}/conversation",
-        get(get_conversation).post(send_message),
+        get(get_conversation)
+            .post(send_message)
+            .delete(clear_conversation),
     )
 }
 
@@ -106,6 +109,20 @@ pub async fn get_conversation(
 ) -> AppResult<Json<Conversation>> {
     access::require_document_view(&state, document_id, user_id).await?;
     Ok(Json(load_conversation(&state, user_id, document_id).await?))
+}
+
+pub async fn clear_conversation(
+    State(state): State<AppState>,
+    AuthenticatedUser(user_id): AuthenticatedUser,
+    Path(document_id): Path<i64>,
+) -> AppResult<StatusCode> {
+    access::require_document_view(&state, document_id, user_id).await?;
+    sqlx::query("DELETE FROM ai_conversations WHERE user_id = ? AND document_id = ?")
+        .bind(user_id)
+        .bind(document_id)
+        .execute(&state.db)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn send_message(

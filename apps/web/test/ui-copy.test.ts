@@ -54,6 +54,9 @@ test("copy that affects a decision remains visible", async () => {
 
   assert.match(aiPanel, /This document already has a summary/);
   assert.match(aiPanel, /Confirm provider request/);
+  assert.match(aiPanel, /Summarize document/);
+  assert.match(aiPanel, /Start a new chat/);
+  assert.match(aiPanel, /saved summary will not be changed/);
   assert.match(aiMetadata, /Confirm provider request/);
   assert.match(aiMetadata, /document text is sent to your AI provider with storage disabled/);
   assert.match(aiMetadata, /Nothing changes until you apply suggestions and save details/);
@@ -67,4 +70,19 @@ test("copy that affects a decision remains visible", async () => {
   assert.match(details, /<AiCoverMode/);
   assert.match(details, />Year<\/label>/);
   assert.match(authGate, /first GitHub account to sign in becomes the owner/);
+});
+
+test("AI settings refresh and private chat clearing stay wired to the panel", async () => {
+  const [app, settings, panel, api] = await Promise.all([
+    readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
+    component("SettingsModal.tsx"),
+    component("AiPanel.tsx"),
+    readFile(new URL("../src/api/ai.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(settings, /onAiSettingsSaved/);
+  assert.match(app, /settingsRevision=\{aiSettingsRevision\}/);
+  assert.match(panel, /\[document\.id, settingsRevision\]/);
+  assert.match(panel, /aiService\.clearConversation\(document\.id\)/);
+  assert.match(api, /api\.delete<void>/);
 });

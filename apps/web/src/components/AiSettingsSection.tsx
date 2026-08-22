@@ -3,9 +3,9 @@ import { Bot } from "lucide-react";
 import { ApiError, aiService, type AiSettings, type ModelCatalog } from "../api";
 import type { UpdateAiSettings } from "../api/ai";
 
-interface Props { onEnabledChange: (enabled: boolean) => void }
+interface Props { onSaved: (settings: AiSettings) => void }
 
-export function AiSettingsSection({ onEnabledChange }: Props) {
+export function AiSettingsSection({ onSaved }: Props) {
   const [settings, setSettings] = useState<AiSettings | null>(null);
   const [models, setModels] = useState<ModelCatalog | null>(null);
   const [openaiKey, setOpenaiKey] = useState("");
@@ -66,7 +66,7 @@ export function AiSettingsSection({ onEnabledChange }: Props) {
     try {
       const next = await aiService.updateSettings(payload());
       setSettings(next); setOpenaiKey(""); setGoogleKey("");
-      setRemoveOpenai(false); setRemoveGoogle(false); onEnabledChange(next.enabled);
+      setRemoveOpenai(false); setRemoveGoogle(false); onSaved(next);
       setMessage("AI settings saved.");
     } catch (error) {
       setMessage(error instanceof ApiError ? error.message : "Could not save AI settings.");

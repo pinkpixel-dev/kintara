@@ -140,6 +140,8 @@ export const aiService = {
     api.get<SummaryPreflight>(`/api/ai/documents/${documentId}/preflight`),
   conversation: (documentId: number) =>
     api.get<AiConversation>(`/api/ai/documents/${documentId}/conversation`),
+  clearConversation: (documentId: number) =>
+    api.delete<void>(`/api/ai/documents/${documentId}/conversation`),
   ask: (documentId: number, message: string) =>
     api.post<AiChatResponse>(`/api/ai/documents/${documentId}/conversation`, {
       action: "ask",

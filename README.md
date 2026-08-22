@@ -9,7 +9,7 @@ folder, indexes its contents, and serves the library through a browser or instal
 
 ## What Kintara does
 
-- Watches one folder for PDF, Markdown, and text documents.
+- Watches one folder for PDF, Markdown, and text documents. Documents can also be manually imported.
 - Extracts PDF metadata, searchable text, page counts, and cover thumbnails with Poppler.
 - Streams PDFs with HTTP Range support, so large files do not need one full download.
 - Keeps libraries, collections, highlights, favorites, and reading progress per user.
@@ -140,6 +140,9 @@ services:
 
 The repository also contains a commented example at
 [`docker/docker-compose.yml`](docker/docker-compose.yml).
+
+The host path on the left side of `/path/to/your/documents:/library` is the folder that
+Kintara scans and watches. Replace it with your document folder or mounted NAS share.
 
 ### 6. Start Kintara
 
@@ -346,7 +349,9 @@ npm test
 ```
 
 `npm run dev` starts the API on port `8080` and Vite on port `1420`. Vite proxies `/api`
-to the Rust server. Set `KINTARA_DEV_API` to use another API address.
+to the Rust server. Set `KINTARA_DEV_API` to use another API address. Local development
+scans and watches `apps/server/data/library` by default. Set `KINTARA_LIBRARY_DIR` before
+you start the server to use another document folder.
 
 Build the frontend and let the Rust server host it:
 
