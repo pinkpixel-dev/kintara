@@ -4,6 +4,42 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-08-22
+
+### 🔎 Natural-language library search
+
+- Added an Ask mode beside the sidebar search box. Describe what you are after and Kintara
+  rewrites it into the same filters a manual search produces: free text, a library, a
+  collection, a tag, favourites, and a sort order.
+- Kept one result surface. The rewrite is applied to the normal document grid rather than
+  opening a separate AI result list.
+- Added an interpretation strip above the grid naming every filter that was applied, with
+  Undo to restore the previous view and query in one click.
+- Sent no document text. Only the request and the names of the libraries, collections, and
+  tags the requester can already see leave the machine, and the sidebar says so in Ask mode.
+- Resolved every returned id back against the requester's own catalogue, so a borrowed or
+  invented id is dropped rather than applied.
+
+### 🧹 Maintenance
+
+- Generalised the provider layer's structured output. A caller now supplies its own JSON
+  schema instead of choosing between one hard-coded citation shape and none.
+- Moved the application keyboard shortcuts into `useKeyboardShortcuts` unchanged, so
+  `App.tsx` stays inside the file size limit.
+
+### 🧪 Tests
+
+- Added unit coverage for catalogue prompt building, id resolution against the requester's
+  own libraries and tags, and the unsupported-sort fallback.
+- Added route coverage proving a search request is refused for a signed-out caller, for
+  disabled AI, and for empty or oversized text before any provider call.
+- Added frontend coverage for scope hints, view selection, layered filters, and the
+  interpretation labels. The full server and web suites pass with 173 tests.
+
+### 🏷️ Versioning
+
+- Bumped Kintara from 1.8.2 to 1.9.0 for natural-language library search.
+
 ## [1.8.2] - 2026-08-22
 
 ### 🐛 Browser uploads

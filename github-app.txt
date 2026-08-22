@@ -1,17 +1,8 @@
 Client ID: Iv23liNILq3QYhrWYa9O
 
-Client Secret: 4a54b315ded4eede34447f2529122ca9d7799ed4
+Client Secret: 8964350b4ad7888517e4949776313d68e26e2551
 
-
-export KINTARA_PUBLIC_URL='http://localhost:1420'
-export KINTARA_GITHUB_CLIENT_ID='paste-your-id-here'
-export KINTARA_GITHUB_CLIENT_SECRET='paste-your-secret-here'
-
-read -rsp 'GitHub client secret: ' KINTARA_GITHUB_CLIENT_SECRET
-export KINTARA_GITHUB_CLIENT_SECRET
-printf '\n'
-
-OR 
+Set variables:
 
 read --silent --global --export --prompt-str 'GitHub client secret: ' KINTARA_GITHUB_CLIENT_SECRET
 echo
@@ -31,3 +22,9 @@ set --query KINTARA_GITHUB_CLIENT_SECRET; and echo 'Client secret is set'
 Then start Kintara from the same terminal:
 
 npm run dev
+
+Alternative (less secure):
+
+export KINTARA_PUBLIC_URL='http://localhost:1420'
+export KINTARA_GITHUB_CLIENT_ID='paste-your-id-here'
+export KINTARA_GITHUB_CLIENT_SECRET='paste-your-secret-here'

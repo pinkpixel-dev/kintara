@@ -296,7 +296,7 @@ pub async fn test_connection(
             input: "Test this Kintara AI connection.",
             reasoning: Some(&configured.reasoning),
             temperature: configured.temperature,
-            structured_citations: false,
+            response_schema: None,
         },
     )
     .await?;
@@ -361,7 +361,7 @@ pub async fn summarize(
             input: text,
             reasoning: Some(&configured.reasoning),
             temperature: configured.temperature,
-            structured_citations: false,
+            response_schema: None,
         },
     )
     .await?;

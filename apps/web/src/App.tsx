@@ -18,7 +18,10 @@ import { MoveDocumentModal } from "./components/MoveDocumentModal";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { ImportOverlays } from "./components/ImportOverlays";
 import { AiPanel } from "./components/AiPanel";
+import { AiSearchSummary } from "./components/AiSearchSummary";
+import { useAiSearch } from "./hooks/useAiSearch";
 import { useDocumentTabs } from "./hooks/useDocumentTabs";
+import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useDocumentImport } from "./hooks/useDocumentImport";
 import { useEntitySettings } from "./hooks/useEntitySettings";
 import { loadSettings, saveSettings } from "./lib/settings";
@@ -71,6 +74,11 @@ function App() {
 
   const entitySettings = useEntitySettings();
 
+  const aiSearch = useAiSearch({
+    activeView, searchQuery, setActiveView, setSearchQuery,
+    onApplied: () => { setViewMode('grid'); if (isNarrow()) setIsLeftSidebarOpen(false); },
+  });
+
   // Theming is applied in main.tsx before the first render; this only decides
   // whether the onboarding overlay is due.
   useEffect(() => {
@@ -78,47 +86,11 @@ function App() {
     aiService.settings().then((value) => setAiEnabled(value.enabled)).catch(() => undefined);
   }, []);
 
-  // Keyboard Shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        switch (e.key.toLowerCase()) {
-          case 'i':
-            e.preventDefault();
-            importFlow.start();
-            break;
-          case 'f':
-            // focus search logic
-            e.preventDefault();
-            const searchInput = document.querySelector('.sidebar-content input[type="text"]') as HTMLInputElement;
-            if (searchInput) {
-              setIsLeftSidebarOpen(true);
-              setTimeout(() => searchInput.focus(), 100);
-            }
-            break;
-          case ',':
-            e.preventDefault();
-            setIsSettingsOpen(true);
-            break;
-          case 'w':
-            e.preventDefault();
-            if (viewMode === 'reading' && openTabs.length > 0) {
-              if (closeTab(activeTabIndex)) setViewMode('grid');
-            }
-            break;
-          case 'b':
-            e.preventDefault();
-            setIsLeftSidebarOpen(prev => !prev);
-            break;
-        }
-      } else if (e.key === 'F1') {
-        e.preventDefault();
-        setIsHelpOpen(true);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [openTabs, activeTabIndex, viewMode]);
+  useKeyboardShortcuts({
+    openTabs, activeTabIndex, viewMode, closeTab, setViewMode,
+    setIsLeftSidebarOpen, setIsSettingsOpen, setIsHelpOpen,
+    startImport: importFlow.start,
+  });
 
   // Listen for custom events from Sidebar
   useEffect(() => {
@@ -162,6 +134,9 @@ function App() {
         query.collectionId = activeView.id;
       }
 
+      // Tag and sort come from an AI rewrite; no sidebar view expresses either.
+      aiSearch.applyTo(query);
+
       const page = await documentService.list(query);
       setDocuments(page.items);
     } catch (err) {
@@ -198,7 +173,7 @@ function App() {
     };
     window.addEventListener('refresh-documents', handleRefresh);
     return () => window.removeEventListener('refresh-documents', handleRefresh);
-  }, [searchQuery, activeView]);
+  }, [searchQuery, activeView, aiSearch.interpretation]);
 
   // Checked when the view changes rather than on every keystroke, so typing in
   // the search box does not fire a request per open tab.
@@ -208,6 +183,7 @@ function App() {
 
   const handleSidebarSelect = (view: ActiveView) => {
     setActiveView(view);
+    aiSearch.clear();
     // Choosing a view is a fresh start. Carrying the query over would make the
     // new library look empty for a reason that is off-screen on a phone.
     setSearchQuery("");
@@ -225,6 +201,7 @@ function App() {
    * open, because that is where the search box is.
    */
   const handleSearchEverywhere = () => {
+    aiSearch.clear();
     setActiveView({ type: 'all' });
     setViewMode('grid');
   };
@@ -415,6 +392,8 @@ function App() {
         onSearchEverywhere={handleSearchEverywhere}
         onScopeNameChange={setScopeName}
         onImport={importFlow.start}
+        aiEnabled={aiEnabled}
+        aiSearch={aiSearch}
       />
 
       <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
@@ -443,7 +422,8 @@ function App() {
         {/* Main Content Area */}
         <div className="flex-1 flex overflow-hidden relative bg-[var(--bg-primary)]">
           {viewMode === 'grid' ? (
-            <div className="w-full h-full animate-in fade-in duration-200">
+            <div className="w-full h-full flex flex-col animate-in fade-in duration-200">
+              <AiSearchSummary search={aiSearch} />
               <DocumentGrid
                 documents={documents}
                 emptyReason={emptyReasonFor(searchQuery, activeView, scopeName)}

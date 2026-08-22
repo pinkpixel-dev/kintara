@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { Document } from "./types";
+import type { Document, SortOrder } from "./types";
 
 export type AiProvider = "openai" | "google";
 
@@ -51,6 +51,24 @@ export interface SummaryPreflight {
   canSummarize: boolean;
 }
 
+/**
+ * A natural-language request rewritten into the filters the document list
+ * already understands. Names travel with the ids so the interpretation can be
+ * shown without a second round trip.
+ */
+export interface AiSearchInterpretation {
+  terms: string;
+  libraryId: number | null;
+  libraryName: string | null;
+  collectionId: number | null;
+  collectionName: string | null;
+  tagId: number | null;
+  tagName: string | null;
+  favorite: boolean;
+  sort: SortOrder;
+  explanation: string;
+}
+
 export interface AiCitation { page: number; excerpt: string }
 export interface AiMessage {
   id: number;
@@ -89,6 +107,8 @@ export const aiService = {
       action: "summarize",
       overwrite,
     }),
+  search: (request: string, scope: { libraryId?: number; collectionId?: number } = {}) =>
+    api.post<AiSearchInterpretation>("/api/ai/search", { request, ...scope }),
   summarize: (documentId: number, overwrite = false) =>
     api.post<Document>(`/api/documents/${documentId}/summarize`, { overwrite }),
 };

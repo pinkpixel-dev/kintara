@@ -6,6 +6,17 @@ use super::Provider;
 
 const MAX_PROVIDER_RESPONSE: usize = 2 * 1024 * 1024;
 
+/// A strict JSON schema the provider must answer with.
+///
+/// Each caller owns its own shape — grounded document answers and rewritten
+/// search filters need different fields — so the schema arrives with the
+/// request rather than living here as a flag.
+#[derive(Debug, Clone)]
+pub struct JsonSchema<'a> {
+    pub name: &'a str,
+    pub schema: Value,
+}
+
 #[derive(Debug, Clone)]
 pub struct GenerateRequest<'a> {
     pub provider: Provider,
@@ -15,7 +26,7 @@ pub struct GenerateRequest<'a> {
     pub input: &'a str,
     pub reasoning: Option<&'a str>,
     pub temperature: Option<f64>,
-    pub structured_citations: bool,
+    pub response_schema: Option<JsonSchema<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -58,13 +69,13 @@ fn openai_body(request: &GenerateRequest<'_>) -> Value {
         "store": false,
         "max_output_tokens": 1200
     });
-    if request.structured_citations {
+    if let Some(schema) = &request.response_schema {
         body["text"] = json!({
             "format": {
                 "type": "json_schema",
-                "name": "document_answer",
+                "name": schema.name,
                 "strict": true,
-                "schema": citation_schema()
+                "schema": schema.schema
             }
         });
     }
@@ -107,37 +118,14 @@ fn google_body(request: &GenerateRequest<'_>) -> Value {
         "store": false,
         "generation_config": generation_config
     });
-    if request.structured_citations {
+    if let Some(schema) = &request.response_schema {
         body["response_format"] = json!({
             "type": "text",
             "mime_type": "application/json",
-            "schema": citation_schema()
+            "schema": schema.schema
         });
     }
     body
-}
-
-fn citation_schema() -> Value {
-    json!({
-        "type": "object",
-        "properties": {
-            "answer": { "type": "string" },
-            "citations": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "page": { "type": "integer", "minimum": 1 },
-                        "excerpt": { "type": "string" }
-                    },
-                    "required": ["page", "excerpt"],
-                    "additionalProperties": false
-                }
-            }
-        },
-        "required": ["answer", "citations"],
-        "additionalProperties": false
-    })
 }
 
 async fn send_json(builder: reqwest::RequestBuilder) -> AppResult<Value> {
@@ -273,11 +261,15 @@ mod tests {
             input: "input",
             reasoning: Some("medium"),
             temperature: None,
-            structured_citations: true,
+            response_schema: Some(JsonSchema {
+                name: "example",
+                schema: json!({ "type": "object" }),
+            }),
         };
         let openai = openai_body(&request);
         assert_eq!(openai["store"], false);
         assert_eq!(openai["text"]["format"]["type"], "json_schema");
+        assert_eq!(openai["text"]["format"]["name"], "example");
 
         let google = google_body(&request);
         assert_eq!(google["store"], false);

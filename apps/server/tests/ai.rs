@@ -329,3 +329,72 @@ async fn document_conversations_are_private_even_when_the_document_is_shared() {
     assert_eq!(owner["messages"][0]["content"], "Owner question");
     assert_eq!(reader["messages"][0]["content"], "Reader question");
 }
+
+#[tokio::test]
+async fn library_search_refuses_before_any_provider_call() {
+    let app = TestApp::new().await;
+    let (_user_id, cookie) = signed_in_owner(&app).await;
+
+    // AI off entirely: nothing should reach a provider, and no key is set.
+    let disabled = json_with_cookie(
+        &app,
+        "POST",
+        "/api/ai/search",
+        &cookie,
+        json!({ "request": "crochet dragons" }),
+    )
+    .await;
+    assert_eq!(disabled.status(), StatusCode::BAD_REQUEST);
+
+    json_with_cookie(
+        &app,
+        "PUT",
+        "/api/ai/settings",
+        &cookie,
+        settings(Some("sk-test-key"), true),
+    )
+    .await;
+
+    // An empty request never becomes a billed round trip.
+    let empty = json_with_cookie(
+        &app,
+        "POST",
+        "/api/ai/search",
+        &cookie,
+        json!({ "request": "   " }),
+    )
+    .await;
+    assert_eq!(empty.status(), StatusCode::BAD_REQUEST);
+    assert!(
+        body_json(empty).await["error"]
+            .as_str()
+            .unwrap()
+            .contains("describe what you are looking for")
+    );
+
+    let too_long = json_with_cookie(
+        &app,
+        "POST",
+        "/api/ai/search",
+        &cookie,
+        json!({ "request": "d".repeat(501) }),
+    )
+    .await;
+    assert_eq!(too_long.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn library_search_requires_a_session() {
+    let app = TestApp::new().await;
+    let response = app
+        .request(
+            Request::builder()
+                .method("POST")
+                .uri("/api/ai/search")
+                .header("content-type", "application/json")
+                .body(Body::from(json!({ "request": "anything" }).to_string()))
+                .unwrap(),
+        )
+        .await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}

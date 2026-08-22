@@ -1,5 +1,6 @@
 pub mod ai;
 pub mod ai_chat;
+pub mod ai_search;
 pub mod annotations;
 pub mod auth;
 pub mod collections;
@@ -31,7 +32,12 @@ pub fn router(state: AppState) -> Router {
         .route("/health", get(health::health))
         .nest("/auth", auth::router())
         .route("/me", get(auth::me))
-        .nest("/ai", ai::router().merge(ai_chat::router()))
+        .nest(
+            "/ai",
+            ai::router()
+                .merge(ai_chat::router())
+                .merge(ai_search::router()),
+        )
         .nest(
             "/documents",
             documents::router(state.config.max_upload_bytes),

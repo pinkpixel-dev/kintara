@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import {
   Search, Library as LibraryIcon, Star, Plus, Settings, HelpCircle,
-  LogOut, X, Clock,
+  LogOut, X, Clock, Sparkles,
 } from "lucide-react";
 import { collectionService, libraryService, type Collection, type Library } from "../api";
 import { authService } from "../api/auth";
 import { SidebarPrompt, type PromptConfig } from "./SidebarPrompt";
 import { SidebarRowMenu, type RowMenuState } from "./SidebarRowMenu";
 import { SidebarLibraryGroup } from "./SidebarLibraryGroups";
+import type { AiSearchState } from "../hooks/useAiSearch";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -25,6 +26,9 @@ interface SidebarProps {
   onScopeNameChange: (name: string | null) => void;
   /** A target files the uploaded document straight into that library or collection. */
   onImport: (target?: ImportTarget) => void;
+  /** Whether the signed-in person has AI turned on; Ask mode is hidden if not. */
+  aiEnabled: boolean;
+  aiSearch: AiSearchState;
 }
 
 /** Where an import should land, when it is started from a specific row. */
@@ -33,7 +37,13 @@ export interface ImportTarget {
   collectionId?: number;
 }
 
-export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setActiveView, onSearchEverywhere, onScopeNameChange, onImport }: SidebarProps) {
+export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setActiveView, onSearchEverywhere, onScopeNameChange, onImport, aiEnabled, aiSearch }: SidebarProps) {
+  // Ask mode is a different kind of input, not a different kind of query: the
+  // sentence stays here as a draft and only the rewritten terms reach
+  // `searchQuery`, so typing a question does not run a literal search for it.
+  const [askMode, setAskMode] = useState(false);
+  const [askDraft, setAskDraft] = useState("");
+  const asking = aiEnabled && askMode;
   const [libraries, setLibraries] = useState<Library[]>([]);
   const [collectionsByLibrary, setCollectionsByLibrary] = useState<Record<number, Collection[]>>({});
   const [expandedLibraries, setExpandedLibraries] = useState<Record<number, boolean>>(() => {
@@ -195,13 +205,76 @@ export function Sidebar({ isOpen, searchQuery, setSearchQuery, activeView, setAc
               <Search className="search-field-icon" size={14} aria-hidden="true" />
               <input
                 type="text"
-                placeholder={scopeName ? `Search in ${scopeName}...` : "Search documents..."}
-                aria-label={scopeName ? `Search in ${scopeName}` : "Search all documents"}
+                placeholder={
+                  asking
+                    ? "Describe what you need..."
+                    : scopeName ? `Search in ${scopeName}...` : "Search documents..."
+                }
+                aria-label={
+                  asking
+                    ? "Describe what you are looking for"
+                    : scopeName ? `Search in ${scopeName}` : "Search all documents"
+                }
                 className="input"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                maxLength={asking ? 500 : undefined}
+                disabled={asking && aiSearch.busy}
+                value={asking ? askDraft : searchQuery}
+                onChange={(e) => (asking ? setAskDraft(e.target.value) : setSearchQuery(e.target.value))}
+                onKeyDown={(e) => {
+                  if (asking && e.key === "Enter") {
+                    e.preventDefault();
+                    aiSearch.run(askDraft);
+                  }
+                }}
               />
             </div>
+
+            {aiEnabled && (
+              <div className="search-mode" role="group" aria-label="Search mode">
+                <button
+                  type="button"
+                  className={askMode ? "search-mode-option" : "search-mode-option active"}
+                  aria-pressed={!askMode}
+                  onClick={() => setAskMode(false)}
+                  title="Match words in titles, authors, keywords, and tags"
+                >
+                  Text
+                </button>
+                <button
+                  type="button"
+                  className={askMode ? "search-mode-option active" : "search-mode-option"}
+                  aria-pressed={askMode}
+                  onClick={() => setAskMode(true)}
+                  title="Describe what you are looking for and let AI build the search"
+                >
+                  <Sparkles size={13} aria-hidden="true" /> Ask
+                </button>
+                {asking && (
+                  <button
+                    type="button"
+                    className="btn btn-primary search-mode-go"
+                    disabled={aiSearch.busy || askDraft.trim().length === 0}
+                    onClick={() => aiSearch.run(askDraft)}
+                  >
+                    {aiSearch.busy ? "Working" : "Search"}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* A disclosure rather than a confirmation dialog: unlike a summary,
+                no document text is sent, and a per-search modal would make the
+                feature unusable. What does leave is worth naming once. */}
+            {asking && (
+              <p className="search-mode-note">
+                Your request and your library, collection, and tag names go to your AI
+                provider. Document text does not.
+              </p>
+            )}
+
+            {aiSearch.error && (
+              <p className="search-mode-error" role="alert">{aiSearch.error}</p>
+            )}
 
             {/* Only while there is something to widen. Before you type, the
                 placeholder already says where the search will land. */}

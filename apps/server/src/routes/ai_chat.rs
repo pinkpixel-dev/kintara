@@ -6,7 +6,7 @@ use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
 use crate::access;
-use crate::ai::providers::{self, GenerateRequest};
+use crate::ai::providers::{self, GenerateRequest, JsonSchema};
 use crate::current_user::AuthenticatedUser;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
@@ -172,7 +172,10 @@ pub async fn send_message(
             input: &input,
             reasoning: Some(&configured.reasoning),
             temperature: configured.temperature,
-            structured_citations: true,
+            response_schema: Some(JsonSchema {
+                name: "document_answer",
+                schema: citation_schema(),
+            }),
         },
     )
     .await?;
@@ -390,6 +393,31 @@ fn build_input(title: &str, pages: &[PageRow], history: &[HistoryRow], request: 
     }
     input.push_str(&format!("USER: {request}\n</conversation>"));
     input
+}
+
+/// The grounded-answer shape. Every field is required and no extra keys are
+/// allowed, because OpenAI's strict mode rejects anything looser.
+fn citation_schema() -> serde_json::Value {
+    serde_json::json!({
+        "type": "object",
+        "properties": {
+            "answer": { "type": "string" },
+            "citations": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "page": { "type": "integer", "minimum": 1 },
+                        "excerpt": { "type": "string" }
+                    },
+                    "required": ["page", "excerpt"],
+                    "additionalProperties": false
+                }
+            }
+        },
+        "required": ["answer", "citations"],
+        "additionalProperties": false
+    })
 }
 
 fn system_instructions(action: ChatAction) -> &'static str {
