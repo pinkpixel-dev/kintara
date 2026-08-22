@@ -1,6 +1,6 @@
 mod common;
 
-use common::{sample_pdf, TestApp};
+use common::{TestApp, sample_pdf};
 use kintara_server::scanner;
 use kintara_server::state::AppState;
 
@@ -21,7 +21,11 @@ async fn titles(app: &TestApp) -> Vec<String> {
 async fn a_scan_indexes_files_that_appeared_while_the_server_was_down() {
     let app = TestApp::new().await;
     std::fs::create_dir_all(app.config.library_dir.join("papers")).unwrap();
-    std::fs::write(app.config.library_dir.join("papers/dropped-in.pdf"), sample_pdf()).unwrap();
+    std::fs::write(
+        app.config.library_dir.join("papers/dropped-in.pdf"),
+        sample_pdf(),
+    )
+    .unwrap();
     std::fs::write(app.config.library_dir.join("notes.md"), b"# hello").unwrap();
 
     scanner::full_scan(&state_of(&app)).await.unwrap();
@@ -91,22 +95,25 @@ async fn a_renamed_file_keeps_its_row_rather_than_becoming_a_new_document() {
     .unwrap();
     scanner::full_scan(&state).await.unwrap();
 
-    let rows: Vec<(i64, String)> =
-        sqlx::query_as("SELECT id, relative_path FROM documents")
-            .fetch_all(&app.db)
-            .await
-            .unwrap();
+    let rows: Vec<(i64, String)> = sqlx::query_as("SELECT id, relative_path FROM documents")
+        .fetch_all(&app.db)
+        .await
+        .unwrap();
 
     assert_eq!(rows.len(), 1, "a rename must not create a second document");
-    assert_eq!(rows[0].0, original_id, "the document id must survive a rename");
+    assert_eq!(
+        rows[0].0, original_id,
+        "the document id must survive a rename"
+    );
     assert_eq!(rows[0].1, "new-name.pdf");
 
-    let progress: f64 =
-        sqlx::query_scalar("SELECT reading_progress FROM user_document_state WHERE document_id = ?")
-            .bind(original_id)
-            .fetch_one(&app.db)
-            .await
-            .unwrap();
+    let progress: f64 = sqlx::query_scalar(
+        "SELECT reading_progress FROM user_document_state WHERE document_id = ?",
+    )
+    .bind(original_id)
+    .fetch_one(&app.db)
+    .await
+    .unwrap();
     assert_eq!(progress, 0.7, "reading progress must survive a rename");
 }
 
@@ -159,8 +166,15 @@ async fn edited_files_are_reindexed_without_losing_corrected_metadata() {
             .await
             .unwrap();
 
-    assert_eq!(title, "Corrected By Hand", "a file edit must not undo a manual correction");
-    assert_eq!(size, changed.len() as i64, "the new size should be recorded");
+    assert_eq!(
+        title, "Corrected By Hand",
+        "a file edit must not undo a manual correction"
+    );
+    assert_eq!(
+        size,
+        changed.len() as i64,
+        "the new size should be recorded"
+    );
 }
 
 #[tokio::test]
@@ -169,7 +183,11 @@ async fn non_document_files_on_the_share_are_ignored() {
     std::fs::write(app.config.library_dir.join("holiday.jpg"), b"jpegdata").unwrap();
     std::fs::write(app.config.library_dir.join("backup.zip"), b"zipdata").unwrap();
     std::fs::write(app.config.library_dir.join(".DS_Store"), b"junk").unwrap();
-    std::fs::write(app.config.library_dir.join("half-copied.pdf.part"), b"partial").unwrap();
+    std::fs::write(
+        app.config.library_dir.join("half-copied.pdf.part"),
+        b"partial",
+    )
+    .unwrap();
 
     scanner::full_scan(&state_of(&app)).await.unwrap();
 
@@ -179,7 +197,11 @@ async fn non_document_files_on_the_share_are_ignored() {
 #[tokio::test]
 async fn scanned_documents_are_immediately_searchable_and_readable() {
     let app = TestApp::new().await;
-    std::fs::write(app.config.library_dir.join("quantum-entanglement.md"), b"# physics").unwrap();
+    std::fs::write(
+        app.config.library_dir.join("quantum-entanglement.md"),
+        b"# physics",
+    )
+    .unwrap();
 
     scanner::full_scan(&state_of(&app)).await.unwrap();
 
@@ -190,4 +212,60 @@ async fn scanned_documents_are_immediately_searchable_and_readable() {
     let response = app.get(&format!("/api/documents/{id}/file")).await;
     assert_eq!(response.status(), axum::http::StatusCode::OK);
     assert_eq!(common::body_bytes(response).await, b"# physics");
+}
+
+#[tokio::test]
+async fn markdown_body_text_is_stored_by_page_and_added_to_fts() {
+    let app = TestApp::new().await;
+    let path = app.config.library_dir.join("plain-title.md");
+    std::fs::write(
+        &path,
+        b"# Notes\n\nA uniquely searchable chrysanthemum passage.",
+    )
+    .unwrap();
+
+    scanner::full_scan(&state_of(&app)).await.unwrap();
+
+    let (id, status, body): (i64, String, String) = sqlx::query_as(
+        "SELECT id, text_status, extracted_text FROM documents WHERE relative_path = 'plain-title.md'",
+    )
+    .fetch_one(&app.db)
+    .await
+    .unwrap();
+    assert_eq!(status, "ok");
+
+    let page: String = sqlx::query_scalar(
+        "SELECT text FROM document_pages WHERE document_id = ? AND page_number = 1",
+    )
+    .bind(id)
+    .fetch_one(&app.db)
+    .await
+    .unwrap();
+    assert_eq!(page, body);
+
+    let found = common::body_json(app.get("/api/documents?q=chrysanthemum").await).await;
+    assert_eq!(found["total"], 1, "body-only text should be searchable");
+}
+
+#[tokio::test]
+async fn unchanged_documents_without_extraction_are_backfilled() {
+    let app = TestApp::new().await;
+    let path = app.config.library_dir.join("backfill.md");
+    std::fs::write(&path, b"Backfilled body text").unwrap();
+    let state = state_of(&app);
+    scanner::full_scan(&state).await.unwrap();
+
+    sqlx::query(
+        "UPDATE documents SET extracted_text = NULL, text_status = NULL, text_extracted_at = NULL",
+    )
+    .execute(&app.db)
+    .await
+    .unwrap();
+
+    scanner::full_scan(&state).await.unwrap();
+    let status: String = sqlx::query_scalar("SELECT text_status FROM documents")
+        .fetch_one(&app.db)
+        .await
+        .unwrap();
+    assert_eq!(status, "ok");
 }

@@ -1,0 +1,33 @@
+Client ID: Iv23liNILq3QYhrWYa9O
+
+Client Secret: 4a54b315ded4eede34447f2529122ca9d7799ed4
+
+
+export KINTARA_PUBLIC_URL='http://localhost:1420'
+export KINTARA_GITHUB_CLIENT_ID='paste-your-id-here'
+export KINTARA_GITHUB_CLIENT_SECRET='paste-your-secret-here'
+
+read -rsp 'GitHub client secret: ' KINTARA_GITHUB_CLIENT_SECRET
+export KINTARA_GITHUB_CLIENT_SECRET
+printf '\n'
+
+OR 
+
+read --silent --global --export --prompt-str 'GitHub client secret: ' KINTARA_GITHUB_CLIENT_SECRET
+echo
+
+When the prompt appears, paste the GitHub client secret and press Enter. The terminal will not display the pasted characters.
+
+Set the other variables using Fish syntax too:
+set --global --export KINTARA_PUBLIC_URL 'http://localhost:1420'
+set --global --export KINTARA_GITHUB_CLIENT_ID 'paste-your-client-id-here'
+
+Verify that all three variables exist without displaying the secret:
+
+set --query KINTARA_PUBLIC_URL; and echo 'Public URL is set'
+set --query KINTARA_GITHUB_CLIENT_ID; and echo 'Client ID is set'
+set --query KINTARA_GITHUB_CLIENT_SECRET; and echo 'Client secret is set'
+
+Then start Kintara from the same terminal:
+
+npm run dev

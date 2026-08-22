@@ -2,21 +2,28 @@ mod common;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use common::{body_json, header, TestApp};
-use serde_json::json;
+use common::{TestApp, body_json};
+use kintara_server::auth::{self, GitHubIdentity};
+use kintara_server::state::AppState;
 
-async fn setup_owner(app: &TestApp) -> String {
-    let response = app
-        .send_json(
-            "POST",
-            "/api/auth/setup",
-            json!({ "username": "jess", "password": "a-good-password" }),
-        )
-        .await;
-    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+fn state_of(app: &TestApp) -> AppState {
+    AppState::new(app.db.clone(), app.config.clone())
+}
 
-    let cookie = header(&response, "set-cookie").expect("session cookie");
-    cookie.split(';').next().unwrap().to_string()
+async fn claim_owner(app: &TestApp) -> (i64, String) {
+    let state = state_of(app);
+    let id = auth::resolve_github_user(
+        &state,
+        &GitHubIdentity {
+            id: 101,
+            login: "jess".into(),
+            avatar_url: Some("https://avatars.githubusercontent.com/u/101".into()),
+        },
+    )
+    .await
+    .unwrap();
+    let session = auth::create_session(&state, id).await.unwrap();
+    (id, format!("kintara_session={session}"))
 }
 
 async fn get_with_cookie(app: &TestApp, uri: &str, cookie: &str) -> axum::response::Response {
@@ -31,162 +38,136 @@ async fn get_with_cookie(app: &TestApp, uri: &str, cookie: &str) -> axum::respon
 }
 
 #[tokio::test]
-async fn a_fresh_install_reports_that_it_needs_setup() {
+async fn a_fresh_install_reports_owner_setup_and_missing_oauth_configuration() {
     let app = TestApp::new().await;
-
-    let status = body_json(app.get("/api/auth/status").await).await;
-    assert_eq!(status["needsSetup"], true);
+    let status = body_json(app.get_unauthenticated("/api/auth/status").await).await;
+    assert_eq!(status["needsOwner"], true);
+    assert_eq!(status["oauthConfigured"], false);
     assert_eq!(status["authenticated"], false);
 }
 
 #[tokio::test]
-async fn the_library_is_reachable_before_a_password_is_set() {
+async fn oauth_callback_state_must_belong_to_the_same_browser() {
+    let app = TestApp::new().await;
+    let response = app
+        .get_unauthenticated("/api/auth/github/callback?code=temporary&state=not-this-browser")
+        .await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn the_library_is_private_before_an_owner_is_linked() {
     let app = TestApp::new().await;
     app.add_document("paper.pdf", b"bytes").await;
-
-    // Otherwise a first run could not scan, and the setup screen would sit in
-    // front of an app that returns 401 for everything.
-    let response = app.get("/api/documents").await;
-    assert_eq!(response.status(), StatusCode::OK);
-}
-
-#[tokio::test]
-async fn setup_creates_the_owner_and_signs_them_in() {
-    let app = TestApp::new().await;
-    let cookie = setup_owner(&app).await;
-
-    let me = body_json(get_with_cookie(&app, "/api/me", &cookie).await).await;
-    assert_eq!(me["username"], "jess");
-    assert_eq!(me["isAdmin"], true);
-
-    let status = body_json(app.get("/api/auth/status").await).await;
-    assert_eq!(status["needsSetup"], false);
-}
-
-#[tokio::test]
-async fn setup_reuses_the_seeded_account_so_existing_reading_state_survives() {
-    let app = TestApp::new().await;
-    let id = app.add_document("paper.pdf", b"bytes").await;
-    let seeded_user = app.user_id().await;
-
-    sqlx::query("INSERT INTO user_document_state (user_id, document_id, reading_progress) VALUES (?, ?, 0.6)")
-        .bind(seeded_user)
-        .bind(id)
-        .execute(&app.db)
-        .await
-        .unwrap();
-
-    let cookie = setup_owner(&app).await;
-
-    // Documents indexed by the scanner before setup should still show their
-    // progress once the owner signs in, rather than belonging to a ghost user.
-    let doc = body_json(get_with_cookie(&app, &format!("/api/documents/{id}"), &cookie).await).await;
-    assert_eq!(doc["readingProgress"], 0.6);
-
-    let users: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
-        .fetch_one(&app.db)
-        .await
-        .unwrap();
-    assert_eq!(users, 1, "setup must not create a second account");
-}
-
-#[tokio::test]
-async fn setup_cannot_be_run_twice() {
-    let app = TestApp::new().await;
-    setup_owner(&app).await;
-
-    // Otherwise anyone reaching the server could seize an existing install.
-    let response = app
-        .send_json(
-            "POST",
-            "/api/auth/setup",
-            json!({ "username": "attacker", "password": "another-password" }),
-        )
-        .await;
-    assert_eq!(response.status(), StatusCode::CONFLICT);
-}
-
-#[tokio::test]
-async fn short_passwords_are_rejected() {
-    let app = TestApp::new().await;
-
-    let response = app
-        .send_json("POST", "/api/auth/setup", json!({ "username": "jess", "password": "short" }))
-        .await;
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-}
-
-#[tokio::test]
-async fn once_a_password_exists_the_api_requires_a_session() {
-    let app = TestApp::new().await;
-    app.add_document("paper.pdf", b"bytes").await;
-    setup_owner(&app).await;
-
-    let response = app.get("/api/documents").await;
     assert_eq!(
-        response.status(),
-        StatusCode::UNAUTHORIZED,
-        "the library must not be readable without signing in"
+        app.get_unauthenticated("/api/documents").await.status(),
+        StatusCode::UNAUTHORIZED
     );
 }
 
 #[tokio::test]
-async fn a_valid_login_returns_a_working_session() {
+async fn first_github_identity_reuses_seeded_owner_and_reading_state() {
     let app = TestApp::new().await;
-    app.add_document("paper.pdf", b"bytes").await;
-    setup_owner(&app).await;
+    let document_id = app.add_document("paper.pdf", b"bytes").await;
+    let seeded_user = app.user_id().await;
+    sqlx::query(
+        "INSERT INTO user_document_state (user_id, document_id, reading_progress)
+         VALUES (?, ?, 0.6)",
+    )
+    .bind(seeded_user)
+    .bind(document_id)
+    .execute(&app.db)
+    .await
+    .unwrap();
 
-    let response = app
-        .send_json(
-            "POST",
-            "/api/auth/login",
-            json!({ "username": "jess", "password": "a-good-password" }),
-        )
-        .await;
-    assert_eq!(response.status(), StatusCode::NO_CONTENT);
-
-    let cookie = header(&response, "set-cookie").expect("session cookie");
-    assert!(cookie.contains("HttpOnly"), "session cookie must not be script-readable");
-
-    let session = cookie.split(';').next().unwrap();
-    let response = get_with_cookie(&app, "/api/documents", session).await;
-    assert_eq!(response.status(), StatusCode::OK);
+    let (owner_id, cookie) = claim_owner(&app).await;
+    assert_eq!(owner_id, seeded_user);
+    let document =
+        body_json(get_with_cookie(&app, &format!("/api/documents/{document_id}"), &cookie).await)
+            .await;
+    assert_eq!(document["readingProgress"], 0.6);
 }
 
 #[tokio::test]
-async fn a_wrong_password_is_rejected_without_revealing_whether_the_user_exists() {
+async fn an_uninvited_github_user_is_rejected() {
     let app = TestApp::new().await;
-    setup_owner(&app).await;
+    claim_owner(&app).await;
+    let result = auth::resolve_github_user(
+        &state_of(&app),
+        &GitHubIdentity {
+            id: 202,
+            login: "not-invited".into(),
+            avatar_url: None,
+        },
+    )
+    .await;
+    assert!(result.is_err());
+}
 
-    let wrong_password = app
-        .send_json(
-            "POST",
-            "/api/auth/login",
-            json!({ "username": "jess", "password": "not-the-password" }),
-        )
-        .await;
-    let unknown_user = app
-        .send_json(
-            "POST",
-            "/api/auth/login",
-            json!({ "username": "nobody", "password": "not-the-password" }),
-        )
-        .await;
+#[tokio::test]
+async fn an_invited_github_user_gets_an_account_and_consumes_the_invitation() {
+    let app = TestApp::new().await;
+    let (owner_id, _) = claim_owner(&app).await;
+    sqlx::query(
+        "INSERT INTO github_invitations (github_login, is_admin, invited_by)
+         VALUES ('reader', 0, ?)",
+    )
+    .bind(owner_id)
+    .execute(&app.db)
+    .await
+    .unwrap();
 
-    assert_eq!(wrong_password.status(), StatusCode::UNAUTHORIZED);
-    assert_eq!(unknown_user.status(), StatusCode::UNAUTHORIZED);
+    let reader_id = auth::resolve_github_user(
+        &state_of(&app),
+        &GitHubIdentity {
+            id: 202,
+            login: "Reader".into(),
+            avatar_url: None,
+        },
+    )
+    .await
+    .unwrap();
+    let github_id: i64 = sqlx::query_scalar("SELECT github_user_id FROM users WHERE id = ?")
+        .bind(reader_id)
+        .fetch_one(&app.db)
+        .await
+        .unwrap();
+    assert_eq!(github_id, 202);
+    let invitations: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM github_invitations")
+        .fetch_one(&app.db)
+        .await
+        .unwrap();
+    assert_eq!(invitations, 0);
+}
 
-    let a = body_json(wrong_password).await;
-    let b = body_json(unknown_user).await;
-    assert_eq!(a["error"], b["error"], "the two cases must be indistinguishable");
+#[tokio::test]
+async fn once_an_owner_exists_the_api_requires_a_session() {
+    let app = TestApp::new().await;
+    app.add_document("paper.pdf", b"bytes").await;
+    claim_owner(&app).await;
+    assert_eq!(
+        app.get_unauthenticated("/api/documents").await.status(),
+        StatusCode::UNAUTHORIZED
+    );
+}
+
+#[tokio::test]
+async fn a_valid_kintara_session_allows_library_access() {
+    let app = TestApp::new().await;
+    app.add_document("paper.pdf", b"bytes").await;
+    let (_, cookie) = claim_owner(&app).await;
+    assert_eq!(
+        get_with_cookie(&app, "/api/documents", &cookie)
+            .await
+            .status(),
+        StatusCode::OK
+    );
 }
 
 #[tokio::test]
 async fn logging_out_revokes_the_session_server_side() {
     let app = TestApp::new().await;
-    app.add_document("paper.pdf", b"bytes").await;
-    let cookie = setup_owner(&app).await;
-
+    let (_, cookie) = claim_owner(&app).await;
     let response = app
         .request(
             Request::builder()
@@ -198,46 +179,70 @@ async fn logging_out_revokes_the_session_server_side() {
         )
         .await;
     assert_eq!(response.status(), StatusCode::NO_CONTENT);
-
-    // Sessions live in the database, so the old cookie is dead rather than
-    // merely cleared in the browser.
-    let response = get_with_cookie(&app, "/api/documents", &cookie).await;
-    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        get_with_cookie(&app, "/api/documents", &cookie)
+            .await
+            .status(),
+        StatusCode::UNAUTHORIZED
+    );
 }
 
 #[tokio::test]
-async fn a_made_up_session_cookie_is_rejected() {
+async fn expired_and_made_up_sessions_are_rejected() {
     let app = TestApp::new().await;
-    setup_owner(&app).await;
-
-    let response = get_with_cookie(&app, "/api/documents", "kintara_session=made-up").await;
-    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-}
-
-#[tokio::test]
-async fn an_expired_session_stops_working() {
-    let app = TestApp::new().await;
-    let cookie = setup_owner(&app).await;
-
+    let (_, cookie) = claim_owner(&app).await;
     sqlx::query("UPDATE sessions SET expires_at = datetime('now', '-1 day')")
         .execute(&app.db)
         .await
         .unwrap();
-
-    let response = get_with_cookie(&app, "/api/documents", &cookie).await;
-    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    for invalid in [&cookie, "kintara_session=made-up"] {
+        assert_eq!(
+            get_with_cookie(&app, "/api/documents", invalid)
+                .await
+                .status(),
+            StatusCode::UNAUTHORIZED
+        );
+    }
 }
 
 #[tokio::test]
-async fn deleting_a_user_takes_their_sessions_with_them() {
+async fn deleting_a_user_cascades_to_sessions() {
     let app = TestApp::new().await;
-    setup_owner(&app).await;
-
-    sqlx::query("DELETE FROM users").execute(&app.db).await.unwrap();
-
+    let (owner_id, _) = claim_owner(&app).await;
+    sqlx::query("DELETE FROM users WHERE id = ?")
+        .bind(owner_id)
+        .execute(&app.db)
+        .await
+        .unwrap();
     let sessions: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sessions")
         .fetch_one(&app.db)
         .await
         .unwrap();
     assert_eq!(sessions, 0);
+}
+
+#[tokio::test]
+async fn a_member_cannot_manage_access() {
+    let app = TestApp::new().await;
+    let (owner_id, _) = claim_owner(&app).await;
+    sqlx::query("INSERT INTO github_invitations (github_login, invited_by) VALUES ('reader', ?)")
+        .bind(owner_id)
+        .execute(&app.db)
+        .await
+        .unwrap();
+    let reader_id = auth::resolve_github_user(
+        &state_of(&app),
+        &GitHubIdentity {
+            id: 202,
+            login: "reader".into(),
+            avatar_url: None,
+        },
+    )
+    .await
+    .unwrap();
+    let session = auth::create_session(&state_of(&app), reader_id)
+        .await
+        .unwrap();
+    let response = get_with_cookie(&app, "/api/users", &format!("kintara_session={session}")).await;
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
 }

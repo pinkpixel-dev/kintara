@@ -1,4 +1,4 @@
-import { Columns, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Bot, Columns, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { TabBar } from "./TabBar";
 import { DocumentActions } from "./DocumentActions";
 import type { Document } from "../api";
@@ -11,6 +11,8 @@ interface AppHeaderProps {
   isSplitView: boolean;
   splitRightTabIndex: number | null;
   isLeftSidebarOpen: boolean;
+  aiEnabled: boolean;
+  isAiOpen: boolean;
   onSelectTab: (index: number) => void;
   onCloseTab: (index: number) => void;
   onSetSplitRightTab: (index: number) => void;
@@ -20,6 +22,7 @@ interface AppHeaderProps {
   onToggleFavorite: (doc: Document) => void;
   onMove: (doc: Document) => void;
   onDelete: (doc: Document) => void;
+  onToggleAi: () => void;
 }
 
 /**
@@ -40,6 +43,8 @@ export function AppHeader({
   isSplitView,
   splitRightTabIndex,
   isLeftSidebarOpen,
+  aiEnabled,
+  isAiOpen,
   onSelectTab,
   onCloseTab,
   onSetSplitRightTab,
@@ -49,6 +54,7 @@ export function AppHeader({
   onToggleFavorite,
   onMove,
   onDelete,
+  onToggleAi,
 }: AppHeaderProps) {
   return (
     <div className="h-12 border-b border-[var(--border-color)] bg-[var(--bg-primary)] flex items-center px-2 z-10 flex-shrink-0">
@@ -69,6 +75,10 @@ export function AppHeader({
       />
 
       <div className="flex items-center gap-2 flex-shrink-0 ml-auto pr-2">
+        <button className={`header-icon-btn ${isAiOpen ? "is-active" : ""}`} onClick={onToggleAi}
+          disabled={!aiEnabled} title={aiEnabled ? "Toggle AI tools" : "Enable AI in Settings"} aria-label="Toggle AI tools">
+          <Bot size={18} />
+        </button>
         {isReading && activeDocument && (
           <DocumentActions
             document={activeDocument}

@@ -28,6 +28,7 @@ async fn test_app() -> (tempfile::TempDir, axum::Router) {
         scan_on_start: false,
         watch: false,
         max_upload_bytes: 64 * 1024 * 1024,
+        github_oauth: None,
     };
     config.ensure_dirs().expect("create dirs");
     std::fs::create_dir_all(&config.web_dir).expect("create web dir");
@@ -57,7 +58,10 @@ async fn health_reports_ok_and_reaches_the_database() {
     assert_eq!(response.status(), StatusCode::OK);
 
     let body = body_string(response).await;
-    assert!(body.contains("\"status\":\"ok\""), "unexpected body: {body}");
+    assert!(
+        body.contains("\"status\":\"ok\""),
+        "unexpected body: {body}"
+    );
     // A document count only comes back if the query actually ran, which makes
     // this a real database check rather than a static string.
     assert!(body.contains("\"documents\":0"), "unexpected body: {body}");
@@ -136,6 +140,7 @@ fn database_lives_in_the_data_dir_not_the_library() {
         scan_on_start: false,
         watch: false,
         max_upload_bytes: 64 * 1024 * 1024,
+        github_oauth: None,
     };
 
     assert!(config.database_path().starts_with("/data"));

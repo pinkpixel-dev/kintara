@@ -14,6 +14,16 @@ services:
       PGID: 1000
       TZ: Etc/UTC
 
+      # Create a GitHub OAuth app whose callback is:
+      # https://kintara.example.com/api/auth/github/callback
+      KINTARA_PUBLIC_URL: https://kintara.example.com
+      KINTARA_GITHUB_CLIENT_ID: replace-with-client-id
+      KINTARA_GITHUB_CLIENT_SECRET: replace-with-client-secret
+
+      # Optional. If omitted, Kintara creates /data/kintara-ai.key. Keep either
+      # this secret or that key file backed up with the database.
+      # KINTARA_SECRET: use-at-least-32-random-characters
+
       # Turn the watcher off if your share does not report filesystem events
       # (some SMB and NFS mounts do not). The startup scan still picks changes up.
       # KINTARA_WATCH: "false"

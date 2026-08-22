@@ -19,13 +19,11 @@ async fn fresh_db() -> (tempfile::TempDir, SqlitePool) {
 /// Inserts one user and one document, returning their ids. Ids are read back
 /// rather than assumed, because AUTOINCREMENT does not restart at 1.
 async fn seed(pool: &SqlitePool) -> (i64, i64) {
-    let user_id: i64 =
-        sqlx::query_scalar("INSERT INTO users (username, password_hash) VALUES (?, ?) RETURNING id")
-            .bind("jess")
-            .bind("hash")
-            .fetch_one(pool)
-            .await
-            .expect("insert user");
+    let user_id: i64 = sqlx::query_scalar("INSERT INTO users (username) VALUES (?) RETURNING id")
+        .bind("jess")
+        .fetch_one(pool)
+        .await
+        .expect("insert user");
 
     let doc_id: i64 = sqlx::query_scalar(
         "INSERT INTO documents (title, relative_path, document_type)
@@ -53,9 +51,13 @@ async fn migrations_apply_to_an_empty_database() {
 
     for expected in [
         "annotations",
+        "ai_usage",
         "collections",
         "documents",
+        "document_pages",
+        "github_invitations",
         "libraries",
+        "user_ai_settings",
         "user_document_state",
         "users",
     ] {
@@ -64,6 +66,39 @@ async fn migrations_apply_to_an_empty_database() {
             "expected table {expected} to exist, got {tables:?}"
         );
     }
+}
+
+#[tokio::test]
+async fn document_pages_are_numbered_and_cascade_with_the_document() {
+    let (_dir, pool) = fresh_db().await;
+    let (_user_id, doc_id) = seed(&pool).await;
+
+    sqlx::query(
+        "INSERT INTO document_pages (document_id, page_number, text) VALUES (?, 1, 'Body text')",
+    )
+    .bind(doc_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let zero_page = sqlx::query(
+        "INSERT INTO document_pages (document_id, page_number, text) VALUES (?, 0, 'bad')",
+    )
+    .bind(doc_id)
+    .execute(&pool)
+    .await;
+    assert!(zero_page.is_err(), "page numbers are one based");
+
+    sqlx::query("DELETE FROM documents WHERE id = ?")
+        .bind(doc_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM document_pages")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 0);
 }
 
 #[tokio::test]
@@ -126,7 +161,10 @@ async fn deleting_a_document_cascades_to_per_user_state_and_annotations() {
         .unwrap();
 
     assert_eq!(state, 0, "reading state should not outlive its document");
-    assert_eq!(annotations, 0, "annotations should not outlive their document");
+    assert_eq!(
+        annotations, 0,
+        "annotations should not outlive their document"
+    );
 }
 
 #[tokio::test]
@@ -212,7 +250,11 @@ async fn fts_index_tracks_inserts_updates_and_deletes() {
         .await
         .expect("delete document");
 
-    assert_eq!(matches(&pool, "attention").await, 0, "delete should deindex");
+    assert_eq!(
+        matches(&pool, "attention").await,
+        0,
+        "delete should deindex"
+    );
 
     let fts_rows: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM documents_fts")
         .fetch_one(&pool)

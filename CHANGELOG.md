@@ -4,6 +4,40 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-08-21
+
+### 🤖 AI
+
+- Added optional document summarization through OpenAI Responses and Google Interactions.
+  Before anything leaves the NAS, Kintara shows the provider, model, approximate input
+  tokens, and asks for confirmation. Provider storage is disabled on every request.
+- Added per-user AI settings with the approved model lists and model-specific controls.
+  OpenAI temperature appears only when reasoning is off; Google receives thinking level
+  but no unsupported temperature field.
+- Provider keys can be saved, replaced, or removed in Settings. They are encrypted before
+  entering SQLite and never returned to the browser. Token usage is recorded per user.
+
+### 🔐 Access
+
+- Replaced password login with GitHub OAuth. The first GitHub identity claims the owner;
+  admins invite later users by GitHub username. GitHub tokens are not stored, and Kintara
+  issues its own HTTP-only sessions after identity verification.
+- Added a local `recover-owner` operator command that can relink the owner and revoke all
+  sessions without adding a second login path.
+
+### 🔎 Documents
+
+- PDF, Markdown, and text documents now receive searchable extracted text during scans.
+  PDF text is also stored by page for future citations. Missing poppler, image-only PDFs,
+  and oversized text are recorded explicitly instead of blocking indexing.
+- Existing unchanged documents are backfilled during a scan when they have no extraction
+  timestamp, so upgrades do not require a destructive reindex.
+
+### 🏷️ Versioning
+
+- Bumped Kintara from 1.5.0 to 1.6.0 for the new user-facing auth, AI settings, and
+  summarization workflows.
+
 ## [1.5.0] - 2026-08-21
 ### Added
 - **The empty grid now says what emptied it.** It used to read "No documents found in this

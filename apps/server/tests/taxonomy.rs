@@ -1,9 +1,8 @@
 mod common;
 
 use axum::http::StatusCode;
-use common::{body_json, TestApp};
+use common::{TestApp, body_json};
 use serde_json::json;
-
 
 // ---------------------------------------------------- libraries
 #[tokio::test]
@@ -227,7 +226,8 @@ async fn tags_attach_to_and_detach_from_documents() {
     let filtered = body_json(app.get(&format!("/api/documents?tagId={tag}")).await).await;
     assert_eq!(filtered["total"], 1);
 
-    app.delete(&format!("/api/documents/{doc}/tags/{tag}")).await;
+    app.delete(&format!("/api/documents/{doc}/tags/{tag}"))
+        .await;
 
     let on_doc = body_json(app.get(&format!("/api/documents/{doc}/tags")).await).await;
     assert_eq!(on_doc.as_array().unwrap().len(), 0);
@@ -320,12 +320,11 @@ async fn one_users_annotations_are_not_visible_or_deletable_by_another() {
     let doc = app.add_document("paper.pdf", b"bytes").await;
 
     // A second user, as multi-user installs will have once auth lands.
-    let other: i64 = sqlx::query_scalar(
-        "INSERT INTO users (username, password_hash) VALUES ('other', '') RETURNING id",
-    )
-    .fetch_one(&app.db)
-    .await
-    .unwrap();
+    let other: i64 =
+        sqlx::query_scalar("INSERT INTO users (username) VALUES ('other') RETURNING id")
+            .fetch_one(&app.db)
+            .await
+            .unwrap();
 
     let foreign: i64 = sqlx::query_scalar(
         "INSERT INTO annotations (document_id, user_id, annotation_type, serialized_position)

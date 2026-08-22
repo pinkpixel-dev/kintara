@@ -1,3 +1,4 @@
+pub mod ai;
 pub mod annotations;
 pub mod auth;
 pub mod collections;
@@ -5,9 +6,10 @@ pub mod documents;
 pub mod health;
 pub mod libraries;
 pub mod tags;
+pub mod users;
 
-use axum::routing::{get, post};
 use axum::Router;
+use axum::routing::{get, post};
 use tower::Layer;
 use tower_http::compression::CompressionLayer;
 use tower_http::services::{ServeDir, ServeFile};
@@ -28,12 +30,21 @@ pub fn router(state: AppState) -> Router {
         .route("/health", get(health::health))
         .nest("/auth", auth::router())
         .route("/me", get(auth::me))
-        .nest("/documents", documents::router(state.config.max_upload_bytes))
+        .nest("/ai", ai::router())
+        .nest(
+            "/documents",
+            documents::router(state.config.max_upload_bytes),
+        )
         .nest("/libraries", libraries::router())
         .nest("/collections", collections::router())
         .nest("/tags", tags::router())
+        .route("/users", get(users::list_access))
+        .nest("/users", users::router())
         .route("/annotations", post(annotations::create))
-        .route("/annotations/{id}", axum::routing::delete(annotations::delete))
+        .route(
+            "/annotations/{id}",
+            axum::routing::delete(annotations::delete),
+        )
         .fallback(api_not_found)
         .with_state(state.clone());
 

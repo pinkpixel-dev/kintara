@@ -15,13 +15,14 @@ use axum::response::Response;
 use http_body_util::BodyExt;
 use kintara_server::config::Config;
 use kintara_server::state::AppState;
-use kintara_server::{db, routes};
+use kintara_server::{auth, db, routes};
 use sqlx::SqlitePool;
 
 pub struct TestApp {
     pub router: axum::Router,
     pub db: SqlitePool,
     pub config: Config,
+    session_cookie: String,
     _dir: tempfile::TempDir,
 }
 
@@ -39,6 +40,7 @@ impl TestApp {
             scan_on_start: false,
             watch: false,
             max_upload_bytes: 64 * 1024 * 1024,
+            github_oauth: None,
         };
         config.ensure_dirs().expect("create dirs");
         std::fs::create_dir_all(&config.web_dir).expect("create web dir");
@@ -46,23 +48,37 @@ impl TestApp {
             .expect("write index.html");
 
         let db = db::connect(&config.database_path()).await.expect("db");
-        let router = routes::router(AppState::new(db.clone(), config.clone()));
+        let state = AppState::new(db.clone(), config.clone());
+        let user_id: i64 = sqlx::query_scalar("SELECT id FROM users ORDER BY id LIMIT 1")
+            .fetch_one(&db)
+            .await
+            .expect("seeded user");
+        let session = auth::create_session(&state, user_id)
+            .await
+            .expect("test session");
+        let router = routes::router(state);
 
         Self {
             router,
             db,
             config,
+            session_cookie: format!("kintara_session={session}"),
             _dir: dir,
         }
     }
 
     pub async fn get(&self, uri: &str) -> Response {
+        self.authenticated_request(Request::builder().uri(uri).body(Body::empty()).unwrap())
+            .await
+    }
+
+    pub async fn get_unauthenticated(&self, uri: &str) -> Response {
         self.request(Request::builder().uri(uri).body(Body::empty()).unwrap())
             .await
     }
 
     pub async fn get_with_range(&self, uri: &str, range: &str) -> Response {
-        self.request(
+        self.authenticated_request(
             Request::builder()
                 .uri(uri)
                 .header("Range", range)
@@ -77,8 +93,16 @@ impl TestApp {
         self.router.clone().oneshot(request).await.unwrap()
     }
 
+    async fn authenticated_request(&self, mut request: Request<Body>) -> Response {
+        request.headers_mut().insert(
+            axum::http::header::COOKIE,
+            self.session_cookie.parse().expect("valid test cookie"),
+        );
+        self.request(request).await
+    }
+
     pub async fn send_json(&self, method: &str, uri: &str, body: serde_json::Value) -> Response {
-        self.request(
+        self.authenticated_request(
             Request::builder()
                 .method(method)
                 .uri(uri)
@@ -90,7 +114,7 @@ impl TestApp {
     }
 
     pub async fn post(&self, uri: &str) -> Response {
-        self.request(
+        self.authenticated_request(
             Request::builder()
                 .method("POST")
                 .uri(uri)
@@ -101,7 +125,7 @@ impl TestApp {
     }
 
     pub async fn delete(&self, uri: &str) -> Response {
-        self.request(
+        self.authenticated_request(
             Request::builder()
                 .method("DELETE")
                 .uri(uri)
@@ -113,7 +137,12 @@ impl TestApp {
 
     /// Posts a `multipart/form-data` upload, hand-building the body so the test
     /// exercises the same parsing path a browser would produce.
-    pub async fn upload(&self, filename: &str, contents: &[u8], fields: &[(&str, &str)]) -> Response {
+    pub async fn upload(
+        &self,
+        filename: &str,
+        contents: &[u8],
+        fields: &[(&str, &str)],
+    ) -> Response {
         const BOUNDARY: &str = "kintaratestboundary";
         let mut body: Vec<u8> = Vec::new();
 
@@ -137,7 +166,7 @@ impl TestApp {
         body.extend_from_slice(contents);
         body.extend_from_slice(format!("\r\n--{BOUNDARY}--\r\n").as_bytes());
 
-        self.request(
+        self.authenticated_request(
             Request::builder()
                 .method("POST")
                 .uri("/api/documents")
@@ -200,8 +229,12 @@ impl TestApp {
     /// Creates a library through the API and returns its id.
     pub async fn create_library(&self, name: &str) -> i64 {
         body_json(
-            self.send_json("POST", "/api/libraries", serde_json::json!({ "name": name }))
-                .await,
+            self.send_json(
+                "POST",
+                "/api/libraries",
+                serde_json::json!({ "name": name }),
+            )
+            .await,
         )
         .await["id"]
             .as_i64()
@@ -250,7 +283,13 @@ impl TestApp {
 }
 
 pub async fn body_bytes(response: Response) -> Vec<u8> {
-    response.into_body().collect().await.unwrap().to_bytes().to_vec()
+    response
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes()
+        .to_vec()
 }
 
 pub async fn body_string(response: Response) -> String {

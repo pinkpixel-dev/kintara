@@ -1,6 +1,6 @@
+use axum::Json;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::Json;
 use serde_json::json;
 
 /// Every fallible handler returns this. Internal detail is logged, never sent
@@ -16,10 +16,16 @@ pub enum AppError {
     #[error("{0}")]
     Unauthorized(String),
 
+    #[error("{0}")]
+    Forbidden(String),
+
     /// The request was valid but conflicts with existing state — a duplicate
     /// upload, or a name already taken.
     #[error("{0}")]
     Conflict(String),
+
+    #[error("{0}")]
+    Unavailable(String),
 
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
@@ -34,7 +40,9 @@ impl IntoResponse for AppError {
             AppError::NotFound => (StatusCode::NOT_FOUND, "not found".to_string()),
             AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
             AppError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg.clone()),
+            AppError::Forbidden(msg) => (StatusCode::FORBIDDEN, msg.clone()),
             AppError::Conflict(msg) => (StatusCode::CONFLICT, msg.clone()),
+            AppError::Unavailable(msg) => (StatusCode::SERVICE_UNAVAILABLE, msg.clone()),
             // A UNIQUE violation reaching this point is a conflict, not a bug —
             // two users racing to create the same library name, for instance.
             AppError::Database(sqlx::Error::Database(db)) if db.is_unique_violation() => (

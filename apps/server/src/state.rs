@@ -10,6 +10,7 @@ use crate::config::Config;
 pub struct AppState {
     pub db: SqlitePool,
     pub config: Arc<Config>,
+    pub http: reqwest::Client,
 }
 
 impl AppState {
@@ -17,6 +18,10 @@ impl AppState {
         Self {
             db,
             config: Arc::new(config),
+            http: reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(90))
+                .build()
+                .expect("valid HTTP client configuration"),
         }
     }
 }

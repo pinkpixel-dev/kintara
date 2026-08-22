@@ -18,17 +18,26 @@ pub fn router(max_upload_bytes: usize) -> Router<AppState> {
     let metadata = Router::new()
         .route(
             "/",
-            get(list).post(upload::upload).layer(DefaultBodyLimit::max(max_upload_bytes)),
+            get(list)
+                .post(upload::upload)
+                .layer(DefaultBodyLimit::max(max_upload_bytes)),
         )
-        .route("/{id}", get(get_one).patch(mutate::update).delete(mutate::delete))
+        .route(
+            "/{id}",
+            get(get_one).patch(mutate::update).delete(mutate::delete),
+        )
         .route("/{id}/progress", put(mutate::set_progress))
         .route("/{id}/favorite", put(mutate::set_favorite))
+        .route("/{id}/summarize", post(crate::routes::ai::summarize))
         .route("/{id}/tags", get(crate::routes::tags::for_document))
         .route(
             "/{id}/tags/{tag_id}",
             post(crate::routes::tags::attach).delete(crate::routes::tags::detach),
         )
-        .route("/{id}/annotations", get(crate::routes::annotations::for_document))
+        .route(
+            "/{id}/annotations",
+            get(crate::routes::annotations::for_document),
+        )
         .route(
             "/{id}/cover",
             // Covers are images; a much smaller ceiling than whole documents.
@@ -163,7 +172,7 @@ pub async fn list(
                     total: 0,
                     limit,
                     offset,
-                }))
+                }));
             }
         },
         _ => None,

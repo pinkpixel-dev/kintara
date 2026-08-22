@@ -19,6 +19,10 @@ live, run it on your NAS, and read them from any device on your network.
   paper do not fight over the bookmark.
 - **Installs as an app.** It is a PWA, so you can add it to a home screen and it opens
   like anything else.
+- **Keeps access tied to GitHub.** The first GitHub account becomes the owner, and admins
+  invite everyone else by GitHub username. Kintara keeps its own sessions, not passwords.
+- **Adds AI only when you ask for it.** Each person can save their own encrypted OpenAI
+  or Google key, then summarize a document after reviewing exactly what will leave the NAS.
 
 ## Running it
 
@@ -35,13 +39,18 @@ services:
       # Find them with `id -u yourname` and `id -g yourname`.
       PUID: 1000
       PGID: 1000
+      KINTARA_PUBLIC_URL: https://kintara.example.com
+      KINTARA_GITHUB_CLIENT_ID: your-oauth-app-client-id
+      KINTARA_GITHUB_CLIENT_SECRET: set-this-in-your-nas-secret-manager
     volumes:
       - /volume1/documents:/library   # your PDFs
       - ./kintara-data:/data          # database and thumbnails
 ```
 
-Then open `http://your-nas:8080` and create your account. The first person to reach it
-sets the password, so do that before exposing the port anywhere.
+Create a GitHub OAuth app for the URL you use to reach Kintara. Set its callback URL to
+`https://kintara.example.com/api/auth/github/callback`, then set the three matching
+variables above. Open Kintara and continue with GitHub. The first GitHub account becomes
+the owner; after that, an admin must invite each GitHub username in Settings.
 
 A ready-to-edit compose file is in [`docker/docker-compose.yml`](docker/docker-compose.yml).
 
@@ -61,15 +70,31 @@ subtle failure.
 | `KINTARA_WATCH` | `true` | Watch for changes while running. Turn off if your share does not report filesystem events. |
 | `KINTARA_MAX_UPLOAD_MB` | `1024` | Largest upload accepted. Magazine scans are big. |
 | `KINTARA_LOG` | `kintara_server=info` | Log filter. |
+| `KINTARA_PUBLIC_URL` | none | Public Kintara origin used to build the OAuth callback. Required with GitHub credentials. |
+| `KINTARA_GITHUB_CLIENT_ID` | none | GitHub OAuth app client id. |
+| `KINTARA_GITHUB_CLIENT_SECRET` | none | GitHub OAuth app client secret. Keep it out of the compose file when your NAS supports secrets. |
+| `KINTARA_SECRET` | generated file | Optional 32+ character source for provider-key encryption. Otherwise `/data/kintara-ai.key` is created. |
+
+### AI keys and privacy
+
+AI is disabled per account until that person saves a provider key and turns it on. Keys
+are encrypted before they enter SQLite and are never returned to the browser. Back up
+`/data/kintara-ai.key` with `kintara.db`; losing it means replacing the saved provider
+keys. Supplying `KINTARA_SECRET` instead is useful when your NAS already has a proper
+secret manager.
+
+Before summarizing, Kintara shows the provider, model, approximate input tokens, and a
+warning that the document text will leave the NAS. OpenAI and Google requests always set
+`store: false`. There is no automatic or background AI processing.
 
 ## Developing
 
-You need Rust, Node, and `poppler-utils` (for `pdfinfo` and `pdftoppm`).
+You need Rust, Node, and `poppler-utils` (for `pdfinfo`, `pdftoppm`, and `pdftotext`).
 
 ```bash
 npm install
 npm run dev      # starts the API on :8080 and the frontend on :1420
-npm test         # 110 tests, no mocks
+npm test         # 143 tests, no mocks
 ```
 
 `npm run dev` runs both halves — the frontend proxies `/api` to the server, so starting

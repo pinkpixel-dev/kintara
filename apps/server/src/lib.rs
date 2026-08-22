@@ -1,3 +1,4 @@
+pub mod ai;
 pub mod auth;
 pub mod config;
 pub mod current_user;
@@ -8,4 +9,6 @@ pub mod media;
 pub mod models;
 pub mod routes;
 pub mod scanner;
+pub mod secrets;
 pub mod state;
+pub mod text_extraction;

@@ -1,0 +1,125 @@
+.ai-settings label,
+.access-invite label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+}
+
+.settings-switch {
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-switch span,
+.access-row span {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-switch small,
+.access-row small,
+.key-status {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.ai-key-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.key-remove {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.5rem !important;
+  color: var(--text-muted);
+  font-size: 0.75rem !important;
+}
+
+.settings-disclosure,
+.ai-confirmation {
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.settings-message {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.access-invite {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.access-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 2.75rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--border-color);
+}
+
+.ai-panel {
+  width: 320px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-color);
+}
+
+.ai-panel-title { display: flex; align-items: center; gap: 0.5rem; }
+.ai-document-title { margin: 0 0 0.5rem; font-size: 1rem; }
+.ai-primary-action { width: 100%; justify-content: center; margin-top: 1rem; }
+.ai-confirmation { margin-top: 1rem; }
+.ai-confirmation dl { margin: 0.75rem 0; }
+.ai-confirmation dl div { display: flex; justify-content: space-between; gap: 1rem; }
+.ai-confirmation dt { color: var(--text-muted); }
+.ai-confirmation dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.ai-warning { color: #fbbf24; }
+.ai-current-summary { margin-top: 1.5rem; }
+.ai-current-summary h4 { margin: 0 0 0.5rem; }
+.ai-current-summary p { font-size: 0.8125rem; line-height: 1.6; white-space: pre-wrap; }
+
+.auth-github {
+  display: inline-flex;
+  gap: 0.5rem;
+  text-decoration: none;
+}
+
+@media (max-width: 900px) {
+  .ai-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    width: min(85vw, 320px);
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+  }
+
+  .ai-key-grid,
+  .access-invite { grid-template-columns: 1fr; }
+}

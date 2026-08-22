@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 use kintara_server::config::Config;
 use kintara_server::state::AppState;
@@ -11,6 +11,11 @@ async fn main() -> Result<()> {
 
     let config = Config::from_env()?;
     config.ensure_dirs()?;
+
+    let args: Vec<String> = std::env::args().collect();
+    if args.get(1).is_some_and(|arg| arg == "recover-owner") {
+        return recover_owner(config, &args).await;
+    }
 
     tracing::info!(
         library = %config.library_dir.display(),
@@ -40,10 +45,10 @@ async fn main() -> Result<()> {
         scanner::spawn_watcher(state.clone());
     }
 
-    if auth::needs_setup(&state).await? {
+    if auth::needs_owner(&state).await? {
         tracing::warn!(
-            "no password is set — open the app to create the owner account. \
-             Until then the library is reachable by anyone who can connect."
+            "no GitHub owner is linked — the first authorized GitHub sign-in \
+             will claim the owner account"
         );
     }
 
@@ -60,6 +65,55 @@ async fn main() -> Result<()> {
         .await
         .context("server error")?;
 
+    Ok(())
+}
+
+async fn recover_owner(config: Config, args: &[String]) -> Result<()> {
+    let github_id: i64 = args
+        .get(2)
+        .context("usage: kintara-server recover-owner <github-id> <github-login>")?
+        .parse()
+        .context("github-id must be the numeric GitHub user id")?;
+    let login = args
+        .get(3)
+        .context("usage: kintara-server recover-owner <github-id> <github-login>")?;
+    if login.trim().is_empty() {
+        anyhow::bail!("github-login cannot be empty");
+    }
+
+    let pool = db::connect(&config.database_path()).await?;
+    let target: i64 = match sqlx::query_scalar("SELECT id FROM users WHERE github_user_id = ?")
+        .bind(github_id)
+        .fetch_optional(&pool)
+        .await?
+    {
+        Some(id) => id,
+        None => {
+            sqlx::query_scalar("SELECT id FROM users ORDER BY is_admin DESC, id LIMIT 1")
+                .fetch_one(&pool)
+                .await?
+        }
+    };
+
+    let mut tx = pool.begin().await?;
+    sqlx::query("UPDATE users SET is_admin = 0")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("UPDATE users SET username = ?, github_user_id = ?, is_admin = 1 WHERE id = ?")
+        .bind(login.trim())
+        .bind(github_id)
+        .bind(target)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DELETE FROM sessions")
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+
+    println!(
+        "Kintara owner recovered for GitHub user {} ({github_id}).",
+        login.trim()
+    );
     Ok(())
 }
 

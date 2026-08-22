@@ -9,6 +9,8 @@ import {
   type Settings,
 } from "../lib/settings";
 import { X, Settings as SettingsIcon, Type, Palette } from "lucide-react";
+import { AiSettingsSection } from "./AiSettingsSection";
+import { AccessSettingsSection } from "./AccessSettingsSection";
 
 // Preset highlight colors: [label, rgba value]
 const HIGHLIGHT_PRESETS: { label: string; value: string; swatch: string }[] = [
@@ -25,9 +27,10 @@ const HIGHLIGHT_PRESETS: { label: string; value: string; swatch: string }[] = [
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onAiEnabledChange: (enabled: boolean) => void;
 }
 
-export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
+export function SettingsModal({ isOpen, onClose, onAiEnabledChange }: SettingsModalProps) {
   const [settings, setSettings] = useState<Settings>(defaultSettings);
 
   useEffect(() => {
@@ -222,6 +225,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               </p>
             </div>
           </section>
+
+          <AiSettingsSection onEnabledChange={onAiEnabledChange} />
+          <AccessSettingsSection />
         </div>
       </div>
     </div>

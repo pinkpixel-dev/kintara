@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import "./App.css";
-import { ApiError, documentService, type Document } from "./api";
+import "./components/Ai.css";
+import { ApiError, aiService, documentService, type Document } from "./api";
 import { Sidebar } from "./components/Sidebar";
 import { DocumentGrid } from "./components/DocumentGrid";
 import { emptyReasonFor, type ActiveView } from "./lib/empty-reason";
@@ -16,6 +17,7 @@ import { ReaderPanes } from "./components/ReaderPanes";
 import { MoveDocumentModal } from "./components/MoveDocumentModal";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { ImportOverlays } from "./components/ImportOverlays";
+import { AiPanel } from "./components/AiPanel";
 import { useDocumentTabs } from "./hooks/useDocumentTabs";
 import { useDocumentImport } from "./hooks/useDocumentImport";
 import { useEntitySettings } from "./hooks/useEntitySettings";
@@ -55,6 +57,8 @@ function App() {
   // It used to be a separate toggle, which meant the two could disagree — the
   // panel could be "open" over nothing, or hold a document while closed.
   const [detailsDocument, setDetailsDocument] = useState<Document | null>(null);
+  const [aiEnabled, setAiEnabled] = useState(false);
+  const [isAiOpen, setIsAiOpen] = useState(false);
 
   // Modals state
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -71,6 +75,7 @@ function App() {
   // whether the onboarding overlay is due.
   useEffect(() => {
     if (!loadSettings().hasSeenOnboarding) setShowOnboarding(true);
+    aiService.settings().then((value) => setAiEnabled(value.enabled)).catch(() => undefined);
   }, []);
 
   // Keyboard Shortcuts
@@ -308,7 +313,7 @@ function App() {
   return (
     <div className="app-container text-primary bg-[var(--bg-primary)]">
       {showOnboarding && <OnboardingOverlay onComplete={handleOnboardingComplete} />}
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} onAiEnabledChange={(enabled) => { setAiEnabled(enabled); if (!enabled) setIsAiOpen(false); }} />
       <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
       <LibrarySettingsModal
         isOpen={entitySettings.isOpen}
@@ -392,13 +397,14 @@ function App() {
 
       {/* Tapping outside a drawer closes it, which is the gesture people expect
           and the only way to dismiss it one-handed. */}
-      {(isLeftSidebarOpen || detailsDocument) && (
+      {(isLeftSidebarOpen || detailsDocument || isAiOpen) && (
         <div
           className="drawer-backdrop"
           onClick={() => {
             if (isNarrow()) {
               setIsLeftSidebarOpen(false);
               setDetailsDocument(null);
+              setIsAiOpen(false);
             }
           }}
           aria-hidden="true"
@@ -425,6 +431,8 @@ function App() {
           isSplitView={isSplitView}
           splitRightTabIndex={splitRightTabIndex}
           isLeftSidebarOpen={isLeftSidebarOpen}
+          aiEnabled={aiEnabled}
+          isAiOpen={isAiOpen}
           onSelectTab={(idx) => { setActiveTabIndex(idx); setViewMode('reading'); }}
           onCloseTab={(idx) => { if (closeTab(idx)) setViewMode('grid'); }}
           onSetSplitRightTab={setSplitRightTabIndex}
@@ -434,6 +442,7 @@ function App() {
           onToggleFavorite={toggleFavorite}
           onMove={setMovingDocument}
           onDelete={setPendingDelete}
+          onToggleAi={() => { setIsAiOpen((open) => !open); setDetailsDocument(null); }}
         />
 
         {/* Main Content Area */}
@@ -475,6 +484,7 @@ function App() {
           onClose={() => setDetailsDocument(null)}
         />
       )}
+      {isAiOpen && <AiPanel document={viewMode === "reading" ? activeDocument : null} onClose={() => setIsAiOpen(false)} onUpdated={(updated) => { replaceDocument(updated); setDocuments((items) => items.map((item) => item.id === updated.id ? updated : item)); }} />}
     </div>
   );
 }

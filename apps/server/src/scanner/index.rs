@@ -9,6 +9,7 @@ use std::path::{Component, Path};
 use crate::error::AppResult;
 use crate::media;
 use crate::state::AppState;
+use crate::text_extraction;
 
 /// Extensions the readers can display. Everything else on the share is ignored
 /// rather than indexed into an entry that cannot be opened.
@@ -16,7 +17,13 @@ pub const INDEXABLE: [&str; 3] = ["pdf", "md", "txt"];
 
 /// Directories NAS software keeps beside your files. Indexing their contents
 /// produces a library full of thumbnails and deleted files.
-const IGNORED_DIRS: [&str; 5] = ["@eaDir", "#recycle", "#snapshot", "lost+found", "$RECYCLE.BIN"];
+const IGNORED_DIRS: [&str; 5] = [
+    "@eaDir",
+    "#recycle",
+    "#snapshot",
+    "lost+found",
+    "$RECYCLE.BIN",
+];
 
 /// True when any component of a library-relative path should be skipped.
 ///
@@ -28,14 +35,20 @@ pub fn is_ignored_relative(relative: &str) -> bool {
             return false;
         };
         let part = part.to_str().unwrap_or_default();
-        part.starts_with('.') || IGNORED_DIRS.iter().any(|dir| part.eq_ignore_ascii_case(dir))
+        part.starts_with('.')
+            || IGNORED_DIRS
+                .iter()
+                .any(|dir| part.eq_ignore_ascii_case(dir))
     })
 }
 
 pub fn is_indexable(path: &Path) -> bool {
     // Editors and sync clients litter the share with partial files; indexing
     // them produces entries that vanish moments later.
-    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or_default();
+    let name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or_default();
     if name.starts_with('.') || name.starts_with('~') || name.ends_with(".part") {
         return false;
     }
@@ -113,14 +126,20 @@ pub async fn index_file(state: &AppState, path: &Path) -> AppResult<Outcome> {
         return Ok(Outcome::Skipped);
     }
 
-    let existing: Option<(i64, Option<String>)> =
-        sqlx::query_as("SELECT id, file_hash FROM documents WHERE relative_path = ?")
-            .bind(&relative_path)
-            .fetch_optional(&state.db)
-            .await?;
+    let existing: Option<(i64, Option<String>, Option<String>)> = sqlx::query_as(
+        "SELECT id, file_hash, text_extracted_at FROM documents WHERE relative_path = ?",
+    )
+    .bind(&relative_path)
+    .fetch_optional(&state.db)
+    .await?;
 
-    if let Some((id, existing_hash)) = existing {
+    if let Some((id, existing_hash, text_extracted_at)) = existing {
         if existing_hash.as_deref() == Some(hash.as_str()) {
+            if text_extracted_at.is_none() {
+                let extension = extension_of(path);
+                text_extraction::extract_and_store(state, id, path, &extension).await?;
+                return Ok(Outcome::Updated(id));
+            }
             return Ok(Outcome::Skipped);
         }
         refresh(state, id, path, &hash, size).await?;
@@ -129,13 +148,12 @@ pub async fn index_file(state: &AppState, path: &Path) -> AppResult<Outcome> {
 
     // Same content under a different path — a copy, or a rename the watcher saw
     // as a create. Move the existing row rather than duplicating it.
-    let moved: Option<i64> = sqlx::query_scalar(
-        "SELECT id FROM documents WHERE file_hash = ? AND relative_path != ?",
-    )
-    .bind(&hash)
-    .bind(&relative_path)
-    .fetch_optional(&state.db)
-    .await?;
+    let moved: Option<i64> =
+        sqlx::query_scalar("SELECT id FROM documents WHERE file_hash = ? AND relative_path != ?")
+            .bind(&hash)
+            .bind(&relative_path)
+            .fetch_optional(&state.db)
+            .await?;
 
     if let Some(id) = moved {
         let still_there: Option<String> =
@@ -160,7 +178,9 @@ pub async fn index_file(state: &AppState, path: &Path) -> AppResult<Outcome> {
         return Ok(Outcome::Skipped);
     }
 
-    Ok(Outcome::Added(add(state, path, &relative_path, &hash, size).await?))
+    Ok(Outcome::Added(
+        add(state, path, &relative_path, &hash, size).await?,
+    ))
 }
 
 async fn add(
@@ -208,8 +228,7 @@ async fn add(
     .await?;
 
     if extension == "pdf" {
-        if let Some(name) =
-            media::generate_thumbnail(path, &state.config.thumbnail_dir(), id).await
+        if let Some(name) = media::generate_thumbnail(path, &state.config.thumbnail_dir(), id).await
         {
             sqlx::query("UPDATE documents SET thumbnail_name = ? WHERE id = ?")
                 .bind(&name)
@@ -219,18 +238,14 @@ async fn add(
         }
     }
 
+    text_extraction::extract_and_store(state, id, path, &extension).await?;
+
     tracing::info!(id, path = %relative_path, "indexed new document");
     Ok(id)
 }
 
 /// Refreshes a document whose bytes changed, leaving user-edited metadata alone.
-async fn refresh(
-    state: &AppState,
-    id: i64,
-    path: &Path,
-    hash: &str,
-    size: i64,
-) -> AppResult<()> {
+async fn refresh(state: &AppState, id: i64, path: &Path, hash: &str, size: i64) -> AppResult<()> {
     let extension = extension_of(path);
 
     // Title, author, and the rest are deliberately not re-read: the user may
@@ -253,8 +268,7 @@ async fn refresh(
                 .fetch_one(&state.db)
                 .await?;
 
-        if let Some(name) =
-            media::generate_thumbnail(path, &state.config.thumbnail_dir(), id).await
+        if let Some(name) = media::generate_thumbnail(path, &state.config.thumbnail_dir(), id).await
         {
             sqlx::query("UPDATE documents SET thumbnail_name = ? WHERE id = ?")
                 .bind(&name)
@@ -271,6 +285,8 @@ async fn refresh(
             }
         }
     }
+
+    text_extraction::extract_and_store(state, id, path, &extension).await?;
 
     tracing::info!(id, "reindexed changed document");
     Ok(())
