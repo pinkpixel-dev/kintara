@@ -114,13 +114,16 @@ pub async fn find(
                 name: "document_passages",
                 schema: passage_schema(),
             }),
+            // Eight quotes with notes is a lot of output, and on OpenAI the
+            // reasoning tokens share this budget. A 1200 ceiling truncated the
+            // JSON mid-string the first time this ran against a real document.
+            max_output_tokens: 8_000,
         },
     )
     .await?;
 
-    let parsed: FoundPassages = serde_json::from_str(&result.text).map_err(|err| {
-        AppError::Unavailable(format!("provider returned an invalid passage list: {err}"))
-    })?;
+    let parsed: FoundPassages = serde_json::from_str(&result.text)
+        .map_err(|err| providers::structured_error(&err, "passage list"))?;
 
     sqlx::query(
         "INSERT INTO ai_usage

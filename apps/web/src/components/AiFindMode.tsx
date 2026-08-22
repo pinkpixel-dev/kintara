@@ -73,7 +73,7 @@ export function AiFindMode({ document, preflight }: Props) {
           <textarea
             value={draft}
             maxLength={500}
-            rows={2}
+            rows={3}
             placeholder="What should I find in this document?"
             aria-label="What should I find in this document?"
             disabled={busy}
@@ -102,61 +102,63 @@ export function AiFindMode({ document, preflight }: Props) {
         )}
       </div>
 
-      {error && <p className="auth-error ai-chat-error" role="alert">{error}</p>}
+      <div className="ai-find-body">
+        {error && <p className="auth-error ai-chat-error" role="alert">{error}</p>}
 
-      {busy && (
-        <div className="ai-thinking" role="status">
-          <span /><span /><span /><span className="sr-only">Searching</span>
-        </div>
-      )}
+        {busy && (
+          <div className="ai-thinking" role="status">
+            <span /><span /><span /><span className="sr-only">Searching</span>
+          </div>
+        )}
 
-      {passages?.length === 0 && !busy && (
-        <p className="ai-find-empty" role="status">
-          Nothing in this document answers that.
-        </p>
-      )}
+        {passages?.length === 0 && !busy && (
+          <p className="ai-find-empty" role="status">
+            Nothing in this document answers that.
+          </p>
+        )}
 
-      <div className="ai-find-results">
-        {passages?.map((passage) => {
-          const placement = placements[passage.excerpt];
-          return (
-            <article key={`${passage.page}-${passage.excerpt}`} className="ai-passage">
-              <header className="ai-passage-head">
-                <span className="ai-citation">Page {passage.page}</span>
-                {placement === "placed" && (
-                  <span className="ai-passage-state" role="status">Highlighted</span>
-                )}
-                {placement === "failed" && (
-                  <span className="ai-passage-state ai-passage-state-failed" role="status">
-                    Could not place
-                  </span>
-                )}
-              </header>
-              <blockquote className="ai-passage-quote">{passage.excerpt}</blockquote>
-              {passage.note && <p className="ai-passage-note">{passage.note}</p>}
-              <div className="ai-passage-actions">
-                <button
-                  type="button"
-                  className="btn btn-ghost ai-passage-action"
-                  onClick={() => highlight(passage)}
-                  disabled={placement === "placing" || placement === "placed"}
-                >
-                  <Highlighter size={14} aria-hidden="true" />
-                  {placement === "placed" ? "Highlighted" : "Highlight"}
-                </button>
-                {isPdf && (
+        <div className="ai-find-results">
+          {passages?.map((passage) => {
+            const placement = placements[passage.excerpt];
+            return (
+              <article key={`${passage.page}-${passage.excerpt}`} className="ai-passage">
+                <header className="ai-passage-head">
+                  <span className="ai-citation">Page {passage.page}</span>
+                  {placement === "placed" && (
+                    <span className="ai-passage-state" role="status">Highlighted</span>
+                  )}
+                  {placement === "failed" && (
+                    <span className="ai-passage-state ai-passage-state-failed" role="status">
+                      Could not place
+                    </span>
+                  )}
+                </header>
+                <blockquote className="ai-passage-quote">{passage.excerpt}</blockquote>
+                {passage.note && <p className="ai-passage-note">{passage.note}</p>}
+                <div className="ai-passage-actions">
                   <button
                     type="button"
                     className="btn btn-ghost ai-passage-action"
-                    onClick={() => requestPage({ documentId: document.id, page: passage.page })}
+                    onClick={() => highlight(passage)}
+                    disabled={placement === "placing" || placement === "placed"}
                   >
-                    <CornerUpRight size={14} aria-hidden="true" /> Go to page
+                    <Highlighter size={14} aria-hidden="true" />
+                    {placement === "placed" ? "Highlighted" : "Highlight"}
                   </button>
-                )}
-              </div>
-            </article>
-          );
-        })}
+                  {isPdf && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost ai-passage-action"
+                      onClick={() => requestPage({ documentId: document.id, page: passage.page })}
+                    >
+                      <CornerUpRight size={14} aria-hidden="true" /> Go to page
+                    </button>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

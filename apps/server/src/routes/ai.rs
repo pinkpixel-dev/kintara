@@ -298,6 +298,9 @@ pub async fn test_connection(
             reasoning: Some(&configured.reasoning),
             temperature: configured.temperature,
             response_schema: None,
+            // Only a word is wanted, but reasoning tokens come out of the same
+            // budget, so a tight ceiling would fail a connection that works.
+            max_output_tokens: 2_000,
         },
     )
     .await?;
@@ -363,6 +366,7 @@ pub async fn summarize(
             reasoning: Some(&configured.reasoning),
             temperature: configured.temperature,
             response_schema: None,
+            max_output_tokens: 4_000,
         },
     )
     .await?;

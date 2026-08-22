@@ -30,6 +30,21 @@ All notable changes to this project will be documented in this file.
 - Said so plainly when a passage cannot be placed, and moved the reader to its page anyway.
   Added Go to page as its own action for PDFs.
 
+### 🐛 Fixes
+
+- Sized the provider output budget per call instead of capping every request at 1200
+  tokens. On OpenAI that budget also covers reasoning, so a passage list could be cut off
+  mid-string and arrive as a JSON parse error; find now asks for 8000.
+- Reported a reply that stopped at the output limit as exactly that, rather than as
+  "EOF while parsing a string". A cut-off reply and a malformed one now read differently.
+- Styled the Find composer. Its textarea rule was scoped to a wrapper only the chat
+  composer has, so the input rendered as an unstyled browser default.
+
+### 🎨 AI panel
+
+- Widened the Find composer to sit across the panel like the chat one, with more room to
+  write, since a find request is usually a whole sentence.
+
 ### 🧹 Maintenance
 
 - Extracted the page loading, readability check, and token estimate shared by chat,
@@ -46,7 +61,9 @@ All notable changes to this project will be documented in this file.
   simply not on the page.
 - Added route coverage proving find is refused for disabled AI, empty requests, documents
   with no extracted text, and documents the caller cannot see.
-- The full server and web suites pass with 195 tests.
+- Added coverage for the per-call output budget, a reply stopped at the output limit, and
+  telling a cut-off reply apart from a malformed one.
+- The full server and web suites pass with 197 tests.
 
 ### 🏷️ Versioning
 

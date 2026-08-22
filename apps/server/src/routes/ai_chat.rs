@@ -161,6 +161,7 @@ pub async fn send_message(
                 name: "document_answer",
                 schema: citation_schema(),
             }),
+            max_output_tokens: 4_000,
         },
     )
     .await?;
@@ -402,11 +403,8 @@ fn system_instructions(action: ChatAction) -> &'static str {
 }
 
 fn parse_grounded(text: &str, pages: &[PageRow]) -> AppResult<GroundedAnswer> {
-    let parsed: GroundedAnswer = serde_json::from_str(text).map_err(|err| {
-        AppError::Unavailable(format!(
-            "provider returned an invalid structured answer: {err}"
-        ))
-    })?;
+    let parsed: GroundedAnswer =
+        serde_json::from_str(text).map_err(|err| providers::structured_error(&err, "answer"))?;
     let answer = parsed.answer.trim().to_string();
     if answer.is_empty() {
         return Err(AppError::Unavailable(

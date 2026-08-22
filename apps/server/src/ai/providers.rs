@@ -27,6 +27,14 @@ pub struct GenerateRequest<'a> {
     pub reasoning: Option<&'a str>,
     pub temperature: Option<f64>,
     pub response_schema: Option<JsonSchema<'a>>,
+    /// Output ceiling for this call.
+    ///
+    /// Per request rather than one constant, because the callers need wildly
+    /// different room: a summary is prose, a passage list is eight quotes. On
+    /// OpenAI this budget also covers reasoning tokens, so a small model at a
+    /// high reasoning level can spend most of it before writing anything —
+    /// which truncates structured output mid-string rather than failing loudly.
+    pub max_output_tokens: u32,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -67,7 +75,7 @@ fn openai_body(request: &GenerateRequest<'_>) -> Value {
         "instructions": request.instructions,
         "input": request.input,
         "store": false,
-        "max_output_tokens": 1200
+        "max_output_tokens": request.max_output_tokens
     });
     if let Some(schema) = &request.response_schema {
         body["text"] = json!({
@@ -107,7 +115,7 @@ async fn google(
 }
 
 fn google_body(request: &GenerateRequest<'_>) -> Value {
-    let mut generation_config = json!({ "max_output_tokens": 1200 });
+    let mut generation_config = json!({ "max_output_tokens": request.max_output_tokens });
     if let Some(thinking) = request.reasoning {
         generation_config["thinking_level"] = json!(thinking);
     }
@@ -175,6 +183,17 @@ async fn send_json(builder: reqwest::RequestBuilder) -> AppResult<Value> {
 }
 
 fn parse_openai(value: &Value) -> AppResult<GenerateResult> {
+    // Reported rather than left to surface as a confusing parse failure further
+    // up: an answer stopped at the ceiling is usually valid JSON with its last
+    // string unterminated.
+    if value["status"] == "incomplete" {
+        let reason = value["incomplete_details"]["reason"].as_str().unwrap_or("");
+        if reason == "max_output_tokens" {
+            return Err(AppError::Unavailable(
+                "the model reached its output limit before it finished; try a shorter request or a lower reasoning level".into(),
+            ));
+        }
+    }
     let text = value["output"]
         .as_array()
         .into_iter()
@@ -222,6 +241,22 @@ fn parse_google(value: &Value) -> AppResult<GenerateResult> {
     })
 }
 
+/// Turns a failure to read a structured reply into something actionable.
+///
+/// A truncated answer and a malformed one need different advice, and serde can
+/// tell them apart: a cut-off reply ends the input early, which classifies as
+/// EOF. Without this the reader sees "EOF while parsing a string at line 1
+/// column 258", which says nothing about what to do next.
+pub fn structured_error(err: &serde_json::Error, what: &str) -> AppError {
+    if err.classify() == serde_json::error::Category::Eof {
+        AppError::Unavailable(format!(
+            "the model's {what} was cut off before it finished; try a shorter request or a lower reasoning level"
+        ))
+    } else {
+        AppError::Unavailable(format!("provider returned an invalid {what}: {err}"))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -265,6 +300,7 @@ mod tests {
                 name: "example",
                 schema: json!({ "type": "object" }),
             }),
+            max_output_tokens: 4000,
         };
         let openai = openai_body(&request);
         assert_eq!(openai["store"], false);
@@ -276,5 +312,36 @@ mod tests {
         assert_eq!(google["response_format"]["type"], "text");
         assert_eq!(google["response_format"]["mime_type"], "application/json");
         assert!(google.get("temperature").is_none());
+        assert_eq!(openai["max_output_tokens"], 4000);
+        assert_eq!(google["generation_config"]["max_output_tokens"], 4000);
+    }
+
+    #[test]
+    fn an_answer_stopped_at_the_output_limit_says_so() {
+        let value = json!({
+            "status": "incomplete",
+            "incomplete_details": { "reason": "max_output_tokens" },
+            "output": []
+        });
+        let message = parse_openai(&value).unwrap_err().to_string();
+        assert!(message.contains("output limit"), "{message}");
+    }
+
+    #[test]
+    fn a_cut_off_reply_reads_differently_from_a_malformed_one() {
+        let truncated =
+            serde_json::from_str::<serde_json::Value>(r#"{"answer":"half"#).unwrap_err();
+        assert!(
+            structured_error(&truncated, "answer")
+                .to_string()
+                .contains("cut off")
+        );
+
+        let malformed = serde_json::from_str::<serde_json::Value>("{oops}").unwrap_err();
+        assert!(
+            structured_error(&malformed, "answer")
+                .to_string()
+                .contains("invalid answer")
+        );
     }
 }

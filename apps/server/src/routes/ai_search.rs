@@ -86,15 +86,13 @@ pub async fn search(
                 name: "library_search",
                 schema: search_schema(),
             }),
+            max_output_tokens: 2_000,
         },
     )
     .await?;
 
-    let parsed: RewrittenSearch = serde_json::from_str(&result.text).map_err(|err| {
-        AppError::Unavailable(format!(
-            "provider returned an invalid search rewrite: {err}"
-        ))
-    })?;
+    let parsed: RewrittenSearch = serde_json::from_str(&result.text)
+        .map_err(|err| providers::structured_error(&err, "search rewrite"))?;
 
     sqlx::query(
         "INSERT INTO ai_usage (user_id, feature, provider, model, input_tokens, output_tokens)
