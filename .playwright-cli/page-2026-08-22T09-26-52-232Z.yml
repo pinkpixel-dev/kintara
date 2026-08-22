@@ -1,4 +1,0 @@
-- generic [ref=e4]:
-  - heading "Sign in to Kintara" [level=1] [ref=e5]
-  - link "Continue with GitHub" [ref=e6] [cursor=pointer]:
-    - /url: /api/auth/github/start
