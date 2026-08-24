@@ -344,6 +344,12 @@
     min-width: 0;
     max-width: none;
     box-shadow: -1rem 0 2.5rem rgba(0, 0, 0, 0.45);
+    /* Fixed to the viewport like the other drawers, so it carries its own
+       insets: the composer at the bottom would otherwise sit under the home
+       indicator, and the close button under the camera housing in landscape. */
+    padding-top: var(--safe-top);
+    padding-right: var(--safe-right);
+    padding-bottom: var(--safe-bottom);
   }
 
   .ai-resize-handle { display: none; }

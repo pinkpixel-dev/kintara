@@ -57,7 +57,7 @@ export function AppHeader({
   onToggleAi,
 }: AppHeaderProps) {
   return (
-    <div className="h-12 border-b border-[var(--border-color)] bg-[var(--bg-primary)] flex items-center px-2 z-10 flex-shrink-0">
+    <div className="app-header border-b border-[var(--border-color)] bg-[var(--bg-primary)] flex items-center px-2 z-10 flex-shrink-0">
       <button
         className="header-icon-btn mr-2 flex-shrink-0"
         onClick={onToggleLeftSidebar}

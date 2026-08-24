@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.13.9] - 2026-08-24
+
+### 📱 Mobile
+
+- Held the app clear of the phone's unusable screen edges. The window is drawn edge to
+  edge in standalone mode, so on a notched phone the header, the drawers, and the modals
+  were being laid out underneath the status bar, the camera housing, and the home
+  indicator.
+- The sidebar toggle now sits below the clock in portrait instead of behind it, and the
+  header's background still fills the strip the clock is drawn on.
+- The sidebar, details, and AI drawers hold their contents clear of the camera housing in
+  landscape while their backgrounds still run to the edge of the screen.
+- Modal dialogs keep their controls inside the usable area in landscape.
+
+### 🏷️ Versioning
+
+- Bumped Kintara from 1.13.8 to 1.13.9 for the mobile safe-area layout fixes.
+
 ## [1.13.8] - 2026-08-22
 
 ### 🐛 Library browsing

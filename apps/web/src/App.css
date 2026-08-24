@@ -233,6 +233,23 @@
   --ui-scale: 1.4;
 }
 
+/*
+  The phone's unusable edges, as lengths we can do arithmetic on.
+
+  The app is laid out edge to edge (`viewport-fit=cover` in index.html), so on
+  a phone in standalone mode the web view really does extend under the clock,
+  the camera housing and the home indicator. `env()` on its own falls back to
+  0px everywhere else, which is what every desktop browser wants, but it cannot
+  be read twice in one `calc()` without repeating the fallback -- hence the
+  aliases.
+*/
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+}
+
 html {
   font-size: calc(var(--font-base) * var(--ui-scale));
 }
@@ -283,6 +300,25 @@ select, option {
   width: 100%;
   overflow: hidden;
   background-color: var(--bg-primary);
+  /* Held off the side cutouts. In portrait both of these are 0px; in landscape
+     they are what keeps the header buttons and the first column of cards out
+     from under the camera housing. The top edge is deliberately not inset here
+     -- the header handles its own, so its background still reaches the top of
+     the screen instead of leaving a bare strip above it. */
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+}
+
+/*
+  The bar with the sidebar toggle, the tabs and the document actions.
+
+  Its height carries the status bar inset on top of its own 3rem so the
+  toggle sits below the clock rather than behind it, while the bar's
+  background fills the strip the clock is drawn on.
+*/
+.app-header {
+  height: calc(3rem + var(--safe-top));
+  padding-top: var(--safe-top);
 }
 
 /* Hides an element while keeping it in the accessibility tree's reach for
@@ -995,7 +1031,14 @@ select, option {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  /* The scrim covers the whole screen, but the dialog on top of it has to stay
+     inside the usable area -- a tall modal in landscape would otherwise put its
+     close button under the camera housing. */
+  padding:
+    calc(1rem + var(--safe-top))
+    calc(1rem + var(--safe-right))
+    calc(1rem + var(--safe-bottom))
+    calc(1rem + var(--safe-left));
 }
 @supports (backdrop-filter: blur(4px)) {
   .fixed-overlay {
@@ -1723,14 +1766,25 @@ select, option {
     z-index: 60;
     width: min(85vw, 320px);
     box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+    /* A fixed element is positioned against the viewport, so it ignores the
+       padding on .app-container and has to hold itself off the edges. */
+    padding-top: var(--safe-top);
+    padding-bottom: var(--safe-bottom);
   }
 
   .sidebar {
     left: 0;
+    /* Padded rather than moved, so the drawer's background still runs to the
+       edge of the screen, and widened by the same amount so the rows inside
+       keep their full width. */
+    padding-left: var(--safe-left);
+    width: calc(min(85vw, 320px) + var(--safe-left));
   }
 
   .inspector-pane {
     right: 0;
+    padding-right: var(--safe-right);
+    width: calc(min(85vw, 320px) + var(--safe-right));
   }
 
 
